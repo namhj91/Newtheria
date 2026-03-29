@@ -157,14 +157,14 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.29(260329-시작화면카드셔플안정화)</button>
+      <button id="easterEgg" type="button">ver.0.0.28(260329-카드셔플드래그연출개선)</button>
     </footer>
   </main>
 
 
   <script>
     const menu = document.getElementById('menu');
-    let cards = [...menu.querySelectorAll('.card')];
+    const cards = [...menu.querySelectorAll('.card')];
     const overlay = document.querySelector('.overlay');
     const eggButton = document.getElementById('easterEgg');
     const dragState = {
@@ -189,16 +189,7 @@
         card.style.setProperty('--rot', `${rot}deg`);
         card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
         card.style.transform = card.dataset.baseTransform;
-        card.style.zIndex = String(100 + i);
       });
-    };
-
-    const shuffleCardOrder = () => {
-      for (let i = cards.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [cards[i], cards[j]] = [cards[j], cards[i]];
-      }
-      cards.forEach((card) => menu.appendChild(card));
     };
 
 
@@ -223,35 +214,34 @@
       await Promise.all(cards.map((card, i) => card.animate([
         { transform: card.dataset.baseTransform },
         { transform: stackTransform }
-      ], { duration: 280, delay: i * 35, easing: 'cubic-bezier(0.16, 0.84, 0.44, 1)' }).finished));
-      cards.forEach((card) => { card.style.transform = stackTransform; });
-
-      // 2) Flip (deck)
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `${stackTransform} rotateY(0deg)` },
-        { transform: `${stackTransform} rotateY(180deg)` }
       ], { duration: 260, easing: 'ease-in-out' }).finished));
       cards.forEach((card) => { card.style.transform = stackTransform; });
 
-      // 3) Spin each card around its own center (alternating direction)
+      // 2) Flip
+      await Promise.all(cards.map((card, i) => card.animate([
+        { transform: `${stackTransform} rotateY(0deg)` },
+        { transform: `${stackTransform} rotateY(180deg)` }
+      ], { duration: 240, easing: 'ease-in-out' }).finished));
+      cards.forEach((card) => { card.style.transform = stackTransform; });
+
+      // 3) Spin each card around its own center (3 turns; alternating direction)
       await Promise.all(cards.map((card, i) => {
         const direction = i % 2 === 0 ? 1 : -1;
         return card.animate([
           { transform: `${stackTransform} rotate(${direction * 0}deg)` },
-          { transform: `${stackTransform} rotate(${direction * 720}deg)` }
-        ], { duration: 520, delay: i * 24, easing: 'ease-in-out' }).finished;
+          { transform: `${stackTransform} rotate(${direction * 1080}deg)` }
+        ], { duration: 640, easing: 'ease-in-out' }).finished;
       }));
       cards.forEach((card) => { card.style.transform = stackTransform; });
 
-      // 4) Shuffle card order then re-fan
-      shuffleCardOrder();
+      // 4) Return to each card position
       layoutCards();
       await Promise.all(cards.map((card, i) => {
         const target = card.dataset.baseTransform;
         return card.animate([
           { transform: stackTransform },
           { transform: target }
-        ], { duration: 340 + i * 60, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
+        ], { duration: 320 + i * 50, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
       }));
 
       // 5) Flip back one by one

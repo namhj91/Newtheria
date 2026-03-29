@@ -56,7 +56,7 @@
       aspect-ratio: var(--card-ratio);
       border-radius: 16px;
       border: 1px solid rgba(180, 202, 255, .6);
-      background: linear-gradient(165deg, rgba(30, 43, 88, .88), rgba(18, 27, 57, .74));
+      background: linear-gradient(165deg, rgba(30, 43, 88, 1), rgba(18, 27, 57, 1));
       color: var(--text);
       box-shadow: 0 14px 26px rgba(0,0,0,.34);
       padding: 18px 16px;
@@ -95,11 +95,11 @@
 
     .meta {
       display: flex;
-      justify-content: space-between;
-      align-items: end;
+      justify-content: center;
+      align-items: center;
       gap: 12px;
       font-size: .86rem;
-      opacity: .82;
+      opacity: .9;
     }
     .meta button {
       border: 0;
@@ -110,19 +110,11 @@
       font: inherit;
       text-decoration: underline;
       text-underline-offset: 3px;
+      white-space: normal;
+      text-align: center;
+      max-width: 100%;
     }
 
-    .hint {
-      position: fixed;
-      right: 22px;
-      bottom: 52px;
-      font-size: .84rem;
-      color: rgba(232, 240, 255, .92);
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity .2s ease, transform .2s ease;
-    }
-    .hint.show { opacity: 1; transform: translateY(0); }
 
     .overlay.play { background: radial-gradient(circle at center, rgba(255,255,255,.09) 0, rgba(3,7,18,.58) 70%); }
 
@@ -132,6 +124,8 @@
     @media (max-width: 760px) {
       :root { --card-w: min(38vw, 184px); --fan-gap: 52px; --fan-tilt: 9deg; }
       .menu { height: min(58vh, 420px); }
+      .screen { padding: 34px 14px 12px; }
+      .meta { font-size: .8rem; }
     }
   </style>
 </head>
@@ -156,17 +150,14 @@
     </section>
 
     <footer class="meta">
-      <span>카드 베이스: 황금비(1:1.618) · Fan 배치</span>
-      <button id="easterEgg" type="button">변경 이력 / 셔플 연출</button>
+      <button id="easterEgg" type="button">ver.0.0.27(260329-시작화면버전표시개선)</button>
     </footer>
   </main>
 
-  <div id="hint" class="hint" role="status" aria-live="polite"></div>
 
   <script>
     const menu = document.getElementById('menu');
     const cards = [...menu.querySelectorAll('.card')];
-    const hint = document.getElementById('hint');
     const overlay = document.querySelector('.overlay');
     const eggButton = document.getElementById('easterEgg');
 
@@ -184,12 +175,6 @@
       });
     };
 
-    const showHint = (text, delay = 1400) => {
-      hint.textContent = text;
-      hint.classList.add('show');
-      clearTimeout(window.__hintTimer);
-      window.__hintTimer = setTimeout(() => hint.classList.remove('show'), delay);
-    };
 
     menu.addEventListener('click', (e) => {
       const card = e.target.closest('.card');
@@ -198,7 +183,6 @@
       cards.forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       overlay.classList.add('play');
-      showHint(`선택: ${card.querySelector('.label').textContent} · 전환 연출 준비 중`);
       setTimeout(() => overlay.classList.remove('play'), 620);
     });
 
@@ -235,7 +219,6 @@
       ], { duration: 250 + i * 40, easing: 'ease-out' }).finished));
 
       menu.classList.remove('rerolling');
-      showHint('리롤 완료: 수렴 → 뒤집힘 → 셔플 → 재전개');
     };
 
     eggButton.addEventListener('click', playReroll);

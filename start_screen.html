@@ -65,6 +65,8 @@
       transform-origin: 50% 86%;
       transition: transform .25s ease, box-shadow .25s ease, filter .25s ease, opacity .25s ease;
       backface-visibility: hidden;
+      touch-action: none;
+      user-select: none;
     }
     .card::after {
       content: "";
@@ -92,6 +94,11 @@
     }
 
     .menu.rerolling .card { pointer-events: none; }
+    .card.dragging {
+      transition: none;
+      z-index: 30;
+      box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
+    }
 
     .meta {
       display: flex;
@@ -150,7 +157,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.27(260329-시작화면버전표시개선)</button>
+      <button id="easterEgg" type="button">ver.0.0.28(260329-카드셔플드래그연출개선)</button>
     </footer>
   </main>
 
@@ -160,6 +167,15 @@
     const cards = [...menu.querySelectorAll('.card')];
     const overlay = document.querySelector('.overlay');
     const eggButton = document.getElementById('easterEgg');
+    const dragState = {
+      pointerId: null,
+      card: null,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      moved: false
+    };
 
     const layoutCards = () => {
       const mid = (cards.length - 1) / 2;
@@ -171,7 +187,8 @@
         card.style.setProperty('--tx', `${tx}px`);
         card.style.setProperty('--ty', `${ty}px`);
         card.style.setProperty('--rot', `${rot}deg`);
-        card.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+        card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+        card.style.transform = card.dataset.baseTransform;
       });
     };
 
@@ -191,35 +208,104 @@
       menu.classList.remove('selecting');
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
+      const stackTransform = 'translate(0px, 0px) rotate(0deg)';
 
       // 1) Collect
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: card.style.transform },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
-      ], { duration: 220, easing: 'ease-in' }).finished));
+        { transform: card.dataset.baseTransform },
+        { transform: stackTransform }
+      ], { duration: 260, easing: 'ease-in-out' }).finished));
+      cards.forEach((card) => { card.style.transform = stackTransform; });
 
       // 2) Flip
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(0deg)` },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(180deg)` }
-      ], { duration: 190, easing: 'ease-in-out' }).finished));
+        { transform: `${stackTransform} rotateY(0deg)` },
+        { transform: `${stackTransform} rotateY(180deg)` }
+      ], { duration: 240, easing: 'ease-in-out' }).finished));
+      cards.forEach((card) => { card.style.transform = stackTransform; });
 
-      // 3) Shuffle
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` },
-        { transform: `translate(${(Math.random() - .5) * 84}px, ${-20 + Math.random() * 34}px) rotate(${(Math.random() - .5) * 24}deg)` },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
-      ], { duration: 300, easing: 'ease-in-out' }).finished));
+      // 3) Spin each card around its own center (3 turns; alternating direction)
+      await Promise.all(cards.map((card, i) => {
+        const direction = i % 2 === 0 ? 1 : -1;
+        return card.animate([
+          { transform: `${stackTransform} rotate(${direction * 0}deg)` },
+          { transform: `${stackTransform} rotate(${direction * 1080}deg)` }
+        ], { duration: 640, easing: 'ease-in-out' }).finished;
+      }));
+      cards.forEach((card) => { card.style.transform = stackTransform; });
 
-      // 4) Re-fan
+      // 4) Return to each card position
       layoutCards();
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(0px, 0px) rotate(0deg)` },
-        { transform: card.style.transform }
-      ], { duration: 250 + i * 40, easing: 'ease-out' }).finished));
+      await Promise.all(cards.map((card, i) => {
+        const target = card.dataset.baseTransform;
+        return card.animate([
+          { transform: stackTransform },
+          { transform: target }
+        ], { duration: 320 + i * 50, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
+      }));
+
+      // 5) Flip back one by one
+      for (const card of cards) {
+        await card.animate([
+          { transform: `${card.dataset.baseTransform} rotateY(180deg)` },
+          { transform: `${card.dataset.baseTransform} rotateY(0deg)` }
+        ], { duration: 180, easing: 'ease-in-out' }).finished;
+        card.style.transform = card.dataset.baseTransform;
+      }
 
       menu.classList.remove('rerolling');
     };
+
+    const resetDraggedCard = (card) => {
+      card.classList.remove('dragging');
+      card.style.transition = 'transform .4s cubic-bezier(0.18, 0.9, 0.35, 1.2)';
+      card.style.transform = card.dataset.baseTransform;
+      window.setTimeout(() => {
+        card.style.transition = '';
+      }, 420);
+    };
+
+    const onPointerMove = (e) => {
+      if (!dragState.card || dragState.pointerId !== e.pointerId) return;
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+      if (Math.hypot(dx, dy) > 5) dragState.moved = true;
+      dragState.card.style.transform = `translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
+    };
+
+    const onPointerUp = (e) => {
+      if (!dragState.card || dragState.pointerId !== e.pointerId) return;
+      const card = dragState.card;
+      card.releasePointerCapture(e.pointerId);
+      resetDraggedCard(card);
+      dragState.pointerId = null;
+      dragState.card = null;
+    };
+
+    cards.forEach((card) => {
+      card.addEventListener('pointerdown', (e) => {
+        if (menu.classList.contains('rerolling')) return;
+        dragState.pointerId = e.pointerId;
+        dragState.card = card;
+        dragState.startX = e.clientX;
+        dragState.startY = e.clientY;
+        dragState.offsetX = parseFloat(card.style.getPropertyValue('--tx')) || 0;
+        dragState.offsetY = parseFloat(card.style.getPropertyValue('--ty')) || 0;
+        dragState.moved = false;
+        card.classList.add('dragging');
+        card.setPointerCapture(e.pointerId);
+      });
+      card.addEventListener('pointermove', onPointerMove);
+      card.addEventListener('pointerup', onPointerUp);
+      card.addEventListener('pointercancel', onPointerUp);
+      card.addEventListener('click', (e) => {
+        if (dragState.moved) {
+          e.preventDefault();
+          e.stopPropagation();
+          dragState.moved = false;
+        }
+      });
+    });
 
     eggButton.addEventListener('click', playReroll);
     window.addEventListener('resize', layoutCards);

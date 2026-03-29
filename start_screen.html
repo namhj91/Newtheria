@@ -65,9 +65,6 @@
       transform-origin: 50% 86%;
       transition: transform .25s ease, box-shadow .25s ease, filter .25s ease, opacity .25s ease;
       backface-visibility: hidden;
-      transform-style: preserve-3d;
-      user-select: none;
-      touch-action: none;
     }
     .card::after {
       content: "";
@@ -76,48 +73,6 @@
       border-radius: 12px;
       border: 1px solid rgba(184, 205, 255, 0.2);
       pointer-events: none;
-    }
-    .card-face {
-      position: absolute;
-      inset: 0;
-      border-radius: 16px;
-      padding: 18px 16px;
-      backface-visibility: hidden;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-    }
-    .card-front {
-      background: linear-gradient(165deg, rgba(30, 43, 88, 1), rgba(18, 27, 57, 1));
-    }
-    .card-back {
-      transform: rotateY(180deg);
-      background:
-        radial-gradient(circle at 50% 30%, rgba(205, 224, 255, .24), transparent 40%),
-        repeating-radial-gradient(circle at center, rgba(168, 197, 255, .2) 0 8px, rgba(30, 46, 89, .35) 8px 16px),
-        linear-gradient(155deg, rgba(31, 43, 82, 1), rgba(19, 28, 54, 1));
-      border: 1px solid rgba(177, 204, 255, .46);
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-    }
-    .card-back::before {
-      content: "✦";
-      font-size: 2.4rem;
-      color: rgba(232, 242, 255, .92);
-      text-shadow: 0 0 14px rgba(138, 176, 255, .85);
-    }
-    .card-back::after {
-      content: "";
-      width: 65%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(215, 232, 255, .75), transparent);
-      border-radius: 999px;
-    }
-    .card .icon {
-      font-size: 1.45rem;
-      margin-bottom: 8px;
-      filter: drop-shadow(0 0 8px rgba(148, 190, 255, .4));
     }
     .card .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
     .card .desc { font-size: .89rem; line-height: 1.45; opacity: .84; }
@@ -187,27 +142,15 @@
 
     <section class="fan-zone" aria-label="시작 카드 선택지">
       <div class="menu" id="menu">
-        <button class="card" type="button" data-route="new">
-          <span class="card-face card-front"><span class="icon" aria-hidden="true">🧭</span><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></span>
-          <span class="card-face card-back" aria-hidden="true"></span>
-        </button>
-        <button class="card" type="button" data-route="continue">
-          <span class="card-face card-front"><span class="icon" aria-hidden="true">📜</span><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></span>
-          <span class="card-face card-back" aria-hidden="true"></span>
-        </button>
-        <button class="card" type="button" data-route="codex">
-          <span class="card-face card-front"><span class="icon" aria-hidden="true">🗺️</span><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></span>
-          <span class="card-face card-back" aria-hidden="true"></span>
-        </button>
-        <button class="card" type="button" data-route="mods">
-          <span class="card-face card-front"><span class="icon" aria-hidden="true">⚙️</span><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></span>
-          <span class="card-face card-back" aria-hidden="true"></span>
-        </button>
+        <button class="card" type="button" data-route="new"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></button>
+        <button class="card" type="button" data-route="continue"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></button>
+        <button class="card" type="button" data-route="codex"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></button>
+        <button class="card" type="button" data-route="mods"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></button>
       </div>
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.28(260329-카드셔플드래그연출강화)</button>
+      <button id="easterEgg" type="button">ver.0.0.27(260329-시작화면버전표시개선)</button>
     </footer>
   </main>
 
@@ -217,13 +160,6 @@
     const cards = [...menu.querySelectorAll('.card')];
     const overlay = document.querySelector('.overlay');
     const eggButton = document.getElementById('easterEgg');
-    const dragState = {
-      card: null,
-      pointerId: null,
-      startX: 0,
-      startY: 0,
-      moved: false
-    };
 
     const layoutCards = () => {
       const mid = (cards.length - 1) / 2;
@@ -235,7 +171,6 @@
         card.style.setProperty('--tx', `${tx}px`);
         card.style.setProperty('--ty', `${ty}px`);
         card.style.setProperty('--rot', `${rot}deg`);
-        card.dataset.homeTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg) rotateY(0deg)`;
         card.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
       });
     };
@@ -244,7 +179,6 @@
     menu.addEventListener('click', (e) => {
       const card = e.target.closest('.card');
       if (!card || menu.classList.contains('rerolling')) return;
-      if (card.dataset.dragged === 'true') return;
       menu.classList.add('selecting');
       cards.forEach(c => c.classList.remove('active'));
       card.classList.add('active');
@@ -257,100 +191,35 @@
       menu.classList.remove('selecting');
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
-      cards.forEach(card => {
-        card.style.transition = 'none';
-        card.style.transform = card.dataset.homeTransform || card.style.transform;
-      });
-
-      const stackX = 0;
-      const stackY = -6;
-      const stackSpread = 6;
 
       // 1) Collect
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: card.dataset.homeTransform || card.style.transform },
-        { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(0deg) rotateY(0deg)` }
-      ], { duration: 260, easing: 'ease-in' }).finished));
+        { transform: card.style.transform },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
+      ], { duration: 220, easing: 'ease-in' }).finished));
 
-      // 2) Stack flip
+      // 2) Flip
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(0deg) rotateY(0deg)` },
-        { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(0deg) rotateY(180deg)` }
-      ], { duration: 220, easing: 'ease-in-out' }).finished));
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(0deg)` },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(180deg)` }
+      ], { duration: 190, easing: 'ease-in-out' }).finished));
 
-      // 3) 3x clockwise/counterclockwise spin while stacked
-      await Promise.all(cards.map((card, i) => {
-        const direction = i % 2 === 0 ? 1 : -1;
-        return card.animate([
-          { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(0deg) rotateY(180deg)` },
-          { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(${direction * 1080}deg) rotateY(180deg)` }
-        ], { duration: 760, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
-      }));
+      // 3) Shuffle
+      await Promise.all(cards.map((card, i) => card.animate([
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` },
+        { transform: `translate(${(Math.random() - .5) * 84}px, ${-20 + Math.random() * 34}px) rotate(${(Math.random() - .5) * 24}deg)` },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
+      ], { duration: 300, easing: 'ease-in-out' }).finished));
 
-      // 4) Move to each home position (still back side)
+      // 4) Re-fan
       layoutCards();
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${stackX + (i - 1.5) * stackSpread}px, ${stackY}px) rotate(0deg) rotateY(180deg)` },
-        { transform: `translate(${card.style.getPropertyValue('--tx')}, ${card.style.getPropertyValue('--ty')}) rotate(${card.style.getPropertyValue('--rot')}) rotateY(180deg)` }
-      ], { duration: 320 + i * 46, easing: 'ease-out' }).finished));
-
-      // 5) Flip to front one by one
-      for (let i = 0; i < cards.length; i += 1) {
-        const card = cards[i];
-        await card.animate([
-          { transform: `translate(${card.style.getPropertyValue('--tx')}, ${card.style.getPropertyValue('--ty')}) rotate(${card.style.getPropertyValue('--rot')}) rotateY(180deg)` },
-          { transform: `translate(${card.style.getPropertyValue('--tx')}, ${card.style.getPropertyValue('--ty')}) rotate(${card.style.getPropertyValue('--rot')}) rotateY(0deg)` }
-        ], { duration: 190, easing: 'ease-in-out' }).finished;
-      }
+        { transform: `translate(0px, 0px) rotate(0deg)` },
+        { transform: card.style.transform }
+      ], { duration: 250 + i * 40, easing: 'ease-out' }).finished));
 
       menu.classList.remove('rerolling');
-      layoutCards();
     };
-
-    const handlePointerDown = (e) => {
-      const card = e.target.closest('.card');
-      if (!card || menu.classList.contains('rerolling')) return;
-      dragState.card = card;
-      dragState.pointerId = e.pointerId;
-      dragState.startX = e.clientX;
-      dragState.startY = e.clientY;
-      dragState.moved = false;
-      card.setPointerCapture(e.pointerId);
-      card.style.transition = 'none';
-      card.style.zIndex = '20';
-    };
-
-    const handlePointerMove = (e) => {
-      if (!dragState.card || dragState.pointerId !== e.pointerId) return;
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      if (Math.hypot(dx, dy) > 4) dragState.moved = true;
-      dragState.card.style.transform = `${dragState.card.dataset.homeTransform || dragState.card.style.transform} translate(${dx}px, ${dy}px)`;
-    };
-
-    const releaseDrag = (e) => {
-      if (!dragState.card || dragState.pointerId !== e.pointerId) return;
-      const card = dragState.card;
-      card.releasePointerCapture(e.pointerId);
-      card.style.transition = 'transform .4s cubic-bezier(0.22, 1, 0.36, 1)';
-      card.style.transform = card.dataset.homeTransform || card.style.transform;
-      card.style.zIndex = '';
-      if (dragState.moved) {
-        card.dataset.dragged = 'true';
-        setTimeout(() => {
-          card.dataset.dragged = 'false';
-        }, 20);
-      }
-      dragState.card = null;
-      dragState.pointerId = null;
-      dragState.moved = false;
-    };
-
-    menu.addEventListener('pointerdown', handlePointerDown);
-    menu.addEventListener('pointermove', handlePointerMove);
-    menu.addEventListener('pointerup', releaseDrag);
-    menu.addEventListener('pointercancel', releaseDrag);
-    menu.addEventListener('lostpointercapture', releaseDrag);
 
     eggButton.addEventListener('click', playReroll);
     window.addEventListener('resize', layoutCards);

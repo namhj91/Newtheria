@@ -9,7 +9,7 @@
       --bg-1: #070b17;
       --bg-2: #16254e;
       --text: #e9efff;
-      --card-w: min(22vw, 220px);
+      --card-w: min(26vw, 288px);
       --card-ratio: 1 / 1.618;
       --fan-gap: 96px;
       --fan-tilt: 12deg;
@@ -114,8 +114,8 @@
       border: 1px solid rgba(194, 214, 255, .24);
       pointer-events: none;
     }
-    .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
-    .desc { font-size: .89rem; line-height: 1.45; opacity: .9; }
+    .label { display: block; font-size: 1.16rem; font-weight: 700; margin-bottom: 10px; }
+    .desc { font-size: .96rem; line-height: 1.5; opacity: .9; }
 
     .card-back {
       transform: rotateY(180deg);
@@ -128,14 +128,14 @@
     }
     .card-back::before {
       content: "✶";
-      font-size: 2.3rem;
+      font-size: 2.7rem;
       color: rgba(213, 226, 255, .92);
       text-shadow: 0 0 16px rgba(168, 197, 255, .8);
     }
     .card-back::after {
       content: "";
       position: absolute;
-      width: 62%;
+      width: 72%;
       aspect-ratio: 1;
       border-radius: 50%;
       border: 1px solid rgba(211, 226, 255, .55);
@@ -173,7 +173,7 @@
     @keyframes pulse { 0%,100%{opacity:.38;} 50%{opacity:.92;} }
 
     @media (max-width: 760px) {
-      :root { --card-w: min(38vw, 182px); --fan-gap: 52px; --fan-tilt: 9deg; }
+      :root { --card-w: min(46vw, 236px); --fan-gap: 52px; --fan-tilt: 9deg; }
       .menu { height: min(60vh, 430px); }
       .screen { padding: 36px 10px 30px; }
       .version-trigger { font-size: .76rem; padding: 8px; }
@@ -202,7 +202,7 @@
     </section>
   </main>
 
-  <button id="versionTrigger" class="version-trigger" type="button">ver.0.0.23(260329-시작화면셔플드래그개선)</button>
+  <button id="versionTrigger" class="version-trigger" type="button">ver.0.0.25(260329-카드페이스크기보강)</button>
 
   <script>
     const menu = document.getElementById('menu');

@@ -11,8 +11,8 @@
       --text: #e9efff;
       --card-w: min(22vw, 220px);
       --card-ratio: 1 / 1.618;
-      --fan-gap: 92px;
-      --fan-tilt: 13deg;
+      --fan-gap: 96px;
+      --fan-tilt: 12deg;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,20 +22,36 @@
       font-family: "Pretendard", "Noto Sans KR", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at 15% 20%, rgba(62, 99, 196, 0.3), transparent 35%),
+        radial-gradient(circle at 15% 20%, rgba(62, 99, 196, 0.32), transparent 35%),
         radial-gradient(circle at 82% 10%, rgba(107, 59, 199, 0.22), transparent 30%),
         linear-gradient(160deg, var(--bg-1), var(--bg-2));
     }
-    .stars, .twinkle, .overlay { position: fixed; inset: 0; pointer-events: none; }
+
+    .stars, .twinkle, .overlay, #constellation {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
     .stars::before, .stars::after, .twinkle::before, .twinkle::after {
-      content: ""; position: absolute; inset: -20%; background-repeat: repeat; background-size: 300px 300px;
+      content: "";
+      position: absolute;
+      inset: -20%;
+      background-repeat: repeat;
+      background-size: 300px 300px;
     }
     .stars::before { background-image: radial-gradient(circle, rgba(234, 243, 255, .9) 1px, transparent 2px); animation: drift 70s linear infinite; }
     .stars::after { background-image: radial-gradient(circle, rgba(146, 181, 255, .9) 1.2px, transparent 2px); animation: drift 95s linear infinite reverse; opacity: .45; }
     .twinkle::before { background-image: radial-gradient(circle, rgba(255, 255, 255, .9) 1px, transparent 2px); animation: pulse 5s ease-in-out infinite; }
-    .twinkle::after { background-image: radial-gradient(circle, rgba(145, 179, 255, .7) 1px, transparent 2px); animation: pulse 8s ease-in-out infinite reverse; opacity: .55; }
+    .twinkle::after { background-image: radial-gradient(circle, rgba(145, 179, 255, .75) 1px, transparent 2px); animation: pulse 8s ease-in-out infinite reverse; opacity: .55; }
 
-    .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
+    .screen {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 44px 24px 24px;
+    }
     .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
     .logo h1 { margin: 0; letter-spacing: .12em; font-size: clamp(2rem, 5.4vw, 4rem); }
     .logo p { margin: 10px 0 0; opacity: .8; letter-spacing: .12em; font-size: clamp(.82rem, 1.6vw, 1rem); }
@@ -44,98 +60,128 @@
     .menu {
       position: relative;
       width: min(980px, 96vw);
-      height: min(62vh, 480px);
+      height: min(62vh, 490px);
       display: flex;
       justify-content: center;
       align-items: center;
+      touch-action: none;
     }
 
     .card {
       position: absolute;
       width: var(--card-w);
       aspect-ratio: var(--card-ratio);
-      border-radius: 16px;
-      border: 1px solid rgba(180, 202, 255, .6);
-      background: linear-gradient(165deg, rgba(30, 43, 88, .88), rgba(18, 27, 57, .74));
-      color: var(--text);
-      box-shadow: 0 14px 26px rgba(0,0,0,.34);
-      padding: 18px 16px;
-      text-align: left;
-      cursor: pointer;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: grab;
+      transform-style: preserve-3d;
       transform-origin: 50% 86%;
-      transition: transform .25s ease, box-shadow .25s ease, filter .25s ease, opacity .25s ease;
-      backface-visibility: hidden;
+      transition: filter .2s ease, opacity .2s ease;
+      user-select: none;
     }
-    .card::after {
+    .card:active { cursor: grabbing; }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform .5s ease;
+      border-radius: 16px;
+      box-shadow: 0 16px 30px rgba(0,0,0,.36);
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      backface-visibility: hidden;
+      overflow: hidden;
+      border: 1px solid #9eb8ff;
+    }
+
+    .card-front {
+      background: linear-gradient(165deg, #263872 0%, #16264f 100%);
+      color: var(--text);
+      padding: 18px 16px;
+    }
+    .card-front::after {
       content: "";
       position: absolute;
       inset: 8px;
       border-radius: 12px;
-      border: 1px solid rgba(184, 205, 255, 0.2);
+      border: 1px solid rgba(194, 214, 255, .24);
       pointer-events: none;
     }
-    .card .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
-    .card .desc { font-size: .89rem; line-height: 1.45; opacity: .84; }
+    .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
+    .desc { font-size: .89rem; line-height: 1.45; opacity: .9; }
 
-    .card:hover, .card:focus-visible {
-      transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) translateY(-12px) scale(1.04);
-      box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
-      outline: none;
-      z-index: 10;
+    .card-back {
+      transform: rotateY(180deg);
+      background:
+        radial-gradient(circle at center, #90aefc 0 2px, transparent 3px),
+        repeating-linear-gradient(45deg, #1a2754 0 8px, #22346f 8px 16px),
+        linear-gradient(160deg, #1a2754, #131d3f);
+      display: grid;
+      place-items: center;
+    }
+    .card-back::before {
+      content: "✶";
+      font-size: 2.3rem;
+      color: rgba(213, 226, 255, .92);
+      text-shadow: 0 0 16px rgba(168, 197, 255, .8);
+    }
+    .card-back::after {
+      content: "";
+      position: absolute;
+      width: 62%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1px solid rgba(211, 226, 255, .55);
+      box-shadow: inset 0 0 0 1px rgba(146, 176, 255, .35);
     }
 
-    .menu.selecting .card:not(.active) { opacity: .32; filter: saturate(.65); }
-    .menu.selecting .card.active {
-      transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) translateY(-18px) scale(1.07);
-      box-shadow: 0 0 30px rgba(145,183,255,.52), 0 16px 30px rgba(0,0,0,.35);
-      z-index: 11;
+    .card:hover .card-inner,
+    .card:focus-visible .card-inner {
+      box-shadow: 0 0 24px rgba(139, 174, 255, .46), 0 16px 28px rgba(0,0,0,.34);
     }
 
+    .menu.selecting .card:not(.active) { opacity: .36; filter: saturate(.68); }
+    .menu.selecting .card.active { z-index: 14; }
     .menu.rerolling .card { pointer-events: none; }
 
-    .meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 12px;
-      font-size: .86rem;
-      opacity: .82;
-    }
-    .meta button {
-      border: 0;
-      color: #dbe6ff;
-      background: transparent;
-      cursor: pointer;
-      padding: 4px 2px;
-      font: inherit;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-
-    .hint {
+    .version-trigger {
       position: fixed;
-      right: 22px;
-      bottom: 52px;
-      font-size: .84rem;
-      color: rgba(232, 240, 255, .92);
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity .2s ease, transform .2s ease;
+      z-index: 3;
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(10px, env(safe-area-inset-bottom));
+      border: 0;
+      background: transparent;
+      color: rgba(228, 238, 255, .9);
+      font: 600 0.82rem/1.2 "Pretendard", "Noto Sans KR", sans-serif;
+      letter-spacing: .01em;
+      cursor: pointer;
+      padding: 8px 10px;
+      white-space: nowrap;
+      text-shadow: 0 0 10px rgba(120, 160, 255, .35);
     }
-    .hint.show { opacity: 1; transform: translateY(0); }
 
-    .overlay.play { background: radial-gradient(circle at center, rgba(255,255,255,.09) 0, rgba(3,7,18,.58) 70%); }
+    .overlay.play { background: radial-gradient(circle at center, rgba(255,255,255,.11) 0, rgba(3,7,18,.6) 72%); }
 
     @keyframes drift { from { transform: translate3d(0,0,0);} to { transform: translate3d(-240px,-170px,0);} }
     @keyframes pulse { 0%,100%{opacity:.38;} 50%{opacity:.92;} }
 
     @media (max-width: 760px) {
-      :root { --card-w: min(38vw, 184px); --fan-gap: 52px; --fan-tilt: 9deg; }
-      .menu { height: min(58vh, 420px); }
+      :root { --card-w: min(38vw, 182px); --fan-gap: 52px; --fan-tilt: 9deg; }
+      .menu { height: min(60vh, 430px); }
+      .screen { padding: 36px 10px 30px; }
+      .version-trigger { font-size: .76rem; padding: 8px; }
     }
   </style>
 </head>
 <body>
+  <canvas id="constellation" aria-hidden="true"></canvas>
   <div class="stars" aria-hidden="true"></div>
   <div class="twinkle" aria-hidden="true"></div>
   <div class="overlay" aria-hidden="true"></div>
@@ -148,99 +194,245 @@
 
     <section class="fan-zone" aria-label="시작 카드 선택지">
       <div class="menu" id="menu">
-        <button class="card" type="button" data-route="new"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></button>
-        <button class="card" type="button" data-route="continue"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></button>
-        <button class="card" type="button" data-route="codex"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></button>
-        <button class="card" type="button" data-route="mods"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></button>
+        <button class="card" type="button" data-route="new"><span class="card-inner"><span class="card-face card-front"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></span><span class="card-face card-back"></span></span></button>
+        <button class="card" type="button" data-route="continue"><span class="card-inner"><span class="card-face card-front"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></span><span class="card-face card-back"></span></span></button>
+        <button class="card" type="button" data-route="codex"><span class="card-inner"><span class="card-face card-front"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></span><span class="card-face card-back"></span></span></button>
+        <button class="card" type="button" data-route="mods"><span class="card-inner"><span class="card-face card-front"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></span><span class="card-face card-back"></span></span></button>
       </div>
     </section>
-
-    <footer class="meta">
-      <span>카드 베이스: 황금비(1:1.618) · Fan 배치</span>
-      <button id="easterEgg" type="button">변경 이력 / 셔플 연출</button>
-    </footer>
   </main>
 
-  <div id="hint" class="hint" role="status" aria-live="polite"></div>
+  <button id="versionTrigger" class="version-trigger" type="button">ver.0.0.23(260329-시작화면셔플드래그개선)</button>
 
   <script>
     const menu = document.getElementById('menu');
     const cards = [...menu.querySelectorAll('.card')];
-    const hint = document.getElementById('hint');
     const overlay = document.querySelector('.overlay');
-    const eggButton = document.getElementById('easterEgg');
+    const versionTrigger = document.getElementById('versionTrigger');
+
+    const buildBaseTransform = (card) => {
+      const tx = card.dataset.tx || '0';
+      const ty = card.dataset.ty || '0';
+      const rot = card.dataset.rot || '0';
+      const flip = card.dataset.flip || '0';
+      return `translate(${tx}px, ${ty}px) rotate(${rot}deg) rotateY(${flip}deg)`;
+    };
+
+    const setCardTransform = (card) => {
+      card.style.transform = buildBaseTransform(card);
+    };
 
     const layoutCards = () => {
+      const style = getComputedStyle(document.documentElement);
+      const gap = parseFloat(style.getPropertyValue('--fan-gap'));
+      const tilt = parseFloat(style.getPropertyValue('--fan-tilt'));
       const mid = (cards.length - 1) / 2;
       cards.forEach((card, i) => {
         const offset = i - mid;
-        const tx = offset * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fan-gap'));
-        const ty = Math.abs(offset) * 14;
-        const rot = offset * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fan-tilt'));
-        card.style.setProperty('--tx', `${tx}px`);
-        card.style.setProperty('--ty', `${ty}px`);
-        card.style.setProperty('--rot', `${rot}deg`);
-        card.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+        card.dataset.tx = String(offset * gap);
+        card.dataset.ty = String(Math.abs(offset) * 14);
+        card.dataset.rot = String(offset * tilt);
+        if (!card.dataset.flip) card.dataset.flip = '0';
+        setCardTransform(card);
       });
     };
 
-    const showHint = (text, delay = 1400) => {
-      hint.textContent = text;
-      hint.classList.add('show');
-      clearTimeout(window.__hintTimer);
-      window.__hintTimer = setTimeout(() => hint.classList.remove('show'), delay);
-    };
-
-    menu.addEventListener('click', (e) => {
-      const card = e.target.closest('.card');
-      if (!card || menu.classList.contains('rerolling')) return;
+    const selectCard = (card) => {
+      if (menu.classList.contains('rerolling')) return;
       menu.classList.add('selecting');
       cards.forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       overlay.classList.add('play');
-      showHint(`선택: ${card.querySelector('.label').textContent} · 전환 연출 준비 중`);
       setTimeout(() => overlay.classList.remove('play'), 620);
-    });
+    };
 
-    const playReroll = async () => {
+    const dragState = { active: false, card: null, moved: false, pointerId: null, offsetX: 0, offsetY: 0 };
+
+    const onPointerDown = (event) => {
+      const card = event.target.closest('.card');
+      if (!card || menu.classList.contains('rerolling')) return;
+      dragState.active = true;
+      dragState.card = card;
+      dragState.pointerId = event.pointerId;
+      dragState.moved = false;
+      const rect = card.getBoundingClientRect();
+      dragState.offsetX = event.clientX - (rect.left + rect.width / 2);
+      dragState.offsetY = event.clientY - (rect.top + rect.height / 2);
+      card.setPointerCapture(event.pointerId);
+      card.style.zIndex = '20';
+    };
+
+    const onPointerMove = (event) => {
+      if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+      const card = dragState.card;
+      dragState.moved = true;
+      const tx = event.clientX - window.innerWidth / 2 - dragState.offsetX;
+      const ty = event.clientY - window.innerHeight / 2 - dragState.offsetY;
+      card.style.transform = `translate(${tx}px, ${ty}px) rotate(0deg) rotateY(${card.dataset.flip || '0'}deg)`;
+    };
+
+    const releaseCard = async (event) => {
+      if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+      const card = dragState.card;
+      dragState.active = false;
+      dragState.card = null;
+      card.style.zIndex = '';
+      await card.animate([
+        { transform: card.style.transform },
+        { transform: buildBaseTransform(card) }
+      ], { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' }).finished;
+      setCardTransform(card);
+      if (!dragState.moved) selectCard(card);
+    };
+
+    menu.addEventListener('pointerdown', onPointerDown);
+    menu.addEventListener('pointermove', onPointerMove);
+    menu.addEventListener('pointerup', releaseCard);
+    menu.addEventListener('pointercancel', releaseCard);
+
+    const playFixedShuffle = async () => {
       if (menu.classList.contains('rerolling')) return;
       menu.classList.remove('selecting');
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
 
-      // 1) Collect
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: card.style.transform },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
-      ], { duration: 220, easing: 'ease-in' }).finished));
+      // 1) 중앙 수렴
+      await Promise.all(cards.map((card, i) => {
+        const collect = `translate(${(i - 1.5) * 10}px, 0px) rotate(0deg) rotateY(0deg)`;
+        return card.animate([{ transform: card.style.transform }, { transform: collect }], { duration: 240, easing: 'ease-in' }).finished;
+      }));
+      cards.forEach((card, i) => {
+        card.dataset.tx = String((i - 1.5) * 10);
+        card.dataset.ty = '0';
+        card.dataset.rot = '0';
+        card.dataset.flip = '0';
+        setCardTransform(card);
+      });
 
-      // 2) Flip
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(0deg)` },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(180deg)` }
-      ], { duration: 190, easing: 'ease-in-out' }).finished));
+      // 2) 카드 뭉치 뒤집힘
+      await Promise.all(cards.map(card => card.animate([
+        { transform: buildBaseTransform(card).replace('rotateY(0deg)', 'rotateY(0deg)') },
+        { transform: buildBaseTransform(card).replace('rotateY(0deg)', 'rotateY(180deg)') }
+      ], { duration: 220, easing: 'ease-in-out' }).finished));
+      cards.forEach(card => {
+        card.dataset.flip = '180';
+        setCardTransform(card);
+      });
 
-      // 3) Shuffle
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` },
-        { transform: `translate(${(Math.random() - .5) * 84}px, ${-20 + Math.random() * 34}px) rotate(${(Math.random() - .5) * 24}deg)` },
-        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
-      ], { duration: 300, easing: 'ease-in-out' }).finished));
+      // 3) 각 카드가 시계/반시계 방향으로 3회 회전
+      await Promise.all(cards.map((card, i) => {
+        const dir = i % 2 === 0 ? 1 : -1;
+        const spin = `translate(${card.dataset.tx}px, ${card.dataset.ty}px) rotate(${dir * 1080}deg) rotateY(180deg)`;
+        return card.animate([{ transform: buildBaseTransform(card) }, { transform: spin }], { duration: 520, easing: 'ease-in-out' }).finished;
+      }));
 
-      // 4) Re-fan
+      // 4) 각자 자리로 이동 (여전히 뒷면)
       layoutCards();
-      await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(0px, 0px) rotate(0deg)` },
-        { transform: card.style.transform }
-      ], { duration: 250 + i * 40, easing: 'ease-out' }).finished));
+      cards.forEach(card => { card.dataset.flip = '180'; setCardTransform(card); });
+      await Promise.all(cards.map(card => card.animate([
+        { transform: `translate(${card.dataset.tx}px, 0px) rotate(0deg) rotateY(180deg)` },
+        { transform: buildBaseTransform(card) }
+      ], { duration: 280, easing: 'ease-out' }).finished));
+
+      // 5) 한 장씩 다시 뒤집힘
+      for (const card of cards) {
+        await card.animate([
+          { transform: buildBaseTransform(card).replace('rotateY(180deg)', 'rotateY(180deg)') },
+          { transform: buildBaseTransform(card).replace('rotateY(180deg)', 'rotateY(0deg)') }
+        ], { duration: 180, easing: 'ease-in-out' }).finished;
+        card.dataset.flip = '0';
+        setCardTransform(card);
+      }
 
       menu.classList.remove('rerolling');
-      showHint('리롤 완료: 수렴 → 뒤집힘 → 셔플 → 재전개');
     };
 
-    eggButton.addEventListener('click', playReroll);
+    versionTrigger.addEventListener('click', playFixedShuffle);
     window.addEventListener('resize', layoutCards);
     layoutCards();
+
+    // 별자리 라인 연출
+    const canvas = document.getElementById('constellation');
+    const ctx = canvas.getContext('2d');
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth * window.devicePixelRatio;
+      canvas.height = window.innerHeight * window.devicePixelRatio;
+      ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const constellation = { active: false, points: [], alpha: 0, progress: 0, start: 0 };
+
+    const spawnConstellation = () => {
+      const count = 3 + Math.floor(Math.random() * 4);
+      const margin = 80;
+      const pts = Array.from({ length: count }, () => ({
+        x: margin + Math.random() * (window.innerWidth - margin * 2),
+        y: margin + Math.random() * (window.innerHeight - margin * 2)
+      }));
+      pts.sort((a, b) => a.x - b.x);
+      constellation.points = pts;
+      constellation.active = true;
+      constellation.alpha = 0;
+      constellation.progress = 0;
+      constellation.start = performance.now();
+    };
+
+    const draw = (now) => {
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      if (constellation.active) {
+        const elapsed = now - constellation.start;
+        const drawTime = 900;
+        const holdTime = 450;
+        const fadeTime = 700;
+        if (elapsed < drawTime) {
+          constellation.progress = elapsed / drawTime;
+          constellation.alpha = 0.85;
+        } else if (elapsed < drawTime + holdTime) {
+          constellation.progress = 1;
+          constellation.alpha = 0.85;
+        } else if (elapsed < drawTime + holdTime + fadeTime) {
+          constellation.progress = 1;
+          constellation.alpha = 1 - (elapsed - drawTime - holdTime) / fadeTime;
+        } else {
+          constellation.active = false;
+        }
+
+        if (constellation.active) {
+          const pts = constellation.points;
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = `rgba(180,205,255,${0.8 * constellation.alpha})`;
+          ctx.shadowColor = `rgba(160,190,255,${0.55 * constellation.alpha})`;
+          ctx.shadowBlur = 9;
+          ctx.beginPath();
+          for (let i = 0; i < pts.length - 1; i++) {
+            const p1 = pts[i];
+            const p2 = pts[i + 1];
+            const local = Math.max(0, Math.min(1, constellation.progress * (pts.length - 1) - i));
+            const x = p1.x + (p2.x - p1.x) * local;
+            const y = p1.y + (p2.y - p1.y) * local;
+            if (i === 0) ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          ctx.shadowBlur = 14;
+          pts.forEach(p => {
+            ctx.fillStyle = `rgba(225,238,255,${0.95 * constellation.alpha})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2.3, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          ctx.shadowBlur = 0;
+        }
+      }
+      requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+    setInterval(() => {
+      if (!constellation.active && Math.random() > 0.4) spawnConstellation();
+    }, 2200);
   </script>
 </body>
 </html>

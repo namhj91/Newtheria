@@ -13,7 +13,6 @@
       --card-ratio: 1 / 1.618;
       --fan-gap: 92px;
       --fan-tilt: 13deg;
-      --ver: "ver.0.0.1(260329-카드연출개편)";
     }
     * { box-sizing: border-box; }
     body {
@@ -27,8 +26,7 @@
         radial-gradient(circle at 82% 10%, rgba(107, 59, 199, 0.22), transparent 30%),
         linear-gradient(160deg, var(--bg-1), var(--bg-2));
     }
-
-    .stars, .twinkle, .overlay, .constellation { position: fixed; inset: 0; pointer-events: none; }
+    .stars, .twinkle, .overlay { position: fixed; inset: 0; pointer-events: none; }
     .stars::before, .stars::after, .twinkle::before, .twinkle::after {
       content: ""; position: absolute; inset: -20%; background-repeat: repeat; background-size: 300px 300px;
     }
@@ -37,21 +35,7 @@
     .twinkle::before { background-image: radial-gradient(circle, rgba(255, 255, 255, .9) 1px, transparent 2px); animation: pulse 5s ease-in-out infinite; }
     .twinkle::after { background-image: radial-gradient(circle, rgba(145, 179, 255, .7) 1px, transparent 2px); animation: pulse 8s ease-in-out infinite reverse; opacity: .55; }
 
-    .constellation svg { width: 100%; height: 100%; opacity: .5; }
-    .constellation .line {
-      fill: none;
-      stroke: rgba(165, 200, 255, .6);
-      stroke-width: 1.3;
-      stroke-dasharray: 5 12;
-      animation: lineFlow 7s linear infinite;
-    }
-    .constellation .dot {
-      fill: rgba(220, 234, 255, .88);
-      filter: drop-shadow(0 0 8px rgba(183, 210, 255, .75));
-      animation: starBlink 2.8s ease-in-out infinite;
-    }
-
-    .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 20px 16px; }
+    .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
     .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
     .logo h1 { margin: 0; letter-spacing: .12em; font-size: clamp(2rem, 5.4vw, 4rem); }
     .logo p { margin: 10px 0 0; opacity: .8; letter-spacing: .12em; font-size: clamp(.82rem, 1.6vw, 1rem); }
@@ -64,86 +48,38 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      perspective: 1300px;
     }
 
     .card {
       position: absolute;
       width: var(--card-w);
       aspect-ratio: var(--card-ratio);
-      border: 0;
-      background: none;
-      padding: 0;
+      border-radius: 16px;
+      border: 1px solid rgba(180, 202, 255, .6);
+      background: linear-gradient(165deg, rgba(30, 43, 88, .88), rgba(18, 27, 57, .74));
+      color: var(--text);
+      box-shadow: 0 14px 26px rgba(0,0,0,.34);
+      padding: 18px 16px;
+      text-align: left;
       cursor: pointer;
       transform-origin: 50% 86%;
-      transition: transform .22s ease;
-      will-change: transform;
-      touch-action: none;
-    }
-    .card-inner {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      border-radius: 16px;
-      box-shadow: 0 16px 28px rgba(0, 0, 0, .38);
-    }
-    .face {
-      position: absolute;
-      inset: 0;
-      border-radius: 16px;
+      transition: transform .25s ease, box-shadow .25s ease, filter .25s ease, opacity .25s ease;
       backface-visibility: hidden;
-      overflow: hidden;
     }
-    .front {
-      border: 1px solid rgba(210, 224, 255, .5);
-      background: linear-gradient(165deg, #253d82, #1a2a5f 58%, #121f4a);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 10px;
-      padding: 22px 16px;
-      text-align: left;
-    }
-    .front::after {
+    .card::after {
       content: "";
       position: absolute;
       inset: 8px;
       border-radius: 12px;
-      border: 1px solid rgba(222, 233, 255, 0.22);
+      border: 1px solid rgba(184, 205, 255, 0.2);
       pointer-events: none;
     }
-    .icon {
-      font-size: 1.75rem;
-      line-height: 1;
-      text-shadow: 0 0 14px rgba(188, 214, 255, .7);
-    }
-    .label { display: block; font-size: 1.08rem; font-weight: 700; }
-    .desc { font-size: .89rem; line-height: 1.45; opacity: .9; }
-
-    .back {
-      transform: rotateY(180deg);
-      border: 1px solid rgba(219, 197, 118, .55);
-      background:
-        radial-gradient(circle at 50% 50%, rgba(255, 227, 134, .18), transparent 50%),
-        linear-gradient(165deg, #1f2855, #131c44);
-    }
-    .back::before,
-    .back::after {
-      content: "";
-      position: absolute;
-      inset: 15%;
-      border-radius: 50%;
-      border: 1.5px solid rgba(242, 219, 137, .4);
-    }
-    .back::after {
-      inset: 28%;
-      transform: rotate(45deg);
-    }
+    .card .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
+    .card .desc { font-size: .89rem; line-height: 1.45; opacity: .84; }
 
     .card:hover, .card:focus-visible {
       transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) translateY(-12px) scale(1.04);
+      box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
       outline: none;
       z-index: 10;
     }
@@ -151,6 +87,7 @@
     .menu.selecting .card:not(.active) { opacity: .32; filter: saturate(.65); }
     .menu.selecting .card.active {
       transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) translateY(-18px) scale(1.07);
+      box-shadow: 0 0 30px rgba(145,183,255,.52), 0 16px 30px rgba(0,0,0,.35);
       z-index: 11;
     }
 
@@ -158,60 +95,49 @@
 
     .meta {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: end;
-      min-height: 32px;
-      font-size: clamp(.74rem, 2.7vw, .86rem);
-      opacity: .9;
+      gap: 12px;
+      font-size: .86rem;
+      opacity: .82;
     }
-    .version {
-      border: 1px solid rgba(181, 204, 255, .4);
-      border-radius: 999px;
-      color: #e9efff;
-      background: rgba(17, 27, 59, .64);
-      padding: 7px 12px;
+    .meta button {
+      border: 0;
+      color: #dbe6ff;
+      background: transparent;
+      cursor: pointer;
+      padding: 4px 2px;
       font: inherit;
-      white-space: nowrap;
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
+
+    .hint {
+      position: fixed;
+      right: 22px;
+      bottom: 52px;
+      font-size: .84rem;
+      color: rgba(232, 240, 255, .92);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .hint.show { opacity: 1; transform: translateY(0); }
 
     .overlay.play { background: radial-gradient(circle at center, rgba(255,255,255,.09) 0, rgba(3,7,18,.58) 70%); }
 
     @keyframes drift { from { transform: translate3d(0,0,0);} to { transform: translate3d(-240px,-170px,0);} }
     @keyframes pulse { 0%,100%{opacity:.38;} 50%{opacity:.92;} }
-    @keyframes lineFlow { to { stroke-dashoffset: -120; } }
-    @keyframes starBlink { 0%,100% { opacity: .36; } 45% { opacity: .95; } }
 
     @media (max-width: 760px) {
       :root { --card-w: min(38vw, 184px); --fan-gap: 52px; --fan-tilt: 9deg; }
       .menu { height: min(58vh, 420px); }
-      .screen { padding-bottom: 14px; }
-      .meta { justify-content: center; }
-      .version { max-width: 94vw; text-overflow: ellipsis; overflow: hidden; }
     }
   </style>
 </head>
 <body>
   <div class="stars" aria-hidden="true"></div>
   <div class="twinkle" aria-hidden="true"></div>
-  <div class="constellation" aria-hidden="true">
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-      <polyline class="line" points="8,70 22,53 37,56 48,40 63,44 74,31 88,37" />
-      <polyline class="line" points="12,24 25,29 34,19 47,24 58,15 73,22" />
-      <circle class="dot" cx="8" cy="70" r="0.58" />
-      <circle class="dot" cx="22" cy="53" r="0.52" />
-      <circle class="dot" cx="37" cy="56" r="0.64" />
-      <circle class="dot" cx="48" cy="40" r="0.54" />
-      <circle class="dot" cx="63" cy="44" r="0.72" />
-      <circle class="dot" cx="74" cy="31" r="0.6" />
-      <circle class="dot" cx="88" cy="37" r="0.68" />
-      <circle class="dot" cx="12" cy="24" r="0.57" />
-      <circle class="dot" cx="25" cy="29" r="0.48" />
-      <circle class="dot" cx="34" cy="19" r="0.53" />
-      <circle class="dot" cx="47" cy="24" r="0.66" />
-      <circle class="dot" cx="58" cy="15" r="0.59" />
-      <circle class="dot" cx="73" cy="22" r="0.53" />
-    </svg>
-  </div>
   <div class="overlay" aria-hidden="true"></div>
 
   <main class="screen">
@@ -222,56 +148,35 @@
 
     <section class="fan-zone" aria-label="시작 카드 선택지">
       <div class="menu" id="menu">
-        <button class="card" type="button" data-route="new" data-icon="✦">
-          <span class="card-inner">
-            <span class="face front"><span class="icon">✦</span><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></span>
-            <span class="face back"></span>
-          </span>
-        </button>
-        <button class="card" type="button" data-route="continue" data-icon="☾">
-          <span class="card-inner">
-            <span class="face front"><span class="icon">☾</span><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></span>
-            <span class="face back"></span>
-          </span>
-        </button>
-        <button class="card" type="button" data-route="codex" data-icon="✧">
-          <span class="card-inner">
-            <span class="face front"><span class="icon">✧</span><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></span>
-            <span class="face back"></span>
-          </span>
-        </button>
-        <button class="card" type="button" data-route="mods" data-icon="⬡">
-          <span class="card-inner">
-            <span class="face front"><span class="icon">⬡</span><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></span>
-            <span class="face back"></span>
-          </span>
-        </button>
+        <button class="card" type="button" data-route="new"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></button>
+        <button class="card" type="button" data-route="continue"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></button>
+        <button class="card" type="button" data-route="codex"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></button>
+        <button class="card" type="button" data-route="mods"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></button>
       </div>
     </section>
 
     <footer class="meta">
-      <button id="versionBadge" class="version" type="button">ver.0.0.1(260329-카드연출개편)</button>
+      <span>카드 베이스: 황금비(1:1.618) · Fan 배치</span>
+      <button id="easterEgg" type="button">변경 이력 / 셔플 연출</button>
     </footer>
   </main>
+
+  <div id="hint" class="hint" role="status" aria-live="polite"></div>
 
   <script>
     const menu = document.getElementById('menu');
     const cards = [...menu.querySelectorAll('.card')];
+    const hint = document.getElementById('hint');
     const overlay = document.querySelector('.overlay');
-    const versionBadge = document.getElementById('versionBadge');
-
-    const baseTransform = card => `translate(${card.style.getPropertyValue('--tx')}, ${card.style.getPropertyValue('--ty')}) rotate(${card.style.getPropertyValue('--rot')})`;
+    const eggButton = document.getElementById('easterEgg');
 
     const layoutCards = () => {
       const mid = (cards.length - 1) / 2;
-      const rootStyle = getComputedStyle(document.documentElement);
-      const gap = parseFloat(rootStyle.getPropertyValue('--fan-gap'));
-      const tilt = parseFloat(rootStyle.getPropertyValue('--fan-tilt'));
       cards.forEach((card, i) => {
         const offset = i - mid;
-        const tx = offset * gap;
+        const tx = offset * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fan-gap'));
         const ty = Math.abs(offset) * 14;
-        const rot = offset * tilt;
+        const rot = offset * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fan-tilt'));
         card.style.setProperty('--tx', `${tx}px`);
         card.style.setProperty('--ty', `${ty}px`);
         card.style.setProperty('--rot', `${rot}deg`);
@@ -279,13 +184,21 @@
       });
     };
 
+    const showHint = (text, delay = 1400) => {
+      hint.textContent = text;
+      hint.classList.add('show');
+      clearTimeout(window.__hintTimer);
+      window.__hintTimer = setTimeout(() => hint.classList.remove('show'), delay);
+    };
+
     menu.addEventListener('click', (e) => {
       const card = e.target.closest('.card');
-      if (!card || menu.classList.contains('rerolling') || card.dataset.dragged === 'true') return;
+      if (!card || menu.classList.contains('rerolling')) return;
       menu.classList.add('selecting');
       cards.forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       overlay.classList.add('play');
+      showHint(`선택: ${card.querySelector('.label').textContent} · 전환 연출 준비 중`);
       setTimeout(() => overlay.classList.remove('play'), 620);
     });
 
@@ -295,104 +208,37 @@
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
 
-      // 1) 가운데로 수렴
+      // 1) Collect
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: baseTransform(card) },
-        { transform: `translate(${(i - 1.5) * 6}px, 0px) rotate(0deg)` }
-      ], { duration: 260, easing: 'ease-in-out', fill: 'forwards' }).finished));
+        { transform: card.style.transform },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
+      ], { duration: 220, easing: 'ease-in' }).finished));
 
-      // 2) 카드 뭉치 뒤집힘
-      await Promise.all(cards.map((card, i) => card.querySelector('.card-inner').animate([
-        { transform: 'rotateY(0deg)' },
-        { transform: 'rotateY(180deg)' }
-      ], { duration: 280, easing: 'ease-in-out', fill: 'forwards', delay: i * 20 }).finished));
-
-      // 3) 각 카드 3회전 (시계/반시계 번갈아)
-      await Promise.all(cards.map((card, i) => {
-        const dir = i % 2 === 0 ? 1 : -1;
-        return card.animate([
-          { transform: `translate(${(i - 1.5) * 6}px, 0px) rotate(0deg)` },
-          { transform: `translate(${(Math.random() - .5) * 40}px, ${-12 + Math.random() * 24}px) rotate(${dir * 540}deg)` },
-          { transform: `translate(${(i - 1.5) * 6}px, 0px) rotate(${dir * 1080}deg)` }
-        ], { duration: 640, easing: 'ease-in-out', fill: 'forwards' }).finished;
-      }));
-
-      // 4) 각자 자리 복귀
+      // 2) Flip
       await Promise.all(cards.map((card, i) => card.animate([
-        { transform: `translate(${(i - 1.5) * 6}px, 0px) rotate(0deg)` },
-        { transform: baseTransform(card) }
-      ], { duration: 360 + i * 50, easing: 'cubic-bezier(.16,.8,.28,1)', fill: 'forwards' }).finished));
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(0deg)` },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotateY(180deg)` }
+      ], { duration: 190, easing: 'ease-in-out' }).finished));
 
-      // 5) 한 장씩 앞면으로 다시 뒤집힘
-      for (const card of cards) {
-        await card.querySelector('.card-inner').animate([
-          { transform: 'rotateY(180deg)' },
-          { transform: 'rotateY(0deg)' }
-        ], { duration: 260, easing: 'ease-in-out', fill: 'forwards' }).finished;
-      }
+      // 3) Shuffle
+      await Promise.all(cards.map((card, i) => card.animate([
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` },
+        { transform: `translate(${(Math.random() - .5) * 84}px, ${-20 + Math.random() * 34}px) rotate(${(Math.random() - .5) * 24}deg)` },
+        { transform: `translate(${(i - 1.5) * 8}px, 0px) rotate(0deg)` }
+      ], { duration: 300, easing: 'ease-in-out' }).finished));
+
+      // 4) Re-fan
+      layoutCards();
+      await Promise.all(cards.map((card, i) => card.animate([
+        { transform: `translate(0px, 0px) rotate(0deg)` },
+        { transform: card.style.transform }
+      ], { duration: 250 + i * 40, easing: 'ease-out' }).finished));
 
       menu.classList.remove('rerolling');
+      showHint('리롤 완료: 수렴 → 뒤집힘 → 셔플 → 재전개');
     };
 
-    const setupDrag = card => {
-      let dragging = false;
-      let moved = false;
-      let startX = 0;
-      let startY = 0;
-      let dx = 0;
-      let dy = 0;
-
-      card.addEventListener('pointerdown', e => {
-        if (menu.classList.contains('rerolling')) return;
-        dragging = true;
-        moved = false;
-        card.dataset.dragged = 'false';
-        startX = e.clientX;
-        startY = e.clientY;
-        card.setPointerCapture(e.pointerId);
-      });
-
-      card.addEventListener('pointermove', e => {
-        if (!dragging) return;
-        dx = e.clientX - startX;
-        dy = e.clientY - startY;
-        if (Math.hypot(dx, dy) > 6) {
-          moved = true;
-          const tx = parseFloat(card.style.getPropertyValue('--tx'));
-          const ty = parseFloat(card.style.getPropertyValue('--ty'));
-          const rot = card.style.getPropertyValue('--rot');
-          card.style.transform = `translate(${tx + dx}px, ${ty + dy}px) rotate(${rot})`;
-          card.style.zIndex = 20;
-        }
-      });
-
-      const release = e => {
-        if (!dragging) return;
-        dragging = false;
-        if (moved) {
-          card.dataset.dragged = 'true';
-          card.animate([
-            { transform: card.style.transform },
-            { transform: baseTransform(card) }
-          ], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
-          setTimeout(() => {
-            card.style.transform = baseTransform(card);
-            card.style.zIndex = '';
-            card.dataset.dragged = 'false';
-          }, 340);
-        }
-        if (e?.pointerId !== undefined && card.hasPointerCapture(e.pointerId)) {
-          card.releasePointerCapture(e.pointerId);
-        }
-      };
-
-      card.addEventListener('pointerup', release);
-      card.addEventListener('pointercancel', release);
-      card.addEventListener('lostpointercapture', release);
-    };
-
-    versionBadge.addEventListener('click', playReroll);
-    cards.forEach(setupDrag);
+    eggButton.addEventListener('click', playReroll);
     window.addEventListener('resize', layoutCards);
     layoutCards();
   </script>

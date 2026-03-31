@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.53(260331-펄린노이즈월드리빌드)';
+const WORLD_VERSION = 'ver.0.0.54(260331-노이즈강도상향)';
 
 const HEX_CONFIG = {
   cols: 210,
@@ -10,9 +10,9 @@ const HEX_CONFIG = {
   coastBand: 0.02,
   mountainLevel: 0.78,
   plateCount: 18,
-  elevationFrequency: 0.0095,
-  moistureFrequency: 0.0105,
-  heatFrequency: 0.0078,
+  elevationFrequency: 0.0125,
+  moistureFrequency: 0.0135,
+  heatFrequency: 0.0092,
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
@@ -126,7 +126,7 @@ const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   return sum / ampSum;
 };
 
-const domainWarp = (baseNoise, x, y, freq, strength = 18) => {
+const domainWarp = (baseNoise, x, y, freq, strength = 28) => {
   const wx = fbmPerlin(baseNoise, x * freq * 0.7 + 13, y * freq * 0.7 - 9, 3);
   const wy = fbmPerlin(baseNoise, x * freq * 0.7 - 11, y * freq * 0.7 + 7, 3);
   return {
@@ -379,39 +379,53 @@ const buildWorldMap = (seed) => {
     for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
       const idx = y * HEX_CONFIG.cols + x;
       const plate = plateField(x, y, plates);
-      const warped = domainWarp(perlinElevation, x, y, HEX_CONFIG.elevationFrequency, 16);
+      const warped = domainWarp(perlinElevation, x, y, HEX_CONFIG.elevationFrequency, 28);
 
       const continentNoise = fbmPerlin(
         perlinElevation,
         warped.x * HEX_CONFIG.elevationFrequency,
         warped.y * HEX_CONFIG.elevationFrequency,
-        5,
+        6,
         2,
-        0.5
+        0.56
       );
       const ridgeNoise = fbmPerlin(
         perlinElevation,
-        x * HEX_CONFIG.elevationFrequency * 2.1,
-        y * HEX_CONFIG.elevationFrequency * 2.1,
-        3,
-        2,
-        0.52
+        x * HEX_CONFIG.elevationFrequency * 2.8,
+        y * HEX_CONFIG.elevationFrequency * 2.8,
+        4,
+        2.15,
+        0.6
       );
       const basinNoise = fbmPerlin(
         perlinElevation,
-        x * HEX_CONFIG.elevationFrequency * 0.7 - 21,
-        y * HEX_CONFIG.elevationFrequency * 0.7 + 19,
-        4,
-        2,
-        0.55
+        x * HEX_CONFIG.elevationFrequency * 1.05 - 21,
+        y * HEX_CONFIG.elevationFrequency * 1.05 + 19,
+        5,
+        2.1,
+        0.58
+      );
+      const detailNoise = fbmPerlin(
+        perlinElevation,
+        x * HEX_CONFIG.elevationFrequency * 4.1 + 37,
+        y * HEX_CONFIG.elevationFrequency * 4.1 - 53,
+        3,
+        2.2,
+        0.62
       );
 
-      const ridgeLift = plate.boundary * 0.17 + (1 - plate.divergence) * 0.06;
-      const trenchCut = clamp01((0.1 - basinNoise) * 1.8) * (1 - plate.boundary) * 0.1;
+      const ridgeLift = plate.boundary * 0.23 + (1 - plate.divergence) * 0.1;
+      const trenchCut = clamp01((0.16 - basinNoise) * 2.2) * (1 - plate.boundary) * 0.16;
       const masked = edgeMask(x, y);
 
       const elev = clamp01(
-        (plate.base * 0.52 + (continentNoise * 0.5 + 0.5) * 0.25 + (ridgeNoise * 0.5 + 0.5) * 0.13 + ridgeLift) * masked
+        (
+          plate.base * 0.47
+          + (continentNoise * 0.5 + 0.5) * 0.24
+          + (ridgeNoise * 0.5 + 0.5) * 0.18
+          + (detailNoise * 0.5 + 0.5) * 0.1
+          + ridgeLift
+        ) * masked
         + (1 - masked) * 0.05
         - trenchCut
       );
@@ -421,9 +435,9 @@ const buildWorldMap = (seed) => {
         perlinHeat,
         x * HEX_CONFIG.heatFrequency,
         y * HEX_CONFIG.heatFrequency,
-        4,
+        5,
         2,
-        0.55
+        0.6
       );
       const seasonal = Math.sin((y / HEX_CONFIG.rows) * Math.PI * 4 + seed * 0.000001) * 0.055;
       heats[idx] = clamp01((1 - latitude * 0.82) * 0.72 + (heatNoise * 0.5 + 0.5) * 0.24 + seasonal);
@@ -432,9 +446,9 @@ const buildWorldMap = (seed) => {
         perlinMoisture,
         x * HEX_CONFIG.moistureFrequency,
         y * HEX_CONFIG.moistureFrequency,
-        5,
+        6,
         2,
-        0.5
+        0.58
       );
       const wind = Math.sin((x / HEX_CONFIG.cols) * Math.PI * 3 + y * 0.04) * 0.07;
       const rainShadow = clamp01(1 - Math.max(0, elev - 0.62) * 1.2);

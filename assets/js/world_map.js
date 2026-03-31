@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.50(260331-헥스해양편향수정)';
+const WORLD_VERSION = 'ver.0.0.51(260331-해양쏠림보정강화)';
 
 const HEX_CONFIG = {
   cols: 200,
@@ -231,8 +231,17 @@ const distanceToWater = (elevations, levels) => {
 
 const getAdaptiveSeaLevels = (elevations) => {
   const sorted = [...elevations].sort((a, b) => a - b);
-  const seaIndex = Math.floor(sorted.length * 0.62);
-  const seaLevel = sorted[Math.max(0, Math.min(sorted.length - 1, seaIndex))];
+  const pickByRatio = (ratio) => {
+    const idx = Math.floor(sorted.length * ratio);
+    return sorted[Math.max(0, Math.min(sorted.length - 1, idx))];
+  };
+
+  let seaLevel = pickByRatio(0.62);
+  const waterRatio = elevations.filter((value) => value < seaLevel).length / elevations.length;
+
+  if (waterRatio > 0.9) seaLevel = pickByRatio(0.52);
+  else if (waterRatio < 0.4) seaLevel = pickByRatio(0.78);
+
   const deepSeaLevel = seaLevel - 0.13;
   return { seaLevel, deepSeaLevel };
 };

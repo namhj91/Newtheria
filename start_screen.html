@@ -215,7 +215,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.33(260331-배경별밀도랜덤강화)</button>
+      <button id="easterEgg" type="button">ver.0.0.34(260331-셔플회전방향교차강화)</button>
     </footer>
   </main>
 
@@ -353,14 +353,22 @@
         ], { duration: 280, easing: 'ease-in-out' }).finished;
       }));
 
-      // 3) Rotate each card around its center (3 turns, alternating direction)
+      // 3) While flipped, rotate cards in opposite directions to emphasize shuffle motion
       await Promise.all(cards.map((card, i) => {
         const spinLayer = card.querySelector('.card-fan-card-spin');
         const direction = i % 2 === 0 ? 1 : -1;
+        const primaryTurn = direction * randomBetween(300, 420);
+        const reboundTurn = direction * -randomBetween(160, 240);
         return spinLayer.animate([
           { transform: 'rotate(0deg)' },
-          { transform: `rotate(${direction * 1080}deg)` }
-        ], { duration: 780, easing: 'cubic-bezier(0.3, 0.08, 0.3, 1)' }).finished;
+          { transform: `rotate(${primaryTurn.toFixed(2)}deg)`, offset: 0.62 },
+          { transform: `rotate(${reboundTurn.toFixed(2)}deg)`, offset: 0.84 },
+          { transform: `rotate(0deg)` }
+        ], {
+          duration: 820 + i * 28,
+          delay: i * 20,
+          easing: 'cubic-bezier(0.2, 0.85, 0.24, 1)'
+        }).finished;
       }));
 
       // 4) Shuffle and spread to fan layout

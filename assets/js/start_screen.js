@@ -2,6 +2,7 @@ const menu = document.getElementById('menu');
 let cards = [...menu.querySelectorAll('.card-fan-card')];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
+const titleWorldMapButton = document.getElementById('titleWorldMap');
 const rootStyle = document.documentElement.style;
 
 const UI = {
@@ -341,6 +342,12 @@ const bindEvents = () => {
   });
 
   eggButton.addEventListener('click', () => reroll.play());
+  titleWorldMapButton?.addEventListener('click', () => {
+    overlay.classList.add('play');
+    window.setTimeout(() => {
+      window.location.href = './world_map.html';
+    }, 260);
+  });
   window.addEventListener('resize', () => layout.layoutCards());
 };
 

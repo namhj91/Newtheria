@@ -215,7 +215,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.33(260331-배경별밀도랜덤강화)</button>
+      <button id="easterEgg" type="button">ver.0.0.34(260331-카드뒷면셔플전반전)</button>
     </footer>
   </main>
 
@@ -328,7 +328,17 @@
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
 
-      // 1) Collect to center as an overlapped, slightly messy deck
+      // 1) Flip cards to the back before shuffling
+      cards.forEach((card) => card.classList.add('is-flipped'));
+      await Promise.all(cards.map((card) => {
+        const inner = card.querySelector('.card-fan-card-inner');
+        return inner.animate([
+          { transform: 'rotateY(0deg)' },
+          { transform: 'rotateY(180deg)' }
+        ], { duration: 280, easing: 'ease-in-out' }).finished;
+      }));
+
+      // 2) Collect to center as an overlapped, slightly messy deck
       const stackTransforms = cards.map((_, i) => {
         const direction = i % 2 === 0 ? 1 : -1;
         const tx = Math.round((Math.random() * 20 + 4) * direction);
@@ -343,16 +353,6 @@
       ], { duration: 360, easing: 'cubic-bezier(0.16, 0.84, 0.44, 1)' }).finished));
       cards.forEach((card, i) => { card.style.transform = stackTransforms[i]; });
 
-      // 2) Flip deck all at once
-      cards.forEach((card) => card.classList.add('is-flipped'));
-      await Promise.all(cards.map((card) => {
-        const inner = card.querySelector('.card-fan-card-inner');
-        return inner.animate([
-          { transform: 'rotateY(0deg)' },
-          { transform: 'rotateY(180deg)' }
-        ], { duration: 280, easing: 'ease-in-out' }).finished;
-      }));
-
       // 3) Rotate each card around its center (3 turns, alternating direction)
       await Promise.all(cards.map((card, i) => {
         const spinLayer = card.querySelector('.card-fan-card-spin');
@@ -363,7 +363,7 @@
         ], { duration: 780, easing: 'cubic-bezier(0.3, 0.08, 0.3, 1)' }).finished;
       }));
 
-      // 4) Shuffle and spread to fan layout
+      // 4) Shuffle and spread to fan layout (cards stay back-facing)
       shuffleCardOrder();
       layoutCards();
       await Promise.all(cards.map((card, i) => {
@@ -374,7 +374,7 @@
         ], { duration: 420 + i * 40, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
       }));
 
-      // 5) Flip back one by one
+      // 5) Flip back to front one by one after shuffle
       for (const card of cards) {
         const inner = card.querySelector('.card-fan-card-inner');
         await inner.animate([

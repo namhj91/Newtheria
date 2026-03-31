@@ -35,23 +35,6 @@
     .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
     .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
     .logo h1 { margin: 0; letter-spacing: .12em; font-size: clamp(2rem, 5.4vw, 4rem); }
-    .title-link {
-      border: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      letter-spacing: inherit;
-      cursor: pointer;
-      padding: 0;
-      text-shadow: inherit;
-      transition: transform .2s ease, opacity .2s ease;
-    }
-    .title-link:hover { transform: translateY(-1px) scale(1.01); opacity: .94; }
-    .title-link:focus-visible {
-      outline: 2px solid rgba(190, 214, 255, .82);
-      outline-offset: 6px;
-      border-radius: 8px;
-    }
     .logo p { margin: 10px 0 0; opacity: .8; letter-spacing: .12em; font-size: clamp(.82rem, 1.6vw, 1rem); }
 
     .fan-zone { position: relative; display: grid; place-items: center; width: 100%; }

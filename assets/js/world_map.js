@@ -1,17 +1,18 @@
+const WORLD_VERSION = 'ver.0.0.49(260331-헥스판구조기후개선)';
+
 const HEX_CONFIG = {
   cols: 200,
   rows: 200,
   z: 0,
   size: 4,
-  seaLevel: 0.5,
-  deepSeaLevel: 0.34,
+  seaLevel: 0.53,
+  deepSeaLevel: 0.36,
   coastBand: 0.03,
   mountainLevel: 0.8,
-  snowTemp: 0.2,
-  riverCount: 140,
-  elevationFrequency: 0.014,
-  moistureFrequency: 0.02,
-  heatFrequency: 0.01,
+  riverCount: 170,
+  plateCount: 16,
+  elevationFrequency: 0.012,
+  heatFrequency: 0.008,
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
@@ -37,16 +38,9 @@ const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
+const versionTag = document.getElementById('worldMapVersion');
 
 const SQRT3 = Math.sqrt(3);
-const OFFSETS = [
-  [1, 0],
-  [1, -1],
-  [0, -1],
-  [-1, 0],
-  [0, 1],
-  [1, 1]
-];
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
 
@@ -68,6 +62,7 @@ const hash2 = (x, y, seed) => {
 
 const smoothstep = (t) => t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 const valueNoise2D = (x, y, seed) => {
   const x0 = Math.floor(x);
@@ -104,6 +99,12 @@ const fbm = (x, y, seed, octaves = 5) => {
   return sum / ampSum;
 };
 
+const domainWarpNoise = (x, y, seed, baseFreq) => {
+  const warpX = (fbm(x * baseFreq * 0.8, y * baseFreq * 0.8, seed + 71, 3) - 0.5) * 28;
+  const warpY = (fbm(x * baseFreq * 0.8, y * baseFreq * 0.8, seed + 131, 3) - 0.5) * 28;
+  return fbm((x + warpX) * baseFreq, (y + warpY) * baseFreq, seed, 5);
+};
+
 const hexToPixel = (q, r, size) => ({
   x: size * SQRT3 * (q + (r % 2) / 2),
   y: size * 1.5 * r
@@ -133,70 +134,148 @@ const edgeFalloff = (x, y) => {
   const dx = Math.abs(x - cx) / cx;
   const dy = Math.abs(y - cy) / cy;
   const d = Math.sqrt(dx * dx + dy * dy);
-  return Math.max(0, 1 - Math.pow(d, 1.8));
+  return Math.max(0, 1 - Math.pow(d, 1.95));
 };
 
-const classifyTerrain = (tile, isNearSea) => {
-  const { elevation, moisture, heat } = tile;
+const generatePlates = (random) => {
+  const plates = [];
+  for (let i = 0; i < HEX_CONFIG.plateCount; i += 1) {
+    plates.push({
+      x: Math.floor(random() * HEX_CONFIG.cols),
+      y: Math.floor(random() * HEX_CONFIG.rows),
+      continental: random() > 0.42,
+      uplift: random() * 0.36 + 0.14
+    });
+  }
+  return plates;
+};
 
+const plateElevation = (x, y, plates) => {
+  let nearest = Infinity;
+  let second = Infinity;
+  let owner = plates[0];
+
+  for (const plate of plates) {
+    const dx = x - plate.x;
+    const dy = y - plate.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < nearest) {
+      second = nearest;
+      nearest = dist;
+      owner = plate;
+    } else if (dist < second) {
+      second = dist;
+    }
+  }
+
+  const boundary = clamp01((second - nearest) / 12);
+  const base = owner.continental ? 0.56 + owner.uplift * 0.3 : 0.34 + owner.uplift * 0.16;
+  const ridgeBoost = clamp01(1 - boundary) * 0.24;
+  return clamp01(base + ridgeBoost);
+};
+
+const smoothField = (field, passes = 2) => {
+  let current = field.slice();
+
+  for (let pass = 0; pass < passes; pass += 1) {
+    const next = current.slice();
+    for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
+      for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
+        const idx = y * HEX_CONFIG.cols + x;
+        const neighbors = getNeighbors(x, y);
+        let sum = current[idx] * 1.2;
+        let weight = 1.2;
+        for (const [nx, ny] of neighbors) {
+          sum += current[ny * HEX_CONFIG.cols + nx];
+          weight += 1;
+        }
+        next[idx] = sum / weight;
+      }
+    }
+    current = next;
+  }
+
+  return current;
+};
+
+const distanceToWater = (elevations) => {
+  const len = HEX_CONFIG.cols * HEX_CONFIG.rows;
+  const dist = new Array(len).fill(Infinity);
+  const queue = [];
+
+  for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
+    for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
+      const idx = y * HEX_CONFIG.cols + x;
+      if (elevations[idx] < HEX_CONFIG.seaLevel) {
+        dist[idx] = 0;
+        queue.push([x, y]);
+      }
+    }
+  }
+
+  for (let i = 0; i < queue.length; i += 1) {
+    const [x, y] = queue[i];
+    const base = dist[y * HEX_CONFIG.cols + x];
+    for (const [nx, ny] of getNeighbors(x, y)) {
+      const nIdx = ny * HEX_CONFIG.cols + nx;
+      if (dist[nIdx] > base + 1) {
+        dist[nIdx] = base + 1;
+        queue.push([nx, ny]);
+      }
+    }
+  }
+
+  return dist;
+};
+
+const classifyTerrain = (elevation, moisture, heat, nearSea) => {
   if (elevation < HEX_CONFIG.deepSeaLevel) return '심해';
   if (elevation < HEX_CONFIG.seaLevel - HEX_CONFIG.coastBand) return '바다';
   if (elevation < HEX_CONFIG.seaLevel) return '해안';
-  if (elevation < HEX_CONFIG.seaLevel + 0.01 && isNearSea) return '모래해변';
+  if (elevation < HEX_CONFIG.seaLevel + 0.012 && nearSea) return '모래해변';
 
-  if (elevation > 0.91 && heat < HEX_CONFIG.snowTemp) return '만년설산';
-  if (elevation > 0.88 && moisture < 0.22) return '화산지대';
+  if (elevation > 0.9 && heat < 0.23) return '만년설산';
+  if (elevation > 0.87 && moisture < 0.24) return '화산지대';
   if (elevation > HEX_CONFIG.mountainLevel) return '산맥';
-  if (elevation > 0.72 && moisture < 0.30) return '협곡';
-  if (elevation > 0.64) return '구릉지';
+  if (elevation > 0.69 && moisture < 0.33) return '협곡';
+  if (elevation > 0.63) return '구릉지';
 
-  if (moisture > 0.78 && heat > 0.55) return '습지';
-  if (moisture > 0.72) return '고대림';
+  if (moisture > 0.8 && heat > 0.54) return '습지';
+  if (moisture > 0.7) return '고대림';
   if (moisture > 0.56) return '숲';
-  if (moisture < 0.2 && heat > 0.6) return '사막';
-  if (moisture < 0.28) return '황무지';
+  if (moisture < 0.22 && heat > 0.58) return '사막';
+  if (moisture < 0.3) return '황무지';
   return '평원';
 };
 
 const carveRivers = (tiles, random) => {
   const get = (x, y) => tiles[y * HEX_CONFIG.cols + x];
-  const landTiles = tiles.filter((tile) => tile.elevation >= HEX_CONFIG.seaLevel + 0.02);
+  const sources = tiles.filter((tile) => tile.elevation > 0.72 && tile.moisture > 0.42);
 
   for (let i = 0; i < HEX_CONFIG.riverCount; i += 1) {
-    const source = landTiles[Math.floor(random() * landTiles.length)];
-    if (!source || source.elevation < 0.7) continue;
+    const source = sources[Math.floor(random() * sources.length)];
+    if (!source) continue;
 
     let x = source.coord.x;
     let y = source.coord.y;
     const visited = new Set();
 
-    for (let step = 0; step < 130; step += 1) {
+    for (let step = 0; step < 150; step += 1) {
       const key = `${x},${y}`;
       if (visited.has(key)) break;
       visited.add(key);
 
       const current = get(x, y);
-      if (!current) break;
-      if (current.elevation <= HEX_CONFIG.seaLevel) break;
+      if (!current || current.elevation <= HEX_CONFIG.seaLevel) break;
 
-      if (current.terrainType !== '산맥' && current.terrainType !== '만년설산') {
+      if (!['산맥', '만년설산', '화산지대'].includes(current.terrainType)) {
         current.terrainType = '강';
         current.color = HEX_CONFIG.terrains.강;
       }
 
-      const neighbors = getNeighbors(x, y);
-      let next = null;
-      let nextScore = current.elevation;
-
-      for (const [nx, ny] of neighbors) {
-        const candidate = get(nx, ny);
-        const slope = candidate.elevation + (random() * 0.01);
-        if (slope < nextScore) {
-          nextScore = slope;
-          next = [nx, ny];
-        }
-      }
-
+      const neighbors = getNeighbors(x, y).map(([nx, ny]) => [nx, ny, get(nx, ny)]);
+      neighbors.sort((a, b) => (a[2].elevation + random() * 0.005) - (b[2].elevation + random() * 0.005));
+      const next = neighbors.find(([, , tile]) => tile.elevation <= current.elevation + 0.005);
       if (!next) break;
       [x, y] = next;
     }
@@ -205,64 +284,70 @@ const carveRivers = (tiles, random) => {
 
 const buildWorldMap = (seed) => {
   const random = mulberry32(seed);
-  const tiles = [];
+  const plates = generatePlates(random);
+  const count = HEX_CONFIG.cols * HEX_CONFIG.rows;
+
+  const elevations = new Array(count).fill(0);
+  const moistures = new Array(count).fill(0);
+  const heats = new Array(count).fill(0);
 
   for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
     const latitude = Math.abs((y / (HEX_CONFIG.rows - 1)) * 2 - 1);
 
     for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
-      const nx = x * HEX_CONFIG.elevationFrequency;
-      const ny = y * HEX_CONFIG.elevationFrequency;
-      const mx = x * HEX_CONFIG.moistureFrequency;
-      const my = y * HEX_CONFIG.moistureFrequency;
-      const hx = x * HEX_CONFIG.heatFrequency;
-      const hy = y * HEX_CONFIG.heatFrequency;
+      const idx = y * HEX_CONFIG.cols + x;
+      const plateBase = plateElevation(x, y, plates);
+      const continentalNoise = domainWarpNoise(x, y, seed + 17, HEX_CONFIG.elevationFrequency);
+      const ruggedNoise = domainWarpNoise(x * 1.8, y * 1.8, seed + 97, HEX_CONFIG.elevationFrequency * 1.8);
+      const islandMask = edgeFalloff(x, y);
 
-      const continental = fbm(nx, ny, seed, 5);
-      const rugged = fbm(nx * 2.6, ny * 2.6, seed + 97, 4) * 0.35;
-      const elevation = continental * 0.7 + rugged * 0.3;
+      const elevation = clamp01((plateBase * 0.58 + continentalNoise * 0.29 + ruggedNoise * 0.13) * islandMask + (1 - islandMask) * 0.06);
+      elevations[idx] = elevation;
 
-      const heatNoise = fbm(hx, hy, seed + 211, 4);
-      const heat = Math.min(1, Math.max(0, (1 - latitude * 0.78) * 0.74 + heatNoise * 0.26));
+      const heatNoise = fbm(x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, seed + 401, 4);
+      heats[idx] = clamp01((1 - latitude * 0.82) * 0.74 + heatNoise * 0.26);
 
-      const rainShadow = fbm((x + 700) * HEX_CONFIG.moistureFrequency, (y - 300) * HEX_CONFIG.moistureFrequency, seed + 509, 4);
-      const moisture = Math.min(1, Math.max(0, fbm(mx, my, seed + 401, 4) * 0.75 + (1 - elevation) * 0.2 + rainShadow * 0.05));
+      const rainNoise = domainWarpNoise(x, y, seed + 719, 0.016);
+      moistures[idx] = clamp01(rainNoise * 0.8 + (1 - elevation) * 0.2);
+    }
+  }
 
-      const island = edgeFalloff(x, y);
-      const finalElevation = Math.min(1, Math.max(0, elevation * island + (1 - island) * 0.08));
+  const smoothElev = smoothField(elevations, 2);
+  const waterDistance = distanceToWater(smoothElev);
+
+  const tiles = [];
+  for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
+    for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
+      const idx = y * HEX_CONFIG.cols + x;
+      const elevation = smoothElev[idx];
+      const coastMoisture = clamp01(1 - waterDistance[idx] / 18);
+      const moisture = clamp01(moistures[idx] * 0.72 + coastMoisture * 0.28);
+      const heat = heats[idx];
+
+      const nearSea = getNeighbors(x, y).some(([nx, ny]) => smoothElev[ny * HEX_CONFIG.cols + nx] < HEX_CONFIG.seaLevel);
+      const terrainType = classifyTerrain(elevation, moisture, heat, nearSea);
 
       tiles.push({
         coord: { x, y, z: HEX_CONFIG.z },
-        elevation: finalElevation,
+        elevation,
         moisture,
         heat,
-        terrainType: '바다',
-        manaSaturation: Math.round((0.35 + moisture * 0.45 + heat * 0.2) * 100),
-        security: Math.round((0.65 - Math.abs(finalElevation - 0.58) * 0.6 + moisture * 0.2) * 100),
+        terrainType,
+        manaSaturation: Math.round((0.3 + moisture * 0.5 + heat * 0.2) * 100),
+        security: Math.round(clamp01(0.68 - Math.abs(elevation - 0.58) * 0.56 + moisture * 0.18) * 100),
         nationId: null,
         settlementId: null,
         influenceId: null,
-        sparkleLight: Number(((0.25 + moisture * 0.4 + heat * 0.35) * 100).toFixed(2)),
+        sparkleLight: Number(((0.26 + moisture * 0.4 + heat * 0.34) * 100).toFixed(2)),
         specialProduct: null,
         threatInfo: null,
         specialTileType: null,
-        color: HEX_CONFIG.terrains.바다
+        color: HEX_CONFIG.terrains[terrainType] || '#ffffff'
       });
     }
   }
 
-  tiles.forEach((tile) => {
-    const { x, y } = tile.coord;
-    const nearSea = getNeighbors(x, y).some(([nx, ny]) => {
-      const neighbor = tiles[ny * HEX_CONFIG.cols + nx];
-      return neighbor.elevation < HEX_CONFIG.seaLevel;
-    });
-    tile.terrainType = classifyTerrain(tile, nearSea);
-    tile.color = HEX_CONFIG.terrains[tile.terrainType] || '#ffffff';
-  });
-
   carveRivers(tiles, random);
-
   return tiles;
 };
 
@@ -299,11 +384,13 @@ const renderWorld = (tiles, seed) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
     return acc;
   }, {});
+
   const landCount = Object.entries(terrainStat)
     .filter(([name]) => !['심해', '바다', '해안', '모래해변', '호수'].includes(name))
     .reduce((sum, [, count]) => sum + count, 0);
 
-  mapMeta.textContent = `seed: ${seed} · hex: ${HEX_CONFIG.cols}x${HEX_CONFIG.rows} (${tiles.length.toLocaleString()} tiles) · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`;
+  const riverCount = terrainStat.강 || 0;
+  mapMeta.textContent = `seed: ${seed} · hex: ${HEX_CONFIG.cols}x${HEX_CONFIG.rows} (${tiles.length.toLocaleString()} tiles) · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()} · 강 ${riverCount.toLocaleString()}`;
 };
 
 const generateAndRender = () => {
@@ -312,6 +399,7 @@ const generateAndRender = () => {
   renderWorld(tiles, seed);
 };
 
+versionTag.textContent = WORLD_VERSION;
 regenButton.addEventListener('click', generateAndRender);
 
 generateAndRender();

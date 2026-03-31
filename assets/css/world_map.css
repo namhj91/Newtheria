@@ -70,3 +70,8 @@ canvas {
   display: block;
   margin: 0;
 }
+
+.version {
+  opacity: 0.9;
+  font-weight: 600;
+}

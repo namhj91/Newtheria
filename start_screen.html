@@ -156,11 +156,13 @@
     .card-fan-card .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
     .card-fan-card .desc { font-size: .89rem; line-height: 1.45; opacity: .84; }
 
-    .card-fan-card:hover, .card-fan-card:focus-visible {
-      transform: var(--base-transform, translate(0px, 0px) rotate(0deg)) translateY(-12px) scale(1.04);
-      box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
+    .card-fan-card:focus-visible {
       outline: none;
-      z-index: 10;
+    }
+    .card-fan-card.is-hovered {
+      transform: var(--base-transform, translate(0px, 0px) rotate(0deg)) translateY(-8px) scale(1.02);
+      box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
+      z-index: 220 !important;
     }
 
     .card-fan.selecting .card-fan-card:not(.active) { opacity: .32; filter: saturate(.65); }
@@ -244,7 +246,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.38(260331-카드뒤집힘플래튼수정)</button>
+      <button id="easterEgg" type="button">ver.0.0.40(260331-카드호버상승강도조정)</button>
     </footer>
   </main>
 
@@ -279,9 +281,41 @@
         card.style.transform = card.dataset.baseTransform;
         card.style.zIndex = String(100 + (cards.length - i));
       });
+      applyCardTransforms();
     };
 
     const randomBetween = (min, max) => Math.random() * (max - min) + min;
+
+    const HOVER_PUSH_MAX = 44;
+
+    const calcHoverPush = (distance) => {
+      if (distance <= 0) return 0;
+      if (distance === 1) return HOVER_PUSH_MAX;
+      if (distance === 2) return Math.round(HOVER_PUSH_MAX * 0.56);
+      return Math.round(HOVER_PUSH_MAX * 0.28);
+    };
+
+    const applyCardTransforms = (hoveredCard = null) => {
+      cards.forEach((card, i) => {
+        const baseTransform = card.dataset.baseTransform || 'translate(0px, 0px) rotate(0deg)';
+        card.classList.toggle('is-hovered', card === hoveredCard);
+
+        if (card.classList.contains('dragging')) return;
+
+        let shiftX = 0;
+        if (hoveredCard) {
+          const hoveredIndex = cards.indexOf(hoveredCard);
+          if (i !== hoveredIndex) {
+            const direction = i < hoveredIndex ? -1 : 1;
+            const distance = Math.abs(i - hoveredIndex);
+            shiftX = direction * calcHoverPush(distance);
+          }
+        }
+
+        card.style.transform = `${baseTransform} translateX(${shiftX}px)`;
+      });
+    };
+
 
     const createStarLayer = ({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) => {
       const gradients = [];
@@ -354,6 +388,7 @@
     const playReroll = async () => {
       if (menu.classList.contains('rerolling')) return;
       menu.classList.remove('selecting');
+      applyCardTransforms();
       cards.forEach(c => c.classList.remove('active'));
       menu.classList.add('rerolling');
 
@@ -423,6 +458,7 @@
       card.style.transform = card.dataset.baseTransform;
       window.setTimeout(() => {
         card.style.transition = '';
+        applyCardTransforms(menu.querySelector('.card-fan-card.is-hovered'));
       }, 420);
     };
 
@@ -459,6 +495,22 @@
       card.addEventListener('pointermove', onPointerMove);
       card.addEventListener('pointerup', onPointerUp);
       card.addEventListener('pointercancel', onPointerUp);
+      card.addEventListener('mouseenter', () => {
+        if (menu.classList.contains('rerolling')) return;
+        applyCardTransforms(card);
+      });
+      card.addEventListener('mouseleave', () => {
+        if (menu.classList.contains('rerolling')) return;
+        applyCardTransforms();
+      });
+      card.addEventListener('focus', () => {
+        if (menu.classList.contains('rerolling')) return;
+        applyCardTransforms(card);
+      });
+      card.addEventListener('blur', () => {
+        if (menu.classList.contains('rerolling')) return;
+        applyCardTransforms();
+      });
       card.addEventListener('click', (e) => {
         if (dragState.moved) {
           e.preventDefault();

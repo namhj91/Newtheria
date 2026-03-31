@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.55(260331-생성구조전면개편)';
+const WORLD_VERSION = 'ver.0.0.56(260331-월드맵렌더오류수정)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -217,7 +217,7 @@ const smoothField = (field, width, height, passes = 1) => {
           sum += current[ny * width + nx];
           weight += 1;
         }
-        next[idx] = sum / w;
+        next[idx] = sum / weight;
       }
     }
     current = next;

@@ -217,7 +217,7 @@ const smoothField = (field, width, height, passes = 1) => {
           sum += current[ny * width + nx];
           weight += 1;
         }
-        next[idx] = sum / weight;
+        next[idx] = sum / w;
       }
     }
     current = next;

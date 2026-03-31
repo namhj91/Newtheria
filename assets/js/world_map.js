@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.56(260331-월드맵렌더오류수정)';
+const WORLD_VERSION = 'ver.0.0.58(260331-노이즈지형자연화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -17,21 +17,31 @@ const HEX_CONFIG = {
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
+    산호초해안: '#0ea5e9',
+    얕은해안: '#38bdf8',
     해안: '#4a90d9',
     모래해변: '#d4c08f',
     호수: '#3f76ca',
     강: '#4f8fd8',
-    평원: '#7fbf5f',
-    숲: '#4d8f45',
-    고대림: '#2f6940',
+    사바나평원: '#65a30d',
+    푸른평원: '#4ade80',
+    울창한숲: '#15803d',
+    침엽수림: '#0f766e',
+    태고의대수림: '#064e3b',
+    열대우림: '#065f46',
     구릉지: '#90a86f',
-    협곡: '#6e5e52',
-    산맥: '#8e98a4',
+    붉은대협곡: '#9a3412',
+    험준한산맥: '#52525b',
     화산지대: '#9c4b3a',
     만년설산: '#e6eef8',
-    습지: '#5b7d50',
-    황무지: '#9c8d64',
-    사막: '#d4bc75'
+    늪지대: '#4d7c0f',
+    얼어붙은툰드라: '#a1a1aa',
+    건조사막: '#fde047',
+    사막오아시스: '#34d399',
+    세계수중심: '#10b981',
+    고대용의둥지: '#9f1239',
+    빛나는수정동굴: '#6d28d9',
+    고대성소유적: '#94a3b8'
   }
 };
 
@@ -287,24 +297,157 @@ const distanceToWater = (elevations, levels, width, height) => {
   return dist;
 };
 
+const isWaterTerrain = (terrainType) => ['심해', '바다', '얕은해안', '산호초해안', '해안', '호수'].includes(terrainType);
+
 const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
   if (elevation < levels.deepSeaLevel) return '심해';
-  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand) return '바다';
-  if (elevation < levels.seaLevel) return '해안';
+  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.7) return '바다';
+  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.25) return heat > 0.75 ? '산호초해안' : '얕은해안';
+  if (elevation < levels.seaLevel) return nearSea ? '해안' : '얕은해안';
   if (elevation < levels.seaLevel + 0.01 && nearSea) return '모래해변';
 
-  if (elevation > 0.9 && heat < 0.25) return '만년설산';
-  if (elevation > 0.85 && moisture < 0.24) return '화산지대';
-  if (elevation > HEX_CONFIG.mountainLevel) return '산맥';
-  if (elevation > 0.68 && moisture < 0.34) return '협곡';
+  if (elevation > 0.75) {
+    if (heat > 0.7 && moisture < 0.45) return elevation > 0.85 ? '붉은대협곡' : '화산지대';
+    if (heat < 0.35 || (moisture > 0.5 && elevation > 0.85)) return '만년설산';
+    return '험준한산맥';
+  }
   if (elevation > 0.62) return '구릉지';
 
-  if (moisture > 0.82 && heat > 0.56) return '습지';
-  if (moisture > 0.7) return '고대림';
-  if (moisture > 0.56) return '숲';
-  if (moisture < 0.22 && heat > 0.6) return '사막';
-  if (moisture < 0.32) return '황무지';
-  return '평원';
+  if (heat > 0.65) {
+    if (moisture > 0.6) return '열대우림';
+    if (moisture < 0.3) return moisture > 0.22 && heat < 0.8 ? '사막오아시스' : '건조사막';
+    return '사바나평원';
+  }
+  if (heat > 0.35) {
+    if (moisture > 0.8) return '늪지대';
+    if (moisture > 0.45) return '울창한숲';
+    return '푸른평원';
+  }
+  return moisture > 0.4 ? '침엽수림' : '얼어붙은툰드라';
+};
+
+const RESOURCE_RULES = [
+  { id: 'herbs', terrains: ['푸른평원', '사바나평원'], prob: 0.06 },
+  { id: 'timber', terrains: ['울창한숲', '침엽수림', '태고의대수림', '열대우림'], prob: 0.08 },
+  { id: 'obsidian', terrains: ['화산지대', '붉은대협곡'], prob: 0.05 },
+  { id: 'crystal', terrains: ['만년설산', '험준한산맥', '빛나는수정동굴'], prob: 0.035 },
+  { id: 'mana_bloom', terrains: ['사막오아시스', '세계수중심', '고대성소유적'], prob: 0.03 }
+];
+
+const assignTerrainResources = (tiles, random) => {
+  tiles.forEach((tile) => {
+    if (isWaterTerrain(tile.terrainType)) return;
+    const candidates = RESOURCE_RULES.filter((rule) => rule.terrains.includes(tile.terrainType));
+    for (const candidate of candidates) {
+      if (random() < candidate.prob) {
+        tile.specialProduct = candidate.id;
+        break;
+      }
+    }
+  });
+};
+
+const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220) => {
+  const visited = new Set();
+  const get = (x, y) => tiles[y * width + x];
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const key = `${x},${y}`;
+      const tile = get(x, y);
+      if (!isWaterTerrain(tile.terrainType) || visited.has(key)) continue;
+
+      const queue = [[x, y]];
+      const body = [];
+      visited.add(key);
+
+      for (let i = 0; i < queue.length; i += 1) {
+        const [cx, cy] = queue[i];
+        const current = get(cx, cy);
+        body.push(current);
+
+        for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
+          const nKey = `${nx},${ny}`;
+          const neighbor = get(nx, ny);
+          if (!visited.has(nKey) && isWaterTerrain(neighbor.terrainType)) {
+            visited.add(nKey);
+            queue.push([nx, ny]);
+          }
+        }
+      }
+
+      if (body.length <= maxLakeSize) {
+        body.forEach((waterTile) => {
+          waterTile.terrainType = '호수';
+          waterTile.color = HEX_CONFIG.terrains.호수;
+        });
+      }
+    }
+  }
+};
+
+const placeMythicLandmarks = (tiles, random, width, height) => {
+  const landTiles = tiles.filter((tile) => !isWaterTerrain(tile.terrainType) && tile.terrainType !== '모래해변');
+  if (!landTiles.length) return;
+
+  const worldTree = landTiles[Math.floor(random() * landTiles.length)];
+  worldTree.terrainType = '세계수중심';
+  worldTree.specialTileType = 'world_tree';
+  worldTree.manaSaturation = 100;
+  worldTree.sparkleLight = 100;
+  worldTree.color = HEX_CONFIG.terrains.세계수중심;
+
+  const ancientForestSize = Math.floor(random() * 20) + 30;
+  const forestSeeds = [worldTree];
+  const marked = new Set([`${worldTree.coord.x},${worldTree.coord.y}`]);
+  let attempts = 0;
+  while (forestSeeds.length && marked.size < ancientForestSize && attempts < 2000) {
+    const current = forestSeeds[Math.floor(random() * forestSeeds.length)];
+    const neighbors = getNeighbors(current.coord.x, current.coord.y, width, height);
+    const [nx, ny] = neighbors[Math.floor(random() * neighbors.length)] || [];
+    if (nx === undefined) break;
+    const key = `${nx},${ny}`;
+    const target = tiles[ny * width + nx];
+
+    if (!marked.has(key) && target && !isWaterTerrain(target.terrainType) && target.terrainType !== '호수') {
+      marked.add(key);
+      target.terrainType = '태고의대수림';
+      target.color = HEX_CONFIG.terrains.태고의대수림;
+      target.manaSaturation = Math.max(90, target.manaSaturation);
+      forestSeeds.push(target);
+    }
+    attempts += 1;
+  }
+
+  const peaks = landTiles.filter((tile) => ['험준한산맥', '화산지대', '붉은대협곡'].includes(tile.terrainType));
+  if (peaks.length) {
+    const dragonPeak = peaks.reduce((max, tile) => (tile.elevation > max.elevation ? tile : max), peaks[0]);
+    dragonPeak.terrainType = '고대용의둥지';
+    dragonPeak.specialTileType = 'dragon_peak';
+    dragonPeak.manaSaturation = 100;
+    dragonPeak.sparkleLight = 100;
+    dragonPeak.color = HEX_CONFIG.terrains.고대용의둥지;
+  }
+
+  const coldTiles = landTiles.filter((tile) => ['만년설산', '얼어붙은툰드라'].includes(tile.terrainType));
+  if (coldTiles.length) {
+    const cave = coldTiles[Math.floor(random() * coldTiles.length)];
+    cave.terrainType = '빛나는수정동굴';
+    cave.specialTileType = 'crystal_cave';
+    cave.manaSaturation = 100;
+    cave.sparkleLight = 100;
+    cave.color = HEX_CONFIG.terrains.빛나는수정동굴;
+  }
+
+  const plains = landTiles.filter((tile) => ['푸른평원', '사막오아시스', '사바나평원'].includes(tile.terrainType));
+  if (plains.length) {
+    const monolith = plains[Math.floor(random() * plains.length)];
+    monolith.terrainType = '고대성소유적';
+    monolith.specialTileType = 'ancient_monolith';
+    monolith.manaSaturation = 100;
+    monolith.sparkleLight = 100;
+    monolith.color = HEX_CONFIG.terrains.고대성소유적;
+  }
 };
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
@@ -333,7 +476,7 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
       const current = get(x, y);
       if (!current || current.elevation <= levels.seaLevel) break;
 
-      if (!['산맥', '만년설산', '화산지대'].includes(current.terrainType)) {
+      if (!['험준한산맥', '만년설산', '화산지대', '고대용의둥지'].includes(current.terrainType)) {
         current.terrainType = '강';
         current.color = HEX_CONFIG.terrains.강;
       }
@@ -350,7 +493,11 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
 const createNoiseContext = (seed) => ({
   elevation: createPerlin2D(seed ^ 0xa54ff53a),
   moisture: createPerlin2D(seed ^ 0x510e527f),
-  heat: createPerlin2D(seed ^ 0x9b05688c)
+  heat: createPerlin2D(seed ^ 0x9b05688c),
+  warpX: createPerlin2D(seed ^ 0x1f83d9ab),
+  warpY: createPerlin2D(seed ^ 0x5be0cd19),
+  detail: createPerlin2D(seed ^ 0xcbbb9d5d),
+  climate: createPerlin2D(seed ^ 0x428a2f98)
 });
 
 const buildScalarFields = (width, height, seed, noiseContext, plates) => {
@@ -360,16 +507,29 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
 
   for (let y = 0; y < height; y += 1) {
     const latitude = Math.abs((y / (height - 1)) * 2 - 1);
+    const equatorBase = 1 - latitude;
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
       const plate = plateField(x, y, plates);
-      const warped = domainWarp(noiseContext.elevation, x, y, HEX_CONFIG.elevationFrequency, 28);
+      const warpCoarseX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
+      const warpCoarseY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
+      const warpFineX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 2.3 + 71, y * HEX_CONFIG.elevationFrequency * 2.3 - 19, 3, 2.1, 0.6) - 0.5) * 11;
+      const warpFineY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 2.3 - 23, y * HEX_CONFIG.elevationFrequency * 2.3 + 43, 3, 2.1, 0.6) - 0.5) * 11;
+
+      const warped = domainWarp(
+        noiseContext.elevation,
+        x + warpCoarseX + warpFineX,
+        y + warpCoarseY + warpFineY,
+        HEX_CONFIG.elevationFrequency,
+        24
+      );
 
       const continentNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency, warped.y * HEX_CONFIG.elevationFrequency, 6, 2, 0.56);
-      const ridgeNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.8, y * HEX_CONFIG.elevationFrequency * 2.8, 4, 2.15, 0.6);
-      const basinNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 1.05 - 21, y * HEX_CONFIG.elevationFrequency * 1.05 + 19, 5, 2.1, 0.58);
-      const detailNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 4.1 + 37, y * HEX_CONFIG.elevationFrequency * 4.1 - 53, 3, 2.2, 0.62);
+      const ridgeNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency * 2.9, warped.y * HEX_CONFIG.elevationFrequency * 2.9, 4, 2.15, 0.6);
+      const basinNoise = fbmPerlin(noiseContext.elevation, (x + warpCoarseX) * HEX_CONFIG.elevationFrequency * 1.05 - 21, (y + warpCoarseY) * HEX_CONFIG.elevationFrequency * 1.05 + 19, 5, 2.1, 0.58);
+      const detailNoise = fbmPerlin(noiseContext.detail, (x + warpFineX) * HEX_CONFIG.elevationFrequency * 4.2 + 37, (y + warpFineY) * HEX_CONFIG.elevationFrequency * 4.2 - 53, 4, 2.2, 0.62);
+      const fractureNoise = Math.abs(fbmPerlin(noiseContext.detail, x * HEX_CONFIG.elevationFrequency * 7.5 - 109, y * HEX_CONFIG.elevationFrequency * 7.5 + 47, 3, 2.2, 0.55));
 
       const ridgeLift = plate.boundary * 0.23 + (1 - plate.divergence) * 0.1;
       const trenchCut = clamp01((0.16 - basinNoise) * 2.2) * (1 - plate.boundary) * 0.16;
@@ -377,10 +537,11 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
 
       const elevation = clamp01(
         (
-          plate.base * 0.47
-          + (continentNoise * 0.5 + 0.5) * 0.24
+          plate.base * 0.44
+          + (continentNoise * 0.5 + 0.5) * 0.26
           + (ridgeNoise * 0.5 + 0.5) * 0.18
-          + (detailNoise * 0.5 + 0.5) * 0.1
+          + (detailNoise * 0.5 + 0.5) * 0.08
+          + fractureNoise * 0.06
           + ridgeLift
         ) * masked
         + (1 - masked) * 0.05
@@ -388,14 +549,18 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
       );
       elevations[idx] = elevation;
 
-      const heatNoise = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
+      const heatNoise = fbmPerlin(noiseContext.heat, (x + warpFineX) * HEX_CONFIG.heatFrequency, (y + warpFineY) * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
+      const heatMicro = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.heatFrequency * 3.8 + 12, y * HEX_CONFIG.heatFrequency * 3.8 - 9, 3, 2, 0.58);
       const seasonal = Math.sin((y / height) * Math.PI * 4 + seed * 0.000001) * 0.055;
-      heats[idx] = clamp01((1 - latitude * 0.82) * 0.72 + (heatNoise * 0.5 + 0.5) * 0.24 + seasonal);
+      const climateWave = Math.sin((x / width) * Math.PI * 2.7 + y * 0.023) * 0.045;
+      heats[idx] = clamp01(equatorBase * 0.43 + (heatNoise * 0.5 + 0.5) * 0.34 + (heatMicro * 0.5 + 0.5) * 0.14 + seasonal + climateWave);
 
-      const moistureNoise = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
+      const moistureNoise = fbmPerlin(noiseContext.moisture, (x + warpCoarseX) * HEX_CONFIG.moistureFrequency, (y + warpCoarseY) * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
+      const humidityCells = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.moistureFrequency * 4.3 - 40, y * HEX_CONFIG.moistureFrequency * 4.3 + 27, 4, 2.05, 0.57);
       const wind = Math.sin((x / width) * Math.PI * 3 + y * 0.04) * 0.07;
-      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.62) * 1.2);
-      moistures[idx] = clamp01((moistureNoise * 0.5 + 0.5) * 0.68 + (1 - elevation) * 0.16 + wind * 0.08 + rainShadow * 0.08);
+      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.6) * 1.22);
+      const coastBoost = clamp01(1 - Math.sqrt(Math.pow((x / (width - 1)) * 2 - 1, 2) + Math.pow((y / (height - 1)) * 2 - 1, 2)) * 0.55);
+      moistures[idx] = clamp01((moistureNoise * 0.5 + 0.5) * 0.54 + (humidityCells * 0.5 + 0.5) * 0.2 + (1 - elevation) * 0.14 + wind * 0.08 + rainShadow * 0.07 + coastBoost * 0.05);
     }
   }
 
@@ -454,8 +619,11 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   const waterDist = distanceToWater(rawFields.elevations, levels, width, height);
 
   const tiles = buildTiles(width, height, rawFields, levels, waterDist);
+  convertSmallWaterBodiesToLakes(tiles, width, height, 200);
+  assignTerrainResources(tiles, random);
+  placeMythicLandmarks(tiles, random, width, height);
 
-  const landTiles = tiles.filter((tile) => !['심해', '바다', '해안', '모래해변', '호수'].includes(tile.terrainType));
+  const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
   const riverBudget = Math.max(90, Math.floor(210 * (0.6 + avgLandMoisture * 0.8) * (landTiles.length / tiles.length + 0.28)));
 
@@ -513,7 +681,7 @@ const renderWorld = (world) => {
   }, {});
 
   const landCount = Object.entries(terrainStat)
-    .filter(([name]) => !['심해', '바다', '해안', '모래해변', '호수'].includes(name))
+    .filter(([name]) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(name))
     .reduce((sum, [, count]) => sum + count, 0);
 
   const riverCount = terrainStat.강 || 0;

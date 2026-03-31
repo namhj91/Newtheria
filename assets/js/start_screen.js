@@ -16,7 +16,7 @@ const UI = {
   reroll: {
     flipToBackMs: 280,
     collectMs: 360,
-    spinMs: 780,
+    spinMs: 1080,
     spreadBaseMs: 420,
     spreadStepMs: 40,
     flipToFrontMs: 200,
@@ -29,7 +29,8 @@ const UI = {
     tyCenterOffset: 9,
     rotRange: 6,
     rotCenterOffset: 3,
-    spinTurnsDeg: 1080
+    spinTurnsDeg: 360,
+    spinCycles: 3
   }
 };
 
@@ -204,14 +205,17 @@ const reroll = {
       card.style.transform = stackTransforms[i];
     });
 
-    // 3) Rotate each card around its center (3 turns, alternating direction)
+    // 3) Rotate each card 3 times, reversing direction every turn
     await Promise.all(cards.map((card, i) => {
       const spinLayer = card.querySelector('.card-fan-card-spin');
       const direction = i % 2 === 0 ? 1 : -1;
+      const turn = direction * UI.stack.spinTurnsDeg;
       return spinLayer.animate([
         { transform: 'rotate(0deg)' },
-        { transform: `rotate(${direction * UI.stack.spinTurnsDeg}deg)` }
-      ], { duration: UI.reroll.spinMs, easing: 'cubic-bezier(0.3, 0.08, 0.3, 1)' }).finished;
+        { transform: `rotate(${turn}deg)`, offset: 1 / UI.stack.spinCycles },
+        { transform: 'rotate(0deg)', offset: 2 / UI.stack.spinCycles },
+        { transform: `rotate(${turn}deg)`, offset: 1 }
+      ], { duration: UI.reroll.spinMs, easing: 'ease-in-out' }).finished;
     }));
 
     // 4) Shuffle and spread to fan layout (cards stay back-facing)

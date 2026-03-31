@@ -1,4 +1,5 @@
 const menu = document.getElementById('menu');
+<<<<<<< codex/refactor-codebase-tx922s
 let cards = [];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
@@ -29,6 +30,12 @@ const CARD_ITEMS = [
     desc: '모드 및 확장 규칙을 조정합니다.'
   }
 ];
+=======
+let cards = [...menu.querySelectorAll('.card-fan-card')];
+const overlay = document.querySelector('.overlay');
+const eggButton = document.getElementById('easterEgg');
+const rootStyle = document.documentElement.style;
+>>>>>>> main
 
 const UI = {
   cardVerticalStep: 14,
@@ -70,6 +77,7 @@ const dragState = {
 };
 
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
+<<<<<<< codex/refactor-codebase-tx922s
 const cardBackTemplate = '<span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span>';
 
 const createCardElement = ({ route, icon, label, desc }) => {
@@ -92,6 +100,8 @@ const renderCards = () => {
   menu.appendChild(fragment);
   cards = [...menu.querySelectorAll('.card-fan-card')];
 };
+=======
+>>>>>>> main
 
 const layout = {
   calcHoverPush(distance) {
@@ -389,7 +399,10 @@ const bindEvents = () => {
 };
 
 const bootstrap = () => {
+<<<<<<< codex/refactor-codebase-tx922s
   renderCards();
+=======
+>>>>>>> main
   bindEvents();
   effects.applyStarField();
   layout.layoutCards();

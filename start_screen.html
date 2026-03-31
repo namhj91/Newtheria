@@ -13,6 +13,10 @@
       --card-ratio: 1 / 1.618;
       --fan-gap: 92px;
       --fan-tilt: 13deg;
+      --stars-a: radial-gradient(circle at 18% 30%, rgba(234, 243, 255, .92) 0 1.3px, transparent 2.5px);
+      --stars-b: radial-gradient(circle at 82% 60%, rgba(158, 189, 255, .8) 0 1.6px, transparent 3px);
+      --twinkle-a: radial-gradient(circle at 35% 75%, rgba(255, 255, 255, .9) 0 1.8px, transparent 3px);
+      --twinkle-b: radial-gradient(circle at 64% 22%, rgba(164, 190, 255, .82) 0 1.7px, transparent 2.9px);
     }
     * { box-sizing: border-box; }
     body {
@@ -28,12 +32,12 @@
     }
     .stars, .twinkle, .overlay { position: fixed; inset: 0; pointer-events: none; }
     .stars::before, .stars::after, .twinkle::before, .twinkle::after {
-      content: ""; position: absolute; inset: -20%; background-repeat: repeat; background-size: 300px 300px;
+      content: ""; position: absolute; inset: -20%; background-repeat: no-repeat; background-size: cover;
     }
-    .stars::before { background-image: radial-gradient(circle, rgba(234, 243, 255, .9) 1px, transparent 2px); animation: drift 70s linear infinite; }
-    .stars::after { background-image: radial-gradient(circle, rgba(146, 181, 255, .9) 1.2px, transparent 2px); animation: drift 95s linear infinite reverse; opacity: .45; }
-    .twinkle::before { background-image: radial-gradient(circle, rgba(255, 255, 255, .9) 1px, transparent 2px); animation: pulse 5s ease-in-out infinite; }
-    .twinkle::after { background-image: radial-gradient(circle, rgba(145, 179, 255, .7) 1px, transparent 2px); animation: pulse 8s ease-in-out infinite reverse; opacity: .55; }
+    .stars::before { background-image: var(--stars-a); animation: drift 68s linear infinite; }
+    .stars::after { background-image: var(--stars-b); animation: drift 92s linear infinite reverse; opacity: .58; }
+    .twinkle::before { background-image: var(--twinkle-a); animation: pulse 4.4s ease-in-out infinite; }
+    .twinkle::after { background-image: var(--twinkle-b); animation: pulse 7.2s ease-in-out infinite reverse; opacity: .62; }
 
     .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
     .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
@@ -211,7 +215,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.32(260331-시작카드셔플연출개선)</button>
+      <button id="easterEgg" type="button">ver.0.0.33(260331-배경별밀도랜덤강화)</button>
     </footer>
   </main>
 
@@ -221,6 +225,7 @@
     let cards = [...menu.querySelectorAll('.card-fan-card')];
     const overlay = document.querySelector('.overlay');
     const eggButton = document.getElementById('easterEgg');
+    const rootStyle = document.documentElement.style;
     const dragState = {
       pointerId: null,
       card: null,
@@ -245,6 +250,57 @@
         card.style.transform = card.dataset.baseTransform;
         card.style.zIndex = String(100 + (cards.length - i));
       });
+    };
+
+    const randomBetween = (min, max) => Math.random() * (max - min) + min;
+
+    const createStarLayer = ({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) => {
+      const gradients = [];
+      for (let i = 0; i < count; i += 1) {
+        const x = randomBetween(0, 100).toFixed(2);
+        const y = randomBetween(0, 100).toFixed(2);
+        const radius = randomBetween(minRadius, maxRadius);
+        const fadeRadius = radius + randomBetween(0.9, 1.8);
+        const alpha = randomBetween(alphaMin, alphaMax).toFixed(2);
+        const color = palette[Math.floor(Math.random() * palette.length)];
+        gradients.push(`radial-gradient(circle at ${x}% ${y}%, rgba(${color}, ${alpha}) 0 ${radius.toFixed(2)}px, transparent ${fadeRadius.toFixed(2)}px)`);
+      }
+      return gradients.join(', ');
+    };
+
+    const applyStarField = () => {
+      rootStyle.setProperty('--stars-a', createStarLayer({
+        count: 210,
+        minRadius: 0.35,
+        maxRadius: 1.35,
+        alphaMin: 0.46,
+        alphaMax: 0.94,
+        palette: ['233, 242, 255', '214, 229, 255', '190, 214, 255']
+      }));
+      rootStyle.setProperty('--stars-b', createStarLayer({
+        count: 160,
+        minRadius: 0.45,
+        maxRadius: 1.55,
+        alphaMin: 0.36,
+        alphaMax: 0.88,
+        palette: ['178, 205, 255', '154, 187, 255', '133, 168, 245']
+      }));
+      rootStyle.setProperty('--twinkle-a', createStarLayer({
+        count: 84,
+        minRadius: 0.55,
+        maxRadius: 1.95,
+        alphaMin: 0.5,
+        alphaMax: 0.98,
+        palette: ['255, 255, 255', '238, 246, 255']
+      }));
+      rootStyle.setProperty('--twinkle-b', createStarLayer({
+        count: 74,
+        minRadius: 0.6,
+        maxRadius: 2.15,
+        alphaMin: 0.42,
+        alphaMax: 0.86,
+        palette: ['184, 208, 255', '163, 190, 252', '146, 177, 248']
+      }));
     };
 
     const shuffleCardOrder = () => {
@@ -385,6 +441,7 @@
 
     eggButton.addEventListener('click', playReroll);
     window.addEventListener('resize', layoutCards);
+    applyStarField();
     layoutCards();
   </script>
 </body>

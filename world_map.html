@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria 월드맵(헥스)</title>
+  <link rel="stylesheet" href="./assets/css/world_map.css" />
+</head>
+<body>
+  <main class="world-map-screen">
+    <header class="world-map-header">
+      <h1>NEWTHERIA HEX WORLD MAP</h1>
+      <p>지상계(z=0) 200×200 기준 랜덤 월드 생성 (헥스 타일)</p>
+      <div class="world-map-actions">
+        <button id="regenButton" type="button">맵 다시 생성</button>
+        <a href="./start_screen.html">시작 화면으로</a>
+      </div>
+      <p id="mapMeta" class="meta" aria-live="polite"></p>
+      <p id="worldMapVersion" class="meta version"></p>
+    </header>
+
+    <section class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
+      <canvas id="worldMapCanvas" width="1400" height="1250"></canvas>
+    </section>
+  </main>
+
+  <script src="./assets/js/world_map.js"></script>
+</body>
+</html>

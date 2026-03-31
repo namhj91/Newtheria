@@ -1,8 +1,41 @@
 const menu = document.getElementById('menu');
+<<<<<<< codex/refactor-codebase-tx922s
+let cards = [];
+const overlay = document.querySelector('.overlay');
+const eggButton = document.getElementById('easterEgg');
+const rootStyle = document.documentElement.style;
+const CARD_ITEMS = [
+  {
+    route: 'new',
+    icon: '🧭',
+    label: '새로운 여정',
+    desc: '처음부터 새로운 세계를 시작합니다.'
+  },
+  {
+    route: 'continue',
+    icon: '📜',
+    label: '어떤 모험가의 일지',
+    desc: '기록된 여정을 이어서 진행합니다.'
+  },
+  {
+    route: 'codex',
+    icon: '📚',
+    label: '대륙견문록',
+    desc: '인물·지리·전승 문서를 열람합니다.'
+  },
+  {
+    route: 'mods',
+    icon: '⚙️',
+    label: '신의 섭리',
+    desc: '모드 및 확장 규칙을 조정합니다.'
+  }
+];
+=======
 let cards = [...menu.querySelectorAll('.card-fan-card')];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
 const rootStyle = document.documentElement.style;
+>>>>>>> main
 
 const UI = {
   cardVerticalStep: 14,
@@ -44,6 +77,31 @@ const dragState = {
 };
 
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
+<<<<<<< codex/refactor-codebase-tx922s
+const cardBackTemplate = '<span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span>';
+
+const createCardElement = ({ route, icon, label, desc }) => {
+  const button = document.createElement('button');
+  button.className = 'card-fan-card';
+  button.type = 'button';
+  button.dataset.route = route;
+  button.innerHTML = `<span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="icon" aria-hidden="true">${icon}</span><span class="label">${label}</span><span class="desc">${desc}</span></span><span class="card-fan-card-face card-fan-back">${cardBackTemplate}</span></span></span>`;
+  return button;
+};
+
+const renderCards = () => {
+  while (menu.firstChild) {
+    menu.removeChild(menu.firstChild);
+  }
+  const fragment = document.createDocumentFragment();
+  CARD_ITEMS.forEach((item) => {
+    fragment.appendChild(createCardElement(item));
+  });
+  menu.appendChild(fragment);
+  cards = [...menu.querySelectorAll('.card-fan-card')];
+};
+=======
+>>>>>>> main
 
 const layout = {
   calcHoverPush(distance) {
@@ -341,6 +399,10 @@ const bindEvents = () => {
 };
 
 const bootstrap = () => {
+<<<<<<< codex/refactor-codebase-tx922s
+  renderCards();
+=======
+>>>>>>> main
   bindEvents();
   effects.applyStarField();
   layout.layoutCards();

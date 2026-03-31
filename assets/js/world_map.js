@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.57(260331-월드맵생성개편)';
+const WORLD_VERSION = 'ver.0.0.58(260331-노이즈지형자연화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -493,7 +493,11 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
 const createNoiseContext = (seed) => ({
   elevation: createPerlin2D(seed ^ 0xa54ff53a),
   moisture: createPerlin2D(seed ^ 0x510e527f),
-  heat: createPerlin2D(seed ^ 0x9b05688c)
+  heat: createPerlin2D(seed ^ 0x9b05688c),
+  warpX: createPerlin2D(seed ^ 0x1f83d9ab),
+  warpY: createPerlin2D(seed ^ 0x5be0cd19),
+  detail: createPerlin2D(seed ^ 0xcbbb9d5d),
+  climate: createPerlin2D(seed ^ 0x428a2f98)
 });
 
 const buildScalarFields = (width, height, seed, noiseContext, plates) => {
@@ -503,16 +507,29 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
 
   for (let y = 0; y < height; y += 1) {
     const latitude = Math.abs((y / (height - 1)) * 2 - 1);
+    const equatorBase = 1 - latitude;
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
       const plate = plateField(x, y, plates);
-      const warped = domainWarp(noiseContext.elevation, x, y, HEX_CONFIG.elevationFrequency, 28);
+      const warpCoarseX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
+      const warpCoarseY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
+      const warpFineX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 2.3 + 71, y * HEX_CONFIG.elevationFrequency * 2.3 - 19, 3, 2.1, 0.6) - 0.5) * 11;
+      const warpFineY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 2.3 - 23, y * HEX_CONFIG.elevationFrequency * 2.3 + 43, 3, 2.1, 0.6) - 0.5) * 11;
+
+      const warped = domainWarp(
+        noiseContext.elevation,
+        x + warpCoarseX + warpFineX,
+        y + warpCoarseY + warpFineY,
+        HEX_CONFIG.elevationFrequency,
+        24
+      );
 
       const continentNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency, warped.y * HEX_CONFIG.elevationFrequency, 6, 2, 0.56);
-      const ridgeNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.8, y * HEX_CONFIG.elevationFrequency * 2.8, 4, 2.15, 0.6);
-      const basinNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 1.05 - 21, y * HEX_CONFIG.elevationFrequency * 1.05 + 19, 5, 2.1, 0.58);
-      const detailNoise = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 4.1 + 37, y * HEX_CONFIG.elevationFrequency * 4.1 - 53, 3, 2.2, 0.62);
+      const ridgeNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency * 2.9, warped.y * HEX_CONFIG.elevationFrequency * 2.9, 4, 2.15, 0.6);
+      const basinNoise = fbmPerlin(noiseContext.elevation, (x + warpCoarseX) * HEX_CONFIG.elevationFrequency * 1.05 - 21, (y + warpCoarseY) * HEX_CONFIG.elevationFrequency * 1.05 + 19, 5, 2.1, 0.58);
+      const detailNoise = fbmPerlin(noiseContext.detail, (x + warpFineX) * HEX_CONFIG.elevationFrequency * 4.2 + 37, (y + warpFineY) * HEX_CONFIG.elevationFrequency * 4.2 - 53, 4, 2.2, 0.62);
+      const fractureNoise = Math.abs(fbmPerlin(noiseContext.detail, x * HEX_CONFIG.elevationFrequency * 7.5 - 109, y * HEX_CONFIG.elevationFrequency * 7.5 + 47, 3, 2.2, 0.55));
 
       const ridgeLift = plate.boundary * 0.23 + (1 - plate.divergence) * 0.1;
       const trenchCut = clamp01((0.16 - basinNoise) * 2.2) * (1 - plate.boundary) * 0.16;
@@ -520,10 +537,11 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
 
       const elevation = clamp01(
         (
-          plate.base * 0.47
-          + (continentNoise * 0.5 + 0.5) * 0.24
+          plate.base * 0.44
+          + (continentNoise * 0.5 + 0.5) * 0.26
           + (ridgeNoise * 0.5 + 0.5) * 0.18
-          + (detailNoise * 0.5 + 0.5) * 0.1
+          + (detailNoise * 0.5 + 0.5) * 0.08
+          + fractureNoise * 0.06
           + ridgeLift
         ) * masked
         + (1 - masked) * 0.05
@@ -531,14 +549,18 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
       );
       elevations[idx] = elevation;
 
-      const heatNoise = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
+      const heatNoise = fbmPerlin(noiseContext.heat, (x + warpFineX) * HEX_CONFIG.heatFrequency, (y + warpFineY) * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
+      const heatMicro = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.heatFrequency * 3.8 + 12, y * HEX_CONFIG.heatFrequency * 3.8 - 9, 3, 2, 0.58);
       const seasonal = Math.sin((y / height) * Math.PI * 4 + seed * 0.000001) * 0.055;
-      heats[idx] = clamp01((1 - latitude * 0.82) * 0.72 + (heatNoise * 0.5 + 0.5) * 0.24 + seasonal);
+      const climateWave = Math.sin((x / width) * Math.PI * 2.7 + y * 0.023) * 0.045;
+      heats[idx] = clamp01(equatorBase * 0.43 + (heatNoise * 0.5 + 0.5) * 0.34 + (heatMicro * 0.5 + 0.5) * 0.14 + seasonal + climateWave);
 
-      const moistureNoise = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
+      const moistureNoise = fbmPerlin(noiseContext.moisture, (x + warpCoarseX) * HEX_CONFIG.moistureFrequency, (y + warpCoarseY) * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
+      const humidityCells = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.moistureFrequency * 4.3 - 40, y * HEX_CONFIG.moistureFrequency * 4.3 + 27, 4, 2.05, 0.57);
       const wind = Math.sin((x / width) * Math.PI * 3 + y * 0.04) * 0.07;
-      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.62) * 1.2);
-      moistures[idx] = clamp01((moistureNoise * 0.5 + 0.5) * 0.68 + (1 - elevation) * 0.16 + wind * 0.08 + rainShadow * 0.08);
+      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.6) * 1.22);
+      const coastBoost = clamp01(1 - Math.sqrt(Math.pow((x / (width - 1)) * 2 - 1, 2) + Math.pow((y / (height - 1)) * 2 - 1, 2)) * 0.55);
+      moistures[idx] = clamp01((moistureNoise * 0.5 + 0.5) * 0.54 + (humidityCells * 0.5 + 0.5) * 0.2 + (1 - elevation) * 0.14 + wind * 0.08 + rainShadow * 0.07 + coastBoost * 0.05);
     }
   }
 

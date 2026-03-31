@@ -1,12 +1,12 @@
-const WORLD_VERSION = 'ver.0.0.49(260331-헥스판구조기후개선)';
+const WORLD_VERSION = 'ver.0.0.50(260331-헥스해양편향수정)';
 
 const HEX_CONFIG = {
   cols: 200,
   rows: 200,
   z: 0,
   size: 4,
-  seaLevel: 0.53,
-  deepSeaLevel: 0.36,
+  seaLevel: 0.5,
+  deepSeaLevel: 0.34,
   coastBand: 0.03,
   mountainLevel: 0.8,
   riverCount: 170,
@@ -198,7 +198,7 @@ const smoothField = (field, passes = 2) => {
   return current;
 };
 
-const distanceToWater = (elevations) => {
+const distanceToWater = (elevations, levels) => {
   const len = HEX_CONFIG.cols * HEX_CONFIG.rows;
   const dist = new Array(len).fill(Infinity);
   const queue = [];
@@ -206,7 +206,7 @@ const distanceToWater = (elevations) => {
   for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
     for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
       const idx = y * HEX_CONFIG.cols + x;
-      if (elevations[idx] < HEX_CONFIG.seaLevel) {
+      if (elevations[idx] < levels.seaLevel) {
         dist[idx] = 0;
         queue.push([x, y]);
       }
@@ -228,11 +228,20 @@ const distanceToWater = (elevations) => {
   return dist;
 };
 
-const classifyTerrain = (elevation, moisture, heat, nearSea) => {
-  if (elevation < HEX_CONFIG.deepSeaLevel) return '심해';
-  if (elevation < HEX_CONFIG.seaLevel - HEX_CONFIG.coastBand) return '바다';
-  if (elevation < HEX_CONFIG.seaLevel) return '해안';
-  if (elevation < HEX_CONFIG.seaLevel + 0.012 && nearSea) return '모래해변';
+
+const getAdaptiveSeaLevels = (elevations) => {
+  const sorted = [...elevations].sort((a, b) => a - b);
+  const seaIndex = Math.floor(sorted.length * 0.62);
+  const seaLevel = sorted[Math.max(0, Math.min(sorted.length - 1, seaIndex))];
+  const deepSeaLevel = seaLevel - 0.13;
+  return { seaLevel, deepSeaLevel };
+};
+
+const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
+  if (elevation < levels.deepSeaLevel) return '심해';
+  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand) return '바다';
+  if (elevation < levels.seaLevel) return '해안';
+  if (elevation < levels.seaLevel + 0.012 && nearSea) return '모래해변';
 
   if (elevation > 0.9 && heat < 0.23) return '만년설산';
   if (elevation > 0.87 && moisture < 0.24) return '화산지대';
@@ -248,7 +257,7 @@ const classifyTerrain = (elevation, moisture, heat, nearSea) => {
   return '평원';
 };
 
-const carveRivers = (tiles, random) => {
+const carveRivers = (tiles, random, levels) => {
   const get = (x, y) => tiles[y * HEX_CONFIG.cols + x];
   const sources = tiles.filter((tile) => tile.elevation > 0.72 && tile.moisture > 0.42);
 
@@ -266,7 +275,7 @@ const carveRivers = (tiles, random) => {
       visited.add(key);
 
       const current = get(x, y);
-      if (!current || current.elevation <= HEX_CONFIG.seaLevel) break;
+      if (!current || current.elevation <= levels.seaLevel) break;
 
       if (!['산맥', '만년설산', '화산지대'].includes(current.terrainType)) {
         current.terrainType = '강';
@@ -313,7 +322,8 @@ const buildWorldMap = (seed) => {
   }
 
   const smoothElev = smoothField(elevations, 2);
-  const waterDistance = distanceToWater(smoothElev);
+  const levels = getAdaptiveSeaLevels(smoothElev);
+  const waterDistance = distanceToWater(smoothElev, levels);
 
   const tiles = [];
   for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
@@ -324,8 +334,8 @@ const buildWorldMap = (seed) => {
       const moisture = clamp01(moistures[idx] * 0.72 + coastMoisture * 0.28);
       const heat = heats[idx];
 
-      const nearSea = getNeighbors(x, y).some(([nx, ny]) => smoothElev[ny * HEX_CONFIG.cols + nx] < HEX_CONFIG.seaLevel);
-      const terrainType = classifyTerrain(elevation, moisture, heat, nearSea);
+      const nearSea = getNeighbors(x, y).some(([nx, ny]) => smoothElev[ny * HEX_CONFIG.cols + nx] < levels.seaLevel);
+      const terrainType = classifyTerrain(elevation, moisture, heat, nearSea, levels);
 
       tiles.push({
         coord: { x, y, z: HEX_CONFIG.z },
@@ -347,7 +357,7 @@ const buildWorldMap = (seed) => {
     }
   }
 
-  carveRivers(tiles, random);
+  carveRivers(tiles, random, levels);
   return tiles;
 };
 

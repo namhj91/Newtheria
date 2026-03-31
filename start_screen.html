@@ -160,7 +160,6 @@
       outline: none;
     }
     .card-fan-card.is-hovered {
-      transform: var(--base-transform, translate(0px, 0px) rotate(0deg)) translateY(-8px) scale(1.02);
       box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
       z-index: 220 !important;
     }
@@ -246,7 +245,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.40(260331-카드호버상승강도조정)</button>
+      <button id="easterEgg" type="button">ver.0.0.41(260331-카드상단상승보정)</button>
     </footer>
   </main>
 
@@ -287,6 +286,8 @@
     const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
     const HOVER_PUSH_MAX = 44;
+    const HOVER_LIFT_Y = -14;
+    const HOVER_SCALE = 1.03;
 
     const calcHoverPush = (distance) => {
       if (distance <= 0) return 0;
@@ -303,16 +304,21 @@
         if (card.classList.contains('dragging')) return;
 
         let shiftX = 0;
+        let hoverY = 0;
+        let hoverScale = 1;
         if (hoveredCard) {
           const hoveredIndex = cards.indexOf(hoveredCard);
           if (i !== hoveredIndex) {
             const direction = i < hoveredIndex ? -1 : 1;
             const distance = Math.abs(i - hoveredIndex);
             shiftX = direction * calcHoverPush(distance);
+          } else {
+            hoverY = HOVER_LIFT_Y;
+            hoverScale = HOVER_SCALE;
           }
         }
 
-        card.style.transform = `${baseTransform} translateX(${shiftX}px)`;
+        card.style.transform = `${baseTransform} translateX(${shiftX}px) translateY(${hoverY}px) scale(${hoverScale})`;
       });
     };
 

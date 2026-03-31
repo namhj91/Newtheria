@@ -211,7 +211,7 @@
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.30(260329-카드팬선택지리뉴얼)</button>
+      <button id="easterEgg" type="button">ver.0.0.31(260330-시작카드z오더조정)</button>
     </footer>
   </main>
 
@@ -243,7 +243,7 @@
         card.style.setProperty('--rot', `${rot}deg`);
         card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
         card.style.transform = card.dataset.baseTransform;
-        card.style.zIndex = String(100 + i);
+        card.style.zIndex = String(100 + (cards.length - i));
       });
     };
 

@@ -106,6 +106,7 @@
       padding: 18px 16px;
       text-align: left;
       backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
     .card-fan-card-face::after {
       content: "";
@@ -121,12 +122,37 @@
     }
     .card-fan-back {
       transform: rotateY(180deg);
-      background: radial-gradient(circle at 20% 20%, #12354d, #020617 65%);
-      text-transform: uppercase;
-      letter-spacing: .28em;
-      font-size: .9rem;
+      background:
+        radial-gradient(circle at 28% 24%, rgba(77, 213, 255, .24), transparent 44%),
+        radial-gradient(circle at 72% 76%, rgba(129, 140, 248, .26), transparent 42%),
+        linear-gradient(160deg, #0a1b34 0%, #091325 48%, #050a17 100%);
       align-items: center;
+      justify-content: center;
       text-align: center;
+      overflow: hidden;
+    }
+    .card-fan-back .sigil {
+      display: block;
+      font-size: 2rem;
+      line-height: 1;
+      color: #8be9ff;
+      text-shadow: 0 0 16px rgba(56, 189, 248, .45);
+      margin-bottom: 10px;
+    }
+    .card-fan-back .brand {
+      display: block;
+      font-size: .92rem;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: rgba(226, 241, 255, .94);
+      font-weight: 700;
+    }
+    .card-fan-back .orbit {
+      position: absolute;
+      inset: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 223, 255, .28);
+      pointer-events: none;
     }
     .card-fan-card .label { display: block; font-size: 1.08rem; font-weight: 700; margin-bottom: 10px; }
     .card-fan-card .desc { font-size: .89rem; line-height: 1.45; opacity: .84; }
@@ -203,23 +229,23 @@
       <div class="card-fan-wrap center">
         <div class="card-fan" id="menu">
           <button class="card-fan-card" type="button" data-route="new">
-            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></span><span class="card-fan-card-face card-fan-back">Newtheria</span></span></span>
+            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">새로운 여정</span><span class="desc">처음부터 새로운 세계를 시작합니다.</span></span><span class="card-fan-card-face card-fan-back"><span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span></span></span></span>
           </button>
           <button class="card-fan-card" type="button" data-route="continue">
-            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></span><span class="card-fan-card-face card-fan-back">Chronicle</span></span></span>
+            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">어떤 모험가의 일지</span><span class="desc">기록된 여정을 이어서 진행합니다.</span></span><span class="card-fan-card-face card-fan-back"><span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span></span></span></span>
           </button>
           <button class="card-fan-card" type="button" data-route="codex">
-            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></span><span class="card-fan-card-face card-fan-back">Codex</span></span></span>
+            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">대륙견문록</span><span class="desc">인물·지리·전승 문서를 열람합니다.</span></span><span class="card-fan-card-face card-fan-back"><span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span></span></span></span>
           </button>
           <button class="card-fan-card" type="button" data-route="mods">
-            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></span><span class="card-fan-card-face card-fan-back">Providence</span></span></span>
+            <span class="card-fan-card-spin"><span class="card-fan-card-inner"><span class="card-fan-card-face card-fan-front"><span class="label">신의 섭리</span><span class="desc">모드 및 확장 규칙을 조정합니다.</span></span><span class="card-fan-card-face card-fan-back"><span class="orbit"></span><span class="sigil">✦</span><span class="brand">AetheriA</span></span></span></span>
           </button>
         </div>
       </div>
     </section>
 
     <footer class="meta">
-      <button id="easterEgg" type="button">ver.0.0.36(260331-카드전체뒤집힘수정)</button>
+      <button id="easterEgg" type="button">ver.0.0.37(260331-카드뒷면에테리아디자인)</button>
     </footer>
   </main>
 

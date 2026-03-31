@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.50(260331-헥스해양편향수정)';
+const WORLD_VERSION = 'ver.0.0.52(260331-월드맵복잡도강화)';
 
 const HEX_CONFIG = {
   cols: 200,
@@ -174,6 +174,29 @@ const plateElevation = (x, y, plates) => {
   return clamp01(base + ridgeBoost);
 };
 
+const plateStress = (x, y, plates) => {
+  let nearest = Infinity;
+  let second = Infinity;
+  let nearestPlate = null;
+
+  for (const plate of plates) {
+    const dx = x - plate.x;
+    const dy = y - plate.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < nearest) {
+      second = nearest;
+      nearest = dist;
+      nearestPlate = plate;
+    } else if (dist < second) {
+      second = dist;
+    }
+  }
+
+  const boundaryStress = clamp01(1 - (second - nearest) / 10);
+  const continentalBoost = nearestPlate?.continental ? 0.14 : 0;
+  return clamp01(boundaryStress + continentalBoost);
+};
+
 const smoothField = (field, passes = 2) => {
   let current = field.slice();
 
@@ -231,10 +254,39 @@ const distanceToWater = (elevations, levels) => {
 
 const getAdaptiveSeaLevels = (elevations) => {
   const sorted = [...elevations].sort((a, b) => a - b);
-  const seaIndex = Math.floor(sorted.length * 0.62);
-  const seaLevel = sorted[Math.max(0, Math.min(sorted.length - 1, seaIndex))];
+  const pickByRatio = (ratio) => {
+    const idx = Math.floor(sorted.length * ratio);
+    return sorted[Math.max(0, Math.min(sorted.length - 1, idx))];
+  };
+
+  let seaLevel = pickByRatio(0.62);
+  const waterRatio = elevations.filter((value) => value < seaLevel).length / elevations.length;
+
+  if (waterRatio > 0.9) seaLevel = pickByRatio(0.52);
+  else if (waterRatio < 0.4) seaLevel = pickByRatio(0.78);
+
   const deepSeaLevel = seaLevel - 0.13;
   return { seaLevel, deepSeaLevel };
+};
+
+const applyErosion = (field, iterations = 1) => {
+  let current = field.slice();
+  for (let step = 0; step < iterations; step += 1) {
+    const next = current.slice();
+    for (let y = 0; y < HEX_CONFIG.rows; y += 1) {
+      for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
+        const idx = y * HEX_CONFIG.cols + x;
+        const here = current[idx];
+        const neighbors = getNeighbors(x, y).map(([nx, ny]) => current[ny * HEX_CONFIG.cols + nx]);
+        const avgNeighbor = neighbors.reduce((sum, value) => sum + value, 0) / neighbors.length;
+        const slope = here - avgNeighbor;
+        const erosion = slope > 0.045 ? slope * 0.22 : 0;
+        next[idx] = clamp01(here - erosion);
+      }
+    }
+    current = next;
+  }
+  return current;
 };
 
 const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
@@ -257,11 +309,16 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
   return '평원';
 };
 
-const carveRivers = (tiles, random, levels) => {
+const carveRivers = (tiles, random, levels, riverBudget) => {
   const get = (x, y) => tiles[y * HEX_CONFIG.cols + x];
-  const sources = tiles.filter((tile) => tile.elevation > 0.72 && tile.moisture > 0.42);
+  let sources = tiles.filter((tile) => tile.elevation > 0.62 && tile.moisture > 0.3);
+  if (sources.length < 24) {
+    sources = [...tiles]
+      .sort((a, b) => (b.elevation + b.moisture * 0.25) - (a.elevation + a.moisture * 0.25))
+      .slice(0, 400);
+  }
 
-  for (let i = 0; i < HEX_CONFIG.riverCount; i += 1) {
+  for (let i = 0; i < riverBudget; i += 1) {
     const source = sources[Math.floor(random() * sources.length)];
     if (!source) continue;
 
@@ -306,22 +363,33 @@ const buildWorldMap = (seed) => {
     for (let x = 0; x < HEX_CONFIG.cols; x += 1) {
       const idx = y * HEX_CONFIG.cols + x;
       const plateBase = plateElevation(x, y, plates);
+      const tectonicStress = plateStress(x, y, plates);
       const continentalNoise = domainWarpNoise(x, y, seed + 17, HEX_CONFIG.elevationFrequency);
       const ruggedNoise = domainWarpNoise(x * 1.8, y * 1.8, seed + 97, HEX_CONFIG.elevationFrequency * 1.8);
+      const trenchNoise = domainWarpNoise(x * 0.65, y * 0.65, seed + 181, HEX_CONFIG.elevationFrequency * 0.72);
       const islandMask = edgeFalloff(x, y);
 
-      const elevation = clamp01((plateBase * 0.58 + continentalNoise * 0.29 + ruggedNoise * 0.13) * islandMask + (1 - islandMask) * 0.06);
+      const ridgeLift = tectonicStress * 0.16;
+      const trenchCut = clamp01((0.5 - trenchNoise) * 2) * (1 - tectonicStress) * 0.08;
+      const elevation = clamp01(
+        (plateBase * 0.52 + continentalNoise * 0.26 + ruggedNoise * 0.14 + ridgeLift) * islandMask
+        + (1 - islandMask) * 0.06
+        - trenchCut
+      );
       elevations[idx] = elevation;
 
       const heatNoise = fbm(x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, seed + 401, 4);
-      heats[idx] = clamp01((1 - latitude * 0.82) * 0.74 + heatNoise * 0.26);
+      const seasonalWave = Math.sin((y / HEX_CONFIG.rows) * Math.PI * 4 + seed * 0.000001) * 0.05;
+      heats[idx] = clamp01((1 - latitude * 0.82) * 0.7 + heatNoise * 0.25 + seasonalWave);
 
       const rainNoise = domainWarpNoise(x, y, seed + 719, 0.016);
-      moistures[idx] = clamp01(rainNoise * 0.8 + (1 - elevation) * 0.2);
+      const windWave = Math.sin((x / HEX_CONFIG.cols) * Math.PI * 3 + y * 0.045) * 0.08;
+      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.63) * 1.25);
+      moistures[idx] = clamp01(rainNoise * 0.67 + (1 - elevation) * 0.17 + windWave * 0.08 + rainShadow * 0.08);
     }
   }
 
-  const smoothElev = smoothField(elevations, 2);
+  const smoothElev = applyErosion(smoothField(elevations, 2), 1);
   const levels = getAdaptiveSeaLevels(smoothElev);
   const waterDistance = distanceToWater(smoothElev, levels);
 
@@ -357,7 +425,15 @@ const buildWorldMap = (seed) => {
     }
   }
 
-  carveRivers(tiles, random, levels);
+  const landTiles = tiles.filter((tile) => !['심해', '바다', '해안', '모래해변', '호수'].includes(tile.terrainType));
+  const wetLandWeight = landTiles.reduce((sum, tile) => sum + tile.moisture, 0);
+  const averageLandMoisture = landTiles.length ? wetLandWeight / landTiles.length : 0;
+  const dynamicRiverCount = Math.max(
+    70,
+    Math.floor(HEX_CONFIG.riverCount * (0.68 + averageLandMoisture * 0.9) * (landTiles.length / tiles.length + 0.35))
+  );
+
+  carveRivers(tiles, random, levels, dynamicRiverCount);
   return tiles;
 };
 

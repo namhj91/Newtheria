@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.62(260409-중앙대륙강제제거)';
+const WORLD_VERSION = 'ver.0.0.63(260409-강축소지형복잡도강화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -10,9 +10,9 @@ const HEX_CONFIG = {
   deepSeaOffset: 0.12,
   coastBand: 0.02,
   mountainLevel: 0.78,
-  elevationFrequency: 0.0125,
-  moistureFrequency: 0.0135,
-  heatFrequency: 0.0092,
+  elevationFrequency: 0.0158,
+  moistureFrequency: 0.0162,
+  heatFrequency: 0.0105,
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
@@ -377,12 +377,12 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
   const get = (x, y) => tiles[y * width + x];
-  let sources = tiles.filter((tile) => tile.elevation > 0.64 && tile.moisture > 0.34);
+  let sources = tiles.filter((tile) => tile.elevation > 0.69 && tile.moisture > 0.44);
 
   if (sources.length < 30) {
     sources = [...tiles]
       .sort((a, b) => (b.elevation + b.moisture * 0.24) - (a.elevation + a.moisture * 0.24))
-      .slice(0, 500);
+      .slice(0, 220);
   }
 
   for (let i = 0; i < riverBudget; i += 1) {
@@ -393,7 +393,7 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
     let y = source.coord.y;
     const visited = new Set();
 
-    for (let step = 0; step < 180; step += 1) {
+    for (let step = 0; step < 120; step += 1) {
       const key = `${x},${y}`;
       if (visited.has(key)) break;
       visited.add(key);
@@ -407,8 +407,8 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
       }
 
       const candidates = getNeighbors(x, y, width, height).map(([nx, ny]) => [nx, ny, get(nx, ny)]);
-      candidates.sort((a, b) => (a[2].elevation + random() * 0.004) - (b[2].elevation + random() * 0.004));
-      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.004);
+      candidates.sort((a, b) => (a[2].elevation + random() * 0.0022) - (b[2].elevation + random() * 0.0022));
+      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.0025);
       if (!next) break;
       [x, y] = next;
     }
@@ -432,32 +432,34 @@ const buildScalarFields = (width, height, noiseContext) => {
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
-      const macroElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency, y * HEX_CONFIG.elevationFrequency, 5, 2, 0.56);
-      const regionalElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.2 + 37, y * HEX_CONFIG.elevationFrequency * 2.2 - 41, 4, 2, 0.58);
-      const microElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 4.6 - 13, y * HEX_CONFIG.elevationFrequency * 4.6 + 17, 3, 2.05, 0.6);
-      const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.75 + 101, y * HEX_CONFIG.elevationFrequency * 0.75 - 73, 2, 2, 0.5);
+      const macroElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency, y * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
+      const regionalElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.6 + 37, y * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
+      const microElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 5.5 - 13, y * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
+      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 8.8 + 59, y * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
+      const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.9 + 101, y * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
 
       const elevation = clamp01(
         ((macroElevation * 0.5 + 0.5) * 0.56
-        + (regionalElevation * 0.5 + 0.5) * 0.3
-        + (microElevation * 0.5 + 0.5) * 0.14)
-        - (oceanScatter * 0.5 + 0.5) * 0.07
+        + (regionalElevation * 0.5 + 0.5) * 0.24
+        + (microElevation * 0.5 + 0.5) * 0.12
+        + ruggedNoise * 0.08)
+        - (oceanScatter * 0.5 + 0.5) * 0.09
       );
       elevations[idx] = elevation;
 
-      const heatLarge = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
-      const heatDetail = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 3.5 + 12, y * HEX_CONFIG.heatFrequency * 3.5 - 9, 3, 2.1, 0.58);
+      const heatLarge = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
+      const heatDetail = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 4.1 + 12, y * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
       heats[idx] = clamp01(equatorBase * 0.52 + (heatLarge * 0.5 + 0.5) * 0.32 + (heatDetail * 0.5 + 0.5) * 0.16);
 
-      const moistureLarge = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
-      const moistureDetail = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 3.9 - 17, y * HEX_CONFIG.moistureFrequency * 3.9 + 29, 4, 2.05, 0.57);
+      const moistureLarge = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
+      const moistureDetail = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 4.5 - 17, y * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
       const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
       moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.62 + (moistureDetail * 0.5 + 0.5) * 0.26 + (1 - elevation) * 0.12 - elevationPenalty);
     }
   }
 
   return {
-    elevations: smoothField(elevations, width, height, 2),
+    elevations: smoothField(elevations, width, height, 1),
     moistures: smoothField(moistures, width, height, 1),
     heats: smoothField(heats, width, height, 1)
   };
@@ -518,7 +520,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
 
   const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
-  const riverBudget = Math.max(90, Math.floor(210 * (0.6 + avgLandMoisture * 0.8) * (landTiles.length / tiles.length + 0.28)));
+  const riverBudget = Math.max(20, Math.floor(55 * (0.35 + avgLandMoisture * 0.5) * (landTiles.length / tiles.length + 0.14)));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
 

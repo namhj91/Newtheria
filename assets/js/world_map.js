@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.60(260409-시작화면별만조정)';
+const WORLD_VERSION = 'ver.0.0.63(260409-강축소지형복잡도강화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -10,10 +10,9 @@ const HEX_CONFIG = {
   deepSeaOffset: 0.12,
   coastBand: 0.02,
   mountainLevel: 0.78,
-  plateCount: 18,
-  elevationFrequency: 0.0125,
-  moistureFrequency: 0.0135,
-  heatFrequency: 0.0092,
+  elevationFrequency: 0.0158,
+  moistureFrequency: 0.0162,
+  heatFrequency: 0.0105,
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
@@ -139,12 +138,6 @@ const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   return sum / ampSum;
 };
 
-const domainWarp = (noise2D, x, y, baseFreq, strength = 28) => {
-  const wx = fbmPerlin(noise2D, x * baseFreq * 0.7 + 13, y * baseFreq * 0.7 - 9, 3);
-  const wy = fbmPerlin(noise2D, x * baseFreq * 0.7 - 11, y * baseFreq * 0.7 + 7, 3);
-  return { x: x + wx * strength, y: y + wy * strength };
-};
-
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
 
 const getNeighbors = (x, y, width, height) => {
@@ -163,56 +156,6 @@ const getNeighbors = (x, y, width, height) => {
   ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
 };
 
-const edgeMask = (x, y, width, height) => {
-  const cx = (width - 1) / 2;
-  const cy = (height - 1) / 2;
-  const dx = Math.abs(x - cx) / cx;
-  const dy = Math.abs(y - cy) / cy;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  return Math.max(0, 1 - Math.pow(d, 1.9));
-};
-
-const generatePlates = (seed, width, height) => {
-  const random = mulberry32(seed ^ 0x6a09e667);
-  const plates = [];
-  for (let i = 0; i < HEX_CONFIG.plateCount; i += 1) {
-    const angle = random() * Math.PI * 2;
-    plates.push({
-      x: Math.floor(random() * width),
-      y: Math.floor(random() * height),
-      vx: Math.cos(angle),
-      vy: Math.sin(angle),
-      continental: random() > 0.45,
-      uplift: random() * 0.3 + 0.12
-    });
-  }
-  return plates;
-};
-
-const plateField = (x, y, plates) => {
-  let first = Infinity;
-  let second = Infinity;
-  let owner = plates[0];
-
-  for (const p of plates) {
-    const dx = x - p.x;
-    const dy = y - p.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < first) {
-      second = first;
-      first = dist;
-      owner = p;
-    } else if (dist < second) {
-      second = dist;
-    }
-  }
-
-  const boundary = clamp01(1 - (second - first) / 11);
-  const divergence = clamp01(Math.abs(owner.vx * (x - owner.x) + owner.vy * (y - owner.y)) / 24);
-  const base = owner.continental ? 0.54 + owner.uplift * 0.26 : 0.32 + owner.uplift * 0.14;
-  return { base, boundary, divergence };
-};
-
 const smoothField = (field, width, height, passes = 1) => {
   let current = field.slice();
   for (let pass = 0; pass < passes; pass += 1) {
@@ -228,24 +171,6 @@ const smoothField = (field, width, height, passes = 1) => {
           weight += 1;
         }
         next[idx] = sum / weight;
-      }
-    }
-    current = next;
-  }
-  return current;
-};
-
-const applyErosion = (field, width, height, passes = 1) => {
-  let current = field.slice();
-  for (let step = 0; step < passes; step += 1) {
-    const next = current.slice();
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const idx = y * width + x;
-        const neighbors = getNeighbors(x, y, width, height).map(([nx, ny]) => current[ny * width + nx]);
-        const avg = neighbors.reduce((a, b) => a + b, 0) / neighbors.length;
-        const slope = current[idx] - avg;
-        next[idx] = clamp01(current[idx] - (slope > 0.04 ? slope * 0.18 : 0));
       }
     }
     current = next;
@@ -452,12 +377,12 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
   const get = (x, y) => tiles[y * width + x];
-  let sources = tiles.filter((tile) => tile.elevation > 0.64 && tile.moisture > 0.34);
+  let sources = tiles.filter((tile) => tile.elevation > 0.69 && tile.moisture > 0.44);
 
   if (sources.length < 30) {
     sources = [...tiles]
       .sort((a, b) => (b.elevation + b.moisture * 0.24) - (a.elevation + a.moisture * 0.24))
-      .slice(0, 500);
+      .slice(0, 220);
   }
 
   for (let i = 0; i < riverBudget; i += 1) {
@@ -468,7 +393,7 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
     let y = source.coord.y;
     const visited = new Set();
 
-    for (let step = 0; step < 180; step += 1) {
+    for (let step = 0; step < 120; step += 1) {
       const key = `${x},${y}`;
       if (visited.has(key)) break;
       visited.add(key);
@@ -482,8 +407,8 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
       }
 
       const candidates = getNeighbors(x, y, width, height).map(([nx, ny]) => [nx, ny, get(nx, ny)]);
-      candidates.sort((a, b) => (a[2].elevation + random() * 0.004) - (b[2].elevation + random() * 0.004));
-      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.004);
+      candidates.sort((a, b) => (a[2].elevation + random() * 0.0022) - (b[2].elevation + random() * 0.0022));
+      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.0025);
       if (!next) break;
       [x, y] = next;
     }
@@ -493,14 +418,10 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
 const createNoiseContext = (seed) => ({
   elevation: createPerlin2D(seed ^ 0xa54ff53a),
   moisture: createPerlin2D(seed ^ 0x510e527f),
-  heat: createPerlin2D(seed ^ 0x9b05688c),
-  warpX: createPerlin2D(seed ^ 0x1f83d9ab),
-  warpY: createPerlin2D(seed ^ 0x5be0cd19),
-  detail: createPerlin2D(seed ^ 0xcbbb9d5d),
-  climate: createPerlin2D(seed ^ 0x428a2f98)
+  heat: createPerlin2D(seed ^ 0x9b05688c)
 });
 
-const buildScalarFields = (width, height, seed, noiseContext, plates) => {
+const buildScalarFields = (width, height, noiseContext) => {
   const elevations = new Array(width * height).fill(0);
   const moistures = new Array(width * height).fill(0);
   const heats = new Array(width * height).fill(0);
@@ -511,60 +432,37 @@ const buildScalarFields = (width, height, seed, noiseContext, plates) => {
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
-      const plate = plateField(x, y, plates);
-      const warpCoarseX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
-      const warpCoarseY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 0.85, y * HEX_CONFIG.elevationFrequency * 0.85, 4, 2, 0.56) - 0.5) * 34;
-      const warpFineX = (fbmPerlin(noiseContext.warpX, x * HEX_CONFIG.elevationFrequency * 2.3 + 71, y * HEX_CONFIG.elevationFrequency * 2.3 - 19, 3, 2.1, 0.6) - 0.5) * 11;
-      const warpFineY = (fbmPerlin(noiseContext.warpY, x * HEX_CONFIG.elevationFrequency * 2.3 - 23, y * HEX_CONFIG.elevationFrequency * 2.3 + 43, 3, 2.1, 0.6) - 0.5) * 11;
-
-      const warped = domainWarp(
-        noiseContext.elevation,
-        x + warpCoarseX + warpFineX,
-        y + warpCoarseY + warpFineY,
-        HEX_CONFIG.elevationFrequency,
-        24
-      );
-
-      const continentNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency, warped.y * HEX_CONFIG.elevationFrequency, 6, 2, 0.56);
-      const ridgeNoise = fbmPerlin(noiseContext.elevation, warped.x * HEX_CONFIG.elevationFrequency * 2.9, warped.y * HEX_CONFIG.elevationFrequency * 2.9, 4, 2.15, 0.6);
-      const basinNoise = fbmPerlin(noiseContext.elevation, (x + warpCoarseX) * HEX_CONFIG.elevationFrequency * 1.05 - 21, (y + warpCoarseY) * HEX_CONFIG.elevationFrequency * 1.05 + 19, 5, 2.1, 0.58);
-      const detailNoise = fbmPerlin(noiseContext.detail, (x + warpFineX) * HEX_CONFIG.elevationFrequency * 4.2 + 37, (y + warpFineY) * HEX_CONFIG.elevationFrequency * 4.2 - 53, 4, 2.2, 0.62);
-      const fractureNoise = Math.abs(fbmPerlin(noiseContext.detail, x * HEX_CONFIG.elevationFrequency * 7.5 - 109, y * HEX_CONFIG.elevationFrequency * 7.5 + 47, 3, 2.2, 0.55));
-
-      const ridgeLift = plate.boundary * 0.23 + (1 - plate.divergence) * 0.1;
-      const trenchCut = clamp01((0.16 - basinNoise) * 2.2) * (1 - plate.boundary) * 0.16;
-      const masked = edgeMask(x, y, width, height);
+      const macroElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency, y * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
+      const regionalElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.6 + 37, y * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
+      const microElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 5.5 - 13, y * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
+      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 8.8 + 59, y * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
+      const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.9 + 101, y * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
 
       const elevation = clamp01(
-        (
-          plate.base * 0.44
-          + (continentNoise * 0.5 + 0.5) * 0.26
-          + (ridgeNoise * 0.5 + 0.5) * 0.18
-          + (detailNoise * 0.5 + 0.5) * 0.08
-          + fractureNoise * 0.06
-          + ridgeLift
-        ) * masked
-        + (1 - masked) * 0.05
-        - trenchCut
+        ((macroElevation * 0.5 + 0.5) * 0.56
+        + (regionalElevation * 0.5 + 0.5) * 0.24
+        + (microElevation * 0.5 + 0.5) * 0.12
+        + ruggedNoise * 0.08)
+        - (oceanScatter * 0.5 + 0.5) * 0.09
       );
       elevations[idx] = elevation;
 
-      const heatNoise = fbmPerlin(noiseContext.heat, (x + warpFineX) * HEX_CONFIG.heatFrequency, (y + warpFineY) * HEX_CONFIG.heatFrequency, 5, 2, 0.6);
-      const heatMicro = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.heatFrequency * 3.8 + 12, y * HEX_CONFIG.heatFrequency * 3.8 - 9, 3, 2, 0.58);
-      const seasonal = Math.sin((y / height) * Math.PI * 4 + seed * 0.000001) * 0.055;
-      const climateWave = Math.sin((x / width) * Math.PI * 2.7 + y * 0.023) * 0.045;
-      heats[idx] = clamp01(equatorBase * 0.43 + (heatNoise * 0.5 + 0.5) * 0.34 + (heatMicro * 0.5 + 0.5) * 0.14 + seasonal + climateWave);
+      const heatLarge = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
+      const heatDetail = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 4.1 + 12, y * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
+      heats[idx] = clamp01(equatorBase * 0.52 + (heatLarge * 0.5 + 0.5) * 0.32 + (heatDetail * 0.5 + 0.5) * 0.16);
 
-      const moistureNoise = fbmPerlin(noiseContext.moisture, (x + warpCoarseX) * HEX_CONFIG.moistureFrequency, (y + warpCoarseY) * HEX_CONFIG.moistureFrequency, 6, 2, 0.58);
-      const humidityCells = fbmPerlin(noiseContext.climate, x * HEX_CONFIG.moistureFrequency * 4.3 - 40, y * HEX_CONFIG.moistureFrequency * 4.3 + 27, 4, 2.05, 0.57);
-      const wind = Math.sin((x / width) * Math.PI * 3 + y * 0.04) * 0.07;
-      const rainShadow = clamp01(1 - Math.max(0, elevation - 0.6) * 1.22);
-      const coastBoost = clamp01(1 - Math.sqrt(Math.pow((x / (width - 1)) * 2 - 1, 2) + Math.pow((y / (height - 1)) * 2 - 1, 2)) * 0.55);
-      moistures[idx] = clamp01((moistureNoise * 0.5 + 0.5) * 0.54 + (humidityCells * 0.5 + 0.5) * 0.2 + (1 - elevation) * 0.14 + wind * 0.08 + rainShadow * 0.07 + coastBoost * 0.05);
+      const moistureLarge = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
+      const moistureDetail = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 4.5 - 17, y * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
+      const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
+      moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.62 + (moistureDetail * 0.5 + 0.5) * 0.26 + (1 - elevation) * 0.12 - elevationPenalty);
     }
   }
 
-  return { elevations, moistures, heats };
+  return {
+    elevations: smoothField(elevations, width, height, 1),
+    moistures: smoothField(moistures, width, height, 1),
+    heats: smoothField(heats, width, height, 1)
+  };
 };
 
 const buildTiles = (width, height, fields, levels, waterDist) => {
@@ -610,10 +508,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   const seed = createSeed();
   const random = mulberry32(seed);
   const noiseContext = createNoiseContext(seed);
-  const plates = generatePlates(seed, width, height);
-
-  const rawFields = buildScalarFields(width, height, seed, noiseContext, plates);
-  rawFields.elevations = applyErosion(smoothField(rawFields.elevations, width, height, 2), width, height, 1);
+  const rawFields = buildScalarFields(width, height, noiseContext);
 
   const levels = getAdaptiveSeaLevels(rawFields.elevations);
   const waterDist = distanceToWater(rawFields.elevations, levels, width, height);
@@ -625,7 +520,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
 
   const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
-  const riverBudget = Math.max(90, Math.floor(210 * (0.6 + avgLandMoisture * 0.8) * (landTiles.length / tiles.length + 0.28)));
+  const riverBudget = Math.max(20, Math.floor(55 * (0.35 + avgLandMoisture * 0.5) * (landTiles.length / tiles.length + 0.14)));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
 

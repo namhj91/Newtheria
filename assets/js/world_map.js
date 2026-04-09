@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.58(260331-노이즈지형자연화)';
+const WORLD_VERSION = 'ver.0.0.60(260409-시작화면별만조정)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {

@@ -132,40 +132,59 @@ const effects = {
 
   applyStarField() {
     rootStyle.setProperty('--stars-a', this.createStarLayer({
-      count: 210,
-      minRadius: 0.35,
-      maxRadius: 1.35,
-      alphaMin: 0.46,
-      alphaMax: 0.94,
+      count: 340,
+      minRadius: 0.28,
+      maxRadius: 1.2,
+      alphaMin: 0.4,
+      alphaMax: 0.92,
       palette: ['233, 242, 255', '214, 229, 255', '190, 214, 255']
     }));
 
     rootStyle.setProperty('--stars-b', this.createStarLayer({
-      count: 160,
+      count: 220,
       minRadius: 0.45,
-      maxRadius: 1.55,
+      maxRadius: 1.62,
       alphaMin: 0.36,
       alphaMax: 0.88,
       palette: ['178, 205, 255', '154, 187, 255', '133, 168, 245']
     }));
 
+    rootStyle.setProperty('--stars-c', this.createStarLayer({
+      count: 66,
+      minRadius: 1.05,
+      maxRadius: 2.7,
+      alphaMin: 0.42,
+      alphaMax: 0.84,
+      palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255']
+    }));
+
     rootStyle.setProperty('--twinkle-a', this.createStarLayer({
-      count: 84,
-      minRadius: 0.55,
-      maxRadius: 1.95,
-      alphaMin: 0.5,
+      count: 112,
+      minRadius: 0.62,
+      maxRadius: 2.1,
+      alphaMin: 0.52,
       alphaMax: 0.98,
       palette: ['255, 255, 255', '238, 246, 255']
     }));
 
     rootStyle.setProperty('--twinkle-b', this.createStarLayer({
-      count: 74,
-      minRadius: 0.6,
-      maxRadius: 2.15,
+      count: 90,
+      minRadius: 0.68,
+      maxRadius: 2.4,
       alphaMin: 0.42,
       alphaMax: 0.86,
       palette: ['184, 208, 255', '163, 190, 252', '146, 177, 248']
     }));
+
+    rootStyle.setProperty('--twinkle-c', this.createStarLayer({
+      count: 42,
+      minRadius: 1.2,
+      maxRadius: 3.2,
+      alphaMin: 0.35,
+      alphaMax: 0.8,
+      palette: ['138, 242, 255', '117, 230, 255']
+    }));
+
   }
 };
 

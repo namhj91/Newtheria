@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.61(260409-펄린노이즈맵생성전환)';
+const WORLD_VERSION = 'ver.0.0.62(260409-중앙대륙강제제거)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -154,15 +154,6 @@ const getNeighbors = (x, y, width, height) => {
     [x - 1, y], [x + 1, y],
     [x, y + 1], [x + 1, y + 1]
   ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
-};
-
-const edgeMask = (x, y, width, height) => {
-  const cx = (width - 1) / 2;
-  const cy = (height - 1) / 2;
-  const dx = Math.abs(x - cx) / cx;
-  const dy = Math.abs(y - cy) / cy;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  return Math.max(0, 1 - Math.pow(d, 1.9));
 };
 
 const smoothField = (field, width, height, passes = 1) => {
@@ -444,13 +435,13 @@ const buildScalarFields = (width, height, noiseContext) => {
       const macroElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency, y * HEX_CONFIG.elevationFrequency, 5, 2, 0.56);
       const regionalElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.2 + 37, y * HEX_CONFIG.elevationFrequency * 2.2 - 41, 4, 2, 0.58);
       const microElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 4.6 - 13, y * HEX_CONFIG.elevationFrequency * 4.6 + 17, 3, 2.05, 0.6);
-      const masked = edgeMask(x, y, width, height);
+      const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.75 + 101, y * HEX_CONFIG.elevationFrequency * 0.75 - 73, 2, 2, 0.5);
 
       const elevation = clamp01(
         ((macroElevation * 0.5 + 0.5) * 0.56
         + (regionalElevation * 0.5 + 0.5) * 0.3
-        + (microElevation * 0.5 + 0.5) * 0.14) * masked
-        + (1 - masked) * 0.04
+        + (microElevation * 0.5 + 0.5) * 0.14)
+        - (oceanScatter * 0.5 + 0.5) * 0.07
       );
       elevations[idx] = elevation;
 

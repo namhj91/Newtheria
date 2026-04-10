@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.67(260410-바이옴다양성균형화)';
+const WORLD_VERSION = 'ver.0.0.68(260410-타일그라데이션강축소조정)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -79,6 +79,24 @@ const createSeed = () => Math.floor(Math.random() * 4294967295);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const quintic = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+const hexToRgb = (hex) => {
+  const normalized = hex.replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map((c) => c + c).join('')
+    : normalized;
+  const int = Number.parseInt(value, 16);
+  return [(int >> 16) & 255, (int >> 8) & 255, int & 255];
+};
+const rgbToHex = ([r, g, b]) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+const blendHex = (from, to, t) => {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  return rgbToHex([
+    lerp(a[0], b[0], t),
+    lerp(a[1], b[1], t),
+    lerp(a[2], b[2], t)
+  ]);
+};
 
 const mulberry32 = (seed) => {
   let t = seed >>> 0;
@@ -143,6 +161,42 @@ const createPerlin2D = (seed) => {
 
     return lerp(x1, x2, v);
   };
+};
+
+const TERRAIN_FAMILY = {
+  심해: 'water', 바다: 'water', 호수: 'water', 강: 'river',
+  산호초해안: 'coast', 얕은해안: 'coast', 해안: 'coast', 모래해변: 'coast',
+  푸른평원: 'grass', 사바나평원: 'grass', 구릉지: 'grass',
+  울창한숲: 'forest', 침엽수림: 'forest', 열대우림: 'forest', 태고의대수림: 'forest', 운무고원림: 'forest', 이끼고원숲: 'forest', 맹그로브습지: 'wetland',
+  늪지대: 'wetland', 사막오아시스: 'wetland',
+  건조사막: 'arid', 붉은고원: 'arid', 붉은대협곡: 'arid',
+  험준한산맥: 'mountain', 건조암봉산맥: 'mountain', 화산지대: 'mountain', 고대용의둥지: 'mountain',
+  만년설산: 'snow', 빙하설산: 'snow', 한랭습윤고원: 'snow', 얼어붙은툰드라: 'snow',
+  세계수중심: 'special', 빛나는수정동굴: 'special', 고대성소유적: 'special', 고산열대운무림: 'special'
+};
+
+const FAMILY_GRADIENTS = {
+  water: ['#1f3d84', '#3f7fd2'],
+  river: ['#3f76ca', '#5ea2f0'],
+  coast: ['#2f8fd1', '#d5c38d'],
+  grass: ['#6f9f4e', '#b4c67c'],
+  forest: ['#0f5f3f', '#3f8f66'],
+  wetland: ['#2f6f4a', '#4fa07a'],
+  arid: ['#a6591f', '#e2bf58'],
+  mountain: ['#4d545f', '#8f7f73'],
+  snow: ['#8da0b0', '#edf5ff'],
+  special: ['#6b7280', '#10b981']
+};
+
+const getTerrainColor = (terrainType, elevation, moisture, heat) => {
+  const family = TERRAIN_FAMILY[terrainType] || 'special';
+  if (['세계수중심', '고대용의둥지', '빛나는수정동굴', '고대성소유적', '태고의대수림'].includes(terrainType)) {
+    return HEX_CONFIG.terrains[terrainType] || '#ffffff';
+  }
+  const [from, to] = FAMILY_GRADIENTS[family] || ['#6b7280', '#cbd5e1'];
+  const rawMix = clamp01(elevation * 0.42 + moisture * 0.33 + heat * 0.25);
+  const terrainBias = clamp01(((HEX_CONFIG.terrains[terrainType] ? hexToRgb(HEX_CONFIG.terrains[terrainType])[1] : 128) / 255) * 0.25);
+  return blendHex(from, to, clamp01(rawMix * 0.75 + terrainBias));
 };
 
 const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
@@ -349,7 +403,7 @@ const rebalanceBiomeDiversity = (tiles, random, levels) => {
       const tile = candidates[i];
       counts[tile.terrainType] = Math.max(0, (counts[tile.terrainType] || 0) - 1);
       tile.terrainType = biome;
-      tile.color = HEX_CONFIG.terrains[biome] || tile.color;
+      tile.color = getTerrainColor(tile.terrainType, tile.elevation, tile.moisture, tile.heat);
       counts[biome] = (counts[biome] || 0) + 1;
     }
   };
@@ -426,7 +480,7 @@ const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220)
       if (body.length <= maxLakeSize) {
         body.forEach((waterTile) => {
           waterTile.terrainType = '호수';
-          waterTile.color = HEX_CONFIG.terrains.호수;
+          waterTile.color = getTerrainColor('호수', waterTile.elevation, waterTile.moisture, waterTile.heat);
         });
       }
     }
@@ -442,7 +496,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
   worldTree.specialTileType = 'world_tree';
   worldTree.manaSaturation = 100;
   worldTree.sparkleLight = 100;
-  worldTree.color = HEX_CONFIG.terrains.세계수중심;
+  worldTree.color = getTerrainColor('세계수중심', worldTree.elevation, worldTree.moisture, worldTree.heat);
 
   const ancientForestSize = Math.floor(random() * 20) + 30;
   const forestSeeds = [worldTree];
@@ -459,7 +513,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
     if (!marked.has(key) && target && !isWaterTerrain(target.terrainType) && target.terrainType !== '호수') {
       marked.add(key);
       target.terrainType = '태고의대수림';
-      target.color = HEX_CONFIG.terrains.태고의대수림;
+      target.color = getTerrainColor('태고의대수림', target.elevation, target.moisture, target.heat);
       target.manaSaturation = Math.max(90, target.manaSaturation);
       forestSeeds.push(target);
     }
@@ -473,7 +527,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
     dragonPeak.specialTileType = 'dragon_peak';
     dragonPeak.manaSaturation = 100;
     dragonPeak.sparkleLight = 100;
-    dragonPeak.color = HEX_CONFIG.terrains.고대용의둥지;
+    dragonPeak.color = getTerrainColor('고대용의둥지', dragonPeak.elevation, dragonPeak.moisture, dragonPeak.heat);
   }
 
   const coldTiles = landTiles.filter((tile) => ['만년설산', '얼어붙은툰드라'].includes(tile.terrainType));
@@ -483,7 +537,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
     cave.specialTileType = 'crystal_cave';
     cave.manaSaturation = 100;
     cave.sparkleLight = 100;
-    cave.color = HEX_CONFIG.terrains.빛나는수정동굴;
+    cave.color = getTerrainColor('빛나는수정동굴', cave.elevation, cave.moisture, cave.heat);
   }
 
   const plains = landTiles.filter((tile) => ['푸른평원', '사막오아시스', '사바나평원'].includes(tile.terrainType));
@@ -493,7 +547,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
     monolith.specialTileType = 'ancient_monolith';
     monolith.manaSaturation = 100;
     monolith.sparkleLight = 100;
-    monolith.color = HEX_CONFIG.terrains.고대성소유적;
+    monolith.color = getTerrainColor('고대성소유적', monolith.elevation, monolith.moisture, monolith.heat);
   }
 };
 
@@ -507,30 +561,40 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
       .slice(0, 220);
   }
 
-  for (let i = 0; i < riverBudget; i += 1) {
-    const source = sources[Math.floor(random() * sources.length)];
+  for (let i = sources.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [sources[i], sources[j]] = [sources[j], sources[i]];
+  }
+
+  const attempts = Math.min(riverBudget, Math.max(8, Math.floor(sources.length * 0.45)));
+
+  for (let i = 0; i < attempts; i += 1) {
+    const source = sources[i % sources.length];
     if (!source) continue;
 
     let x = source.coord.x;
     let y = source.coord.y;
     const visited = new Set();
+    let carvedLength = 0;
 
-    for (let step = 0; step < 120; step += 1) {
+    for (let step = 0; step < 80; step += 1) {
       const key = `${x},${y}`;
       if (visited.has(key)) break;
       visited.add(key);
 
       const current = get(x, y);
       if (!current || current.elevation <= levels.seaLevel) break;
+      if (current.terrainType === '강' && carvedLength > 10) break;
 
       if (!['험준한산맥', '만년설산', '화산지대', '고대용의둥지'].includes(current.terrainType)) {
         current.terrainType = '강';
-        current.color = HEX_CONFIG.terrains.강;
+        current.color = getTerrainColor('강', current.elevation, current.moisture, current.heat);
+        carvedLength += 1;
       }
 
       const candidates = getNeighbors(x, y, width, height).map(([nx, ny]) => [nx, ny, get(nx, ny)]);
       candidates.sort((a, b) => (a[2].elevation + random() * 0.0022) - (b[2].elevation + random() * 0.0022));
-      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.0025);
+      const next = candidates.find(([, , tile]) => tile.elevation <= current.elevation + 0.0009);
       if (!next) break;
       [x, y] = next;
     }
@@ -650,7 +714,7 @@ const buildTiles = (width, height, fields, levels, waterDist, random) => {
         specialProduct: null,
         threatInfo: null,
         specialTileType: null,
-        color: HEX_CONFIG.terrains[terrainType] || '#ffffff'
+        color: getTerrainColor(terrainType, elevation, moisture, heat)
       });
     }
   }
@@ -678,7 +742,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
 
   const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
-  const riverBudget = Math.max(20, Math.floor(55 * (0.35 + avgLandMoisture * 0.5) * (landTiles.length / tiles.length + 0.14)));
+  const riverBudget = Math.max(8, Math.floor(30 * (0.28 + avgLandMoisture * 0.42) * (landTiles.length / tiles.length + 0.1)));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
 

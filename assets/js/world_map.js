@@ -1,8 +1,6 @@
-<<<<<<< codex/update-world-map-tile-colors-go8jic
+
 const WORLD_VERSION = 'ver.0.0.70(260410-붉은고원완화해양해안청색분리)';
-=======
-const WORLD_VERSION = 'ver.0.0.69(260410-월드맵지형대비해변색상개선)';
->>>>>>> main
+
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {

@@ -56,7 +56,31 @@ body {
   font-size: 0.92rem;
 }
 
+.world-map-layer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.layer-button {
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  background: rgba(16, 28, 50, 0.85);
+  color: #e6eeff;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.layer-button.is-active {
+  background: rgba(94, 146, 255, 0.88);
+  border-color: rgba(184, 212, 255, 0.95);
+  color: #061124;
+  font-weight: 700;
+}
+
 .world-map-viewport {
+  position: relative;
   width: 100%;
   max-height: calc(100vh - 220px);
   overflow: auto;
@@ -69,6 +93,26 @@ body {
 canvas {
   display: block;
   margin: 0;
+}
+
+.tile-popup {
+  position: absolute;
+  min-width: 190px;
+  max-width: 260px;
+  z-index: 20;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.75);
+  background: rgba(8, 15, 30, 0.95);
+  color: #eff6ff;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  line-height: 1.45;
+  font-size: 0.87rem;
+}
+
+.tile-popup strong {
+  color: #93c5fd;
 }
 
 .version {

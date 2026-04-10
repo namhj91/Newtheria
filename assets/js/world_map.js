@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.64(260409-협폭지형분포강화)';
+const WORLD_VERSION = 'ver.0.0.65(260410-월드맵기후레이어팝업추가)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -51,8 +51,19 @@ const ctx = canvas.getContext('2d');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
 const versionTag = document.getElementById('worldMapVersion');
+const layerButtons = [...document.querySelectorAll('.layer-button')];
+const tilePopup = document.getElementById('tilePopup');
 
 const SQRT3 = Math.sqrt(3);
+const LAYER_MODE = {
+  TERRAIN: 'terrain',
+  ELEVATION: 'elevation',
+  MOISTURE: 'moisture',
+  HEAT: 'heat'
+};
+
+let activeLayer = LAYER_MODE.TERRAIN;
+let currentWorld = null;
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -567,6 +578,55 @@ const drawHex = (x, y, size, color) => {
   ctx.fill();
 };
 
+const valueToGradient = (value, stops) => {
+  if (value <= stops[0].value) return stops[0].color;
+  if (value >= stops[stops.length - 1].value) return stops[stops.length - 1].color;
+
+  for (let i = 1; i < stops.length; i += 1) {
+    const start = stops[i - 1];
+    const end = stops[i];
+    if (value <= end.value) {
+      const t = (value - start.value) / (end.value - start.value);
+      const [sr, sg, sb] = start.color;
+      const [er, eg, eb] = end.color;
+      const r = Math.round(lerp(sr, er, t));
+      const g = Math.round(lerp(sg, eg, t));
+      const b = Math.round(lerp(sb, eb, t));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }
+
+  return `rgb(${stops[stops.length - 1].color.join(', ')})`;
+};
+
+const getTileColorByLayer = (tile, layer) => {
+  if (layer === LAYER_MODE.TERRAIN) return tile.color;
+  if (layer === LAYER_MODE.ELEVATION) {
+    return valueToGradient(tile.elevation, [
+      { value: 0, color: [17, 24, 39] },
+      { value: 0.3, color: [30, 64, 175] },
+      { value: 0.58, color: [74, 222, 128] },
+      { value: 0.75, color: [163, 230, 53] },
+      { value: 1, color: [250, 250, 250] }
+    ]);
+  }
+  if (layer === LAYER_MODE.MOISTURE) {
+    return valueToGradient(tile.moisture, [
+      { value: 0, color: [120, 53, 15] },
+      { value: 0.3, color: [202, 138, 4] },
+      { value: 0.55, color: [34, 197, 94] },
+      { value: 1, color: [8, 145, 178] }
+    ]);
+  }
+
+  return valueToGradient(tile.heat, [
+    { value: 0, color: [59, 130, 246] },
+    { value: 0.35, color: [56, 189, 248] },
+    { value: 0.62, color: [253, 224, 71] },
+    { value: 1, color: [239, 68, 68] }
+  ]);
+};
+
 const renderWorld = (world) => {
   const { tiles, seed, width, height, riverBudget } = world;
 
@@ -581,7 +641,7 @@ const renderWorld = (world) => {
 
   tiles.forEach((tile) => {
     const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-    drawHex(x + 8, y + 8, HEX_CONFIG.size, tile.color);
+    drawHex(x + 8, y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
   });
 
   const terrainStat = tiles.reduce((acc, tile) => {
@@ -599,8 +659,82 @@ const renderWorld = (world) => {
 
 const generateAndRender = () => {
   const world = generateWorldMap(MAP_SIZE, MAP_SIZE);
+  currentWorld = world;
+  tilePopup.hidden = true;
   renderWorld(world);
 };
+
+const cubeRound = (x, y, z) => {
+  let rx = Math.round(x);
+  let ry = Math.round(y);
+  let rz = Math.round(z);
+
+  const dx = Math.abs(rx - x);
+  const dy = Math.abs(ry - y);
+  const dz = Math.abs(rz - z);
+
+  if (dx > dy && dx > dz) rx = -ry - rz;
+  else if (dy > dz) ry = -rx - rz;
+  else rz = -rx - ry;
+
+  return { x: rx, y: ry, z: rz };
+};
+
+const pixelToHexCoord = (pixelX, pixelY, size) => {
+  const px = pixelX - 8;
+  const py = pixelY - 8;
+  const q = (SQRT3 / 3 * px - py / 3) / size;
+  const r = ((2 / 3) * py) / size;
+  const cube = cubeRound(q, -q - r, r);
+  const row = cube.z;
+  const col = cube.x + (row - (row & 1)) / 2;
+  return { x: col, y: row };
+};
+
+const updateLayerButtons = () => {
+  layerButtons.forEach((button) => {
+    const isActive = button.dataset.layer === activeLayer;
+    button.classList.toggle('is-active', isActive);
+  });
+};
+
+const showTilePopup = (tile, offsetX, offsetY) => {
+  tilePopup.innerHTML = `
+    <strong>타일 (${tile.coord.x}, ${tile.coord.y}, z=${tile.coord.z})</strong><br />
+    지형: ${tile.terrainType}<br />
+    고도: ${tile.elevation.toFixed(3)}<br />
+    습도: ${tile.moisture.toFixed(3)}<br />
+    온도: ${tile.heat.toFixed(3)}
+  `;
+  tilePopup.style.left = `${offsetX + 16}px`;
+  tilePopup.style.top = `${offsetY + 16}px`;
+  tilePopup.hidden = false;
+};
+
+layerButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    activeLayer = button.dataset.layer || LAYER_MODE.TERRAIN;
+    updateLayerButtons();
+    if (currentWorld) renderWorld(currentWorld);
+  });
+});
+
+canvas.addEventListener('click', (event) => {
+  if (!currentWorld) return;
+  const { offsetX, offsetY } = event;
+  const target = pixelToHexCoord(offsetX, offsetY, HEX_CONFIG.size);
+  if (!inBounds(target.x, target.y, currentWorld.width, currentWorld.height)) {
+    tilePopup.hidden = true;
+    return;
+  }
+
+  const tile = currentWorld.tiles[target.y * currentWorld.width + target.x];
+  if (!tile) {
+    tilePopup.hidden = true;
+    return;
+  }
+  showTilePopup(tile, offsetX, offsetY);
+});
 
 versionTag.textContent = WORLD_VERSION;
 regenButton.addEventListener('click', generateAndRender);

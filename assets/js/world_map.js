@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.66(260410-지형워프3축바이옴확장)';
+const WORLD_VERSION = 'ver.0.0.67(260410-바이옴다양성균형화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -247,9 +247,34 @@ const distanceToWater = (elevations, levels, width, height) => {
 
 const isWaterTerrain = (terrainType) => ['심해', '바다', '얕은해안', '산호초해안', '해안', '호수'].includes(terrainType);
 
-const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
-  const mountainStart = Math.max(0.7, levels.seaLevel + 0.14);
-  const highlandStart = Math.max(0.58, levels.seaLevel + 0.08);
+const quantile = (values, ratio) => {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.max(0, Math.min(sorted.length - 1, Math.floor(sorted.length * ratio)));
+  return sorted[idx];
+};
+
+const computeBiomeBands = (tilesForBanding) => {
+  const elevations = tilesForBanding.map((tile) => tile.elevation);
+  const moistures = tilesForBanding.map((tile) => tile.moisture);
+  const heats = tilesForBanding.map((tile) => tile.heat);
+
+  return {
+    elevation: { low: quantile(elevations, 0.34), high: quantile(elevations, 0.68) },
+    moisture: { low: quantile(moistures, 0.33), high: quantile(moistures, 0.67) },
+    heat: { low: quantile(heats, 0.33), high: quantile(heats, 0.67) }
+  };
+};
+
+const getBand = (value, low, high) => {
+  if (value <= low) return 'low';
+  if (value >= high) return 'high';
+  return 'mid';
+};
+
+const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, random) => {
+  const mountainStart = Math.max(bands.elevation.high, levels.seaLevel + 0.12);
+  const highlandStart = Math.max(bands.elevation.low, levels.seaLevel + 0.04);
 
   if (elevation < levels.deepSeaLevel) return '심해';
   if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.7) return '바다';
@@ -257,34 +282,95 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
   if (elevation < levels.seaLevel) return nearSea ? '해안' : '얕은해안';
   if (elevation < levels.seaLevel + 0.01 && nearSea) return '모래해변';
 
+  const elevationBand = getBand(elevation, bands.elevation.low, bands.elevation.high);
+  const moistureBand = getBand(moisture, bands.moisture.low, bands.moisture.high);
+  const heatBand = getBand(heat, bands.heat.low, bands.heat.high);
+
   if (elevation > mountainStart) {
-    if (heat > 0.72 && moisture < 0.35) return elevation > mountainStart + 0.12 ? '붉은대협곡' : '화산지대';
-    if (heat > 0.62 && moisture > 0.55) return '고산열대운무림';
-    if (heat < 0.3 && moisture > 0.55) return '빙하설산';
-    if (moisture < 0.25) return '건조암봉산맥';
-    if (heat < 0.35 || (moisture > 0.5 && elevation > mountainStart + 0.1)) return '만년설산';
+    if (heatBand === 'high' && moistureBand === 'high') return random < 0.48 ? '고산열대운무림' : '험준한산맥';
+    if (heatBand === 'low' && moistureBand === 'high') return random < 0.52 ? '빙하설산' : '만년설산';
+    if (moistureBand === 'low') return random < 0.55 ? '건조암봉산맥' : '험준한산맥';
+    if (heatBand === 'high' && moistureBand !== 'high') return random < 0.5 ? '화산지대' : '붉은대협곡';
+    if (heatBand === 'low') return '만년설산';
     return '험준한산맥';
   }
   if (elevation > highlandStart) {
-    if (heat > 0.68 && moisture > 0.62) return '운무고원림';
-    if (heat > 0.64 && moisture < 0.3) return '붉은고원';
-    if (heat < 0.36 && moisture > 0.55) return '한랭습윤고원';
-    if (moisture > 0.65) return '이끼고원숲';
+    if (heatBand === 'high' && moistureBand === 'high') return random < 0.6 ? '운무고원림' : '고산열대운무림';
+    if (heatBand === 'high' && moistureBand === 'low') return '붉은고원';
+    if (heatBand === 'low' && moistureBand === 'high') return random < 0.55 ? '한랭습윤고원' : '이끼고원숲';
+    if (moistureBand === 'high') return '이끼고원숲';
     return '구릉지';
   }
 
-  if (heat > 0.65) {
-    if (moisture > 0.78 && (nearSea || elevation < levels.seaLevel + 0.08)) return '맹그로브습지';
-    if (moisture > 0.6) return '열대우림';
-    if (moisture < 0.3) return moisture > 0.22 && heat < 0.8 ? '사막오아시스' : '건조사막';
-    return '사바나평원';
+  if (heatBand === 'high') {
+    if (moistureBand === 'high') {
+      if (nearSea && random < 0.5) return '맹그로브습지';
+      return random < 0.5 ? '열대우림' : '늪지대';
+    }
+    if (moistureBand === 'low') return random < 0.4 ? '사막오아시스' : '건조사막';
+    return random < 0.6 ? '사바나평원' : '푸른평원';
   }
-  if (heat > 0.35) {
-    if (moisture > 0.8) return '늪지대';
-    if (moisture > 0.45) return '울창한숲';
-    return '푸른평원';
+  if (heatBand === 'mid') {
+    if (moistureBand === 'high') return random < 0.45 ? '울창한숲' : '늪지대';
+    if (moistureBand === 'low') return random < 0.6 ? '푸른평원' : '사바나평원';
+    return random < 0.5 ? '푸른평원' : '울창한숲';
   }
-  return moisture > 0.4 ? '침엽수림' : '얼어붙은툰드라';
+  if (moistureBand === 'high') return random < 0.6 ? '침엽수림' : '한랭습윤고원';
+  if (moistureBand === 'low') return random < 0.6 ? '얼어붙은툰드라' : '건조암봉산맥';
+  return random < 0.5 ? '침엽수림' : '얼어붙은툰드라';
+};
+
+const rebalanceBiomeDiversity = (tiles, random, levels) => {
+  const LAND_WATER = new Set(['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수']);
+  const targetBiomes = [
+    '맹그로브습지', '열대우림', '사막오아시스', '건조사막', '사바나평원',
+    '운무고원림', '이끼고원숲', '붉은고원', '한랭습윤고원',
+    '험준한산맥', '건조암봉산맥', '만년설산', '빙하설산', '고산열대운무림', '화산지대', '붉은대협곡'
+  ];
+
+  const counts = tiles.reduce((acc, tile) => {
+    acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
+    return acc;
+  }, {});
+
+  const landTiles = tiles.filter((tile) => !LAND_WATER.has(tile.terrainType));
+  const minTarget = Math.max(18, Math.floor(landTiles.length * 0.004));
+
+  const tryPromote = (biome, predicate) => {
+    const missing = minTarget - (counts[biome] || 0);
+    if (missing <= 0) return;
+    const candidates = landTiles.filter((tile) => predicate(tile) && tile.terrainType !== biome);
+    for (let i = candidates.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    const take = Math.min(missing, candidates.length);
+    for (let i = 0; i < take; i += 1) {
+      const tile = candidates[i];
+      counts[tile.terrainType] = Math.max(0, (counts[tile.terrainType] || 0) - 1);
+      tile.terrainType = biome;
+      tile.color = HEX_CONFIG.terrains[biome] || tile.color;
+      counts[biome] = (counts[biome] || 0) + 1;
+    }
+  };
+
+  tryPromote('맹그로브습지', (tile) => tile.heat > 0.62 && tile.moisture > 0.6 && tile.elevation < levels.seaLevel + 0.08);
+  tryPromote('열대우림', (tile) => tile.heat > 0.6 && tile.moisture > 0.58 && tile.elevation < levels.seaLevel + 0.16);
+  tryPromote('사막오아시스', (tile) => tile.heat > 0.62 && tile.moisture > 0.22 && tile.moisture < 0.36);
+  tryPromote('건조사막', (tile) => tile.heat > 0.63 && tile.moisture < 0.28);
+  tryPromote('운무고원림', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat > 0.56 && tile.moisture > 0.58);
+  tryPromote('이끼고원숲', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.moisture > 0.62);
+  tryPromote('붉은고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat > 0.58 && tile.moisture < 0.34);
+  tryPromote('한랭습윤고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat < 0.42 && tile.moisture > 0.56);
+  tryPromote('건조암봉산맥', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.moisture < 0.32);
+  tryPromote('빙하설산', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat < 0.33 && tile.moisture > 0.52);
+  tryPromote('고산열대운무림', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat > 0.58 && tile.moisture > 0.52);
+  tryPromote('화산지대', (tile) => tile.elevation > levels.seaLevel + 0.15 && tile.heat > 0.62 && tile.moisture < 0.48);
+  tryPromote('붉은대협곡', (tile) => tile.elevation > levels.seaLevel + 0.18 && tile.heat > 0.6 && tile.moisture < 0.42);
+
+  for (const biome of targetBiomes) {
+    counts[biome] = counts[biome] || 0;
+  }
 };
 
 const RESOURCE_RULES = [
@@ -518,8 +604,9 @@ const buildScalarFields = (width, height, noiseContext) => {
   };
 };
 
-const buildTiles = (width, height, fields, levels, waterDist) => {
+const buildTiles = (width, height, fields, levels, waterDist, random) => {
   const tiles = [];
+  const tilesForBanding = [];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -530,7 +617,23 @@ const buildTiles = (width, height, fields, levels, waterDist) => {
       const heat = fields.heats[idx];
 
       const nearSea = getNeighbors(x, y, width, height).some(([nx, ny]) => fields.elevations[ny * width + nx] < levels.seaLevel);
-      const terrainType = classifyTerrain(elevation, moisture, heat, nearSea, levels);
+      if (elevation >= levels.seaLevel) {
+        tilesForBanding.push({ elevation, moisture, heat });
+      }
+    }
+  }
+
+  const bands = computeBiomeBands(tilesForBanding);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = y * width + x;
+      const elevation = fields.elevations[idx];
+      const coastMoisture = clamp01(1 - waterDist[idx] / 17);
+      const moisture = clamp01(fields.moistures[idx] * 0.72 + coastMoisture * 0.28);
+      const heat = fields.heats[idx];
+      const nearSea = getNeighbors(x, y, width, height).some(([nx, ny]) => fields.elevations[ny * width + nx] < levels.seaLevel);
+      const terrainType = classifyTerrain(elevation, moisture, heat, nearSea, levels, bands, random());
 
       tiles.push({
         coord: { x, y, z: HEX_CONFIG.z },
@@ -552,6 +655,8 @@ const buildTiles = (width, height, fields, levels, waterDist) => {
     }
   }
 
+  rebalanceBiomeDiversity(tiles, random, levels);
+
   return tiles;
 };
 
@@ -566,7 +671,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   const levels = getAdaptiveSeaLevels(rawFields.elevations);
   const waterDist = distanceToWater(rawFields.elevations, levels, width, height);
 
-  const tiles = buildTiles(width, height, rawFields, levels, waterDist);
+  const tiles = buildTiles(width, height, rawFields, levels, waterDist, random);
   convertSmallWaterBodiesToLakes(tiles, width, height, 200);
   assignTerrainResources(tiles, random);
   placeMythicLandmarks(tiles, random, width, height);

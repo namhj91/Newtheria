@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.68(260410-타일그라데이션강축소조정)';
+const WORLD_VERSION = 'ver.0.0.69(260410-월드맵지형대비해변색상개선)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -176,16 +176,16 @@ const TERRAIN_FAMILY = {
 };
 
 const FAMILY_GRADIENTS = {
-  water: ['#1f3d84', '#3f7fd2'],
-  river: ['#3f76ca', '#5ea2f0'],
-  coast: ['#2f8fd1', '#d5c38d'],
-  grass: ['#6f9f4e', '#b4c67c'],
-  forest: ['#0f5f3f', '#3f8f66'],
-  wetland: ['#2f6f4a', '#4fa07a'],
-  arid: ['#a6591f', '#e2bf58'],
-  mountain: ['#4d545f', '#8f7f73'],
-  snow: ['#8da0b0', '#edf5ff'],
-  special: ['#6b7280', '#10b981']
+  water: ['#15326f', '#4ea0e3'],
+  river: ['#2e67b3', '#75bbff'],
+  coast: ['#3f9dca', '#efd57a'],
+  grass: ['#4f8d3f', '#b9d47e'],
+  forest: ['#0a4f33', '#4ea070'],
+  wetland: ['#2b6241', '#62ab82'],
+  arid: ['#9a4d1a', '#e7c96c'],
+  mountain: ['#464d56', '#978376'],
+  snow: ['#97a8b8', '#f4f8ff'],
+  special: ['#5f6672', '#2ac08b']
 };
 
 const getTerrainColor = (terrainType, elevation, moisture, heat) => {
@@ -194,9 +194,20 @@ const getTerrainColor = (terrainType, elevation, moisture, heat) => {
     return HEX_CONFIG.terrains[terrainType] || '#ffffff';
   }
   const [from, to] = FAMILY_GRADIENTS[family] || ['#6b7280', '#cbd5e1'];
-  const rawMix = clamp01(elevation * 0.42 + moisture * 0.33 + heat * 0.25);
-  const terrainBias = clamp01(((HEX_CONFIG.terrains[terrainType] ? hexToRgb(HEX_CONFIG.terrains[terrainType])[1] : 128) / 255) * 0.25);
-  return blendHex(from, to, clamp01(rawMix * 0.75 + terrainBias));
+  const rawMix = clamp01(elevation * 0.44 + moisture * 0.31 + heat * 0.25);
+  const terrainBias = clamp01(((HEX_CONFIG.terrains[terrainType] ? hexToRgb(HEX_CONFIG.terrains[terrainType])[1] : 128) / 255));
+  const familyGamma = family === 'coast' ? 0.85 : 0.92;
+  const gradientMix = Math.pow(clamp01(rawMix * 0.92 + terrainBias * 0.18), familyGamma);
+  let color = blendHex(from, to, gradientMix);
+  const terrainBase = HEX_CONFIG.terrains[terrainType];
+  if (terrainBase) {
+    color = blendHex(color, terrainBase, family === 'coast' ? 0.32 : 0.22);
+  }
+  if (family === 'coast') {
+    const warmSand = blendHex('#e7cd78', '#f3df9f', clamp01((1 - moisture) * 0.6 + heat * 0.4));
+    color = blendHex(color, warmSand, 0.38);
+  }
+  return color;
 };
 
 const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {

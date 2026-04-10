@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.63(260409-강축소지형복잡도강화)';
+const WORLD_VERSION = 'ver.0.0.64(260409-협폭지형분포강화)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -13,6 +13,8 @@ const HEX_CONFIG = {
   elevationFrequency: 0.0158,
   moistureFrequency: 0.0162,
   heatFrequency: 0.0105,
+  biomePatchFrequency: 0.054,
+  biomePatchStrength: 0.12,
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
@@ -438,30 +440,42 @@ const buildScalarFields = (width, height, noiseContext) => {
       const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 8.8 + 59, y * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
       const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.9 + 101, y * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
 
+      const biomePatch = fbmPerlin(
+        noiseContext.elevation,
+        x * HEX_CONFIG.biomePatchFrequency + 211,
+        y * HEX_CONFIG.biomePatchFrequency - 157,
+        3,
+        2.2,
+        0.58
+      );
+
       const elevation = clamp01(
         ((macroElevation * 0.5 + 0.5) * 0.56
         + (regionalElevation * 0.5 + 0.5) * 0.24
         + (microElevation * 0.5 + 0.5) * 0.12
         + ruggedNoise * 0.08)
         - (oceanScatter * 0.5 + 0.5) * 0.09
+        + biomePatch * HEX_CONFIG.biomePatchStrength
       );
       elevations[idx] = elevation;
 
       const heatLarge = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
       const heatDetail = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 4.1 + 12, y * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
-      heats[idx] = clamp01(equatorBase * 0.52 + (heatLarge * 0.5 + 0.5) * 0.32 + (heatDetail * 0.5 + 0.5) * 0.16);
+      const heatPatch = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 9.8 - 143, y * HEX_CONFIG.heatFrequency * 9.8 + 227, 3, 2.24, 0.58);
+      heats[idx] = clamp01(equatorBase * 0.5 + (heatLarge * 0.5 + 0.5) * 0.3 + (heatDetail * 0.5 + 0.5) * 0.14 + (heatPatch * 0.5 + 0.5) * 0.06);
 
       const moistureLarge = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
       const moistureDetail = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 4.5 - 17, y * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
+      const moisturePatch = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 10.2 + 71, y * HEX_CONFIG.moistureFrequency * 10.2 - 93, 3, 2.18, 0.6);
       const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
-      moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.62 + (moistureDetail * 0.5 + 0.5) * 0.26 + (1 - elevation) * 0.12 - elevationPenalty);
+      moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.56 + (moistureDetail * 0.5 + 0.5) * 0.24 + (moisturePatch * 0.5 + 0.5) * 0.1 + (1 - elevation) * 0.1 - elevationPenalty);
     }
   }
 
   return {
     elevations: smoothField(elevations, width, height, 1),
-    moistures: smoothField(moistures, width, height, 1),
-    heats: smoothField(heats, width, height, 1)
+    moistures: smoothField(moistures, width, height, 0),
+    heats: smoothField(heats, width, height, 0)
   };
 };
 

@@ -1,8 +1,4 @@
-<<<<<<< codex/adjust-terrain-spread-for-realism-yiuzmw
-const WORLD_VERSION = 'ver.0.0.69(260410-타일색대비해변노랑강화)';
-=======
 const WORLD_VERSION = 'ver.0.0.68(260410-타일그라데이션강축소조정)';
->>>>>>> main
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -180,18 +176,6 @@ const TERRAIN_FAMILY = {
 };
 
 const FAMILY_GRADIENTS = {
-<<<<<<< codex/adjust-terrain-spread-for-realism-yiuzmw
-  water: ['#163a79', '#4f9be9'],
-  river: ['#2f73d0', '#78b8ff'],
-  coast: ['#caa35a', '#f3e1a7'],
-  grass: ['#5d8f35', '#b8d97f'],
-  forest: ['#0a5134', '#43a36f'],
-  wetland: ['#2f6844', '#62b08a'],
-  arid: ['#99501b', '#e7bf63'],
-  mountain: ['#4b5360', '#a18a76'],
-  snow: ['#7b93a8', '#f3f8ff'],
-  special: ['#5f6b7c', '#20c997']
-=======
   water: ['#1f3d84', '#3f7fd2'],
   river: ['#3f76ca', '#5ea2f0'],
   coast: ['#2f8fd1', '#d5c38d'],
@@ -202,7 +186,6 @@ const FAMILY_GRADIENTS = {
   mountain: ['#4d545f', '#8f7f73'],
   snow: ['#8da0b0', '#edf5ff'],
   special: ['#6b7280', '#10b981']
->>>>>>> main
 };
 
 const getTerrainColor = (terrainType, elevation, moisture, heat) => {
@@ -212,17 +195,8 @@ const getTerrainColor = (terrainType, elevation, moisture, heat) => {
   }
   const [from, to] = FAMILY_GRADIENTS[family] || ['#6b7280', '#cbd5e1'];
   const rawMix = clamp01(elevation * 0.42 + moisture * 0.33 + heat * 0.25);
-<<<<<<< codex/adjust-terrain-spread-for-realism-yiuzmw
-  const contrast = family === 'coast' ? 1.15 : 1.05;
-  const mix = clamp01((rawMix - 0.5) * contrast + 0.5);
-  const familyColor = blendHex(from, to, mix);
-  const baseColor = HEX_CONFIG.terrains[terrainType] || familyColor;
-  const terrainBlend = family === 'coast' ? 0.62 : 0.42;
-  return blendHex(familyColor, baseColor, terrainBlend);
-=======
   const terrainBias = clamp01(((HEX_CONFIG.terrains[terrainType] ? hexToRgb(HEX_CONFIG.terrains[terrainType])[1] : 128) / 255) * 0.25);
   return blendHex(from, to, clamp01(rawMix * 0.75 + terrainBias));
->>>>>>> main
 };
 
 const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {

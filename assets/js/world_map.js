@@ -1,4 +1,8 @@
+<<<<<<< codex/update-world-map-tile-colors-go8jic
 const WORLD_VERSION = 'ver.0.0.70(260410-붉은고원완화해양해안청색분리)';
+=======
+const WORLD_VERSION = 'ver.0.0.69(260410-월드맵지형대비해변색상개선)';
+>>>>>>> main
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -176,9 +180,15 @@ const TERRAIN_FAMILY = {
 };
 
 const FAMILY_GRADIENTS = {
+<<<<<<< codex/update-world-map-tile-colors-go8jic
   water: ['#10306a', '#2f78c7'],
   river: ['#2b63ad', '#67b2f8'],
   coast: ['#4aa9d8', '#8fd4ff'],
+=======
+  water: ['#15326f', '#4ea0e3'],
+  river: ['#2e67b3', '#75bbff'],
+  coast: ['#3f9dca', '#efd57a'],
+>>>>>>> main
   grass: ['#4f8d3f', '#b9d47e'],
   forest: ['#0a4f33', '#4ea070'],
   wetland: ['#2b6241', '#62ab82'],
@@ -201,11 +211,19 @@ const getTerrainColor = (terrainType, elevation, moisture, heat) => {
   let color = blendHex(from, to, gradientMix);
   const terrainBase = HEX_CONFIG.terrains[terrainType];
   if (terrainBase) {
+<<<<<<< codex/update-world-map-tile-colors-go8jic
     color = blendHex(color, terrainBase, family === 'coast' ? 0.28 : 0.22);
   }
   if (terrainType === '모래해변') {
     const warmSand = blendHex('#e7cd78', '#f3df9f', clamp01((1 - moisture) * 0.6 + heat * 0.4));
     color = blendHex(color, warmSand, 0.34);
+=======
+    color = blendHex(color, terrainBase, family === 'coast' ? 0.32 : 0.22);
+  }
+  if (family === 'coast') {
+    const warmSand = blendHex('#e7cd78', '#f3df9f', clamp01((1 - moisture) * 0.6 + heat * 0.4));
+    color = blendHex(color, warmSand, 0.38);
+>>>>>>> main
   }
   return color;
 };

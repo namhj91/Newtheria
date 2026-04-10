@@ -1,4 +1,8 @@
+<<<<<<< codex/update-world-map-tile-colors-go8jic
+const WORLD_VERSION = 'ver.0.0.70(260410-붉은고원완화해양해안청색분리)';
+=======
 const WORLD_VERSION = 'ver.0.0.69(260410-월드맵지형대비해변색상개선)';
+>>>>>>> main
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -37,7 +41,7 @@ const HEX_CONFIG = {
     운무고원림: '#3f7c65',
     이끼고원숲: '#5b8f72',
     한랭습윤고원: '#7f9c96',
-    붉은고원: '#b45309',
+    붉은고원: '#a8783a',
     붉은대협곡: '#9a3412',
     험준한산맥: '#52525b',
     건조암봉산맥: '#6b7280',
@@ -176,9 +180,15 @@ const TERRAIN_FAMILY = {
 };
 
 const FAMILY_GRADIENTS = {
+<<<<<<< codex/update-world-map-tile-colors-go8jic
+  water: ['#10306a', '#2f78c7'],
+  river: ['#2b63ad', '#67b2f8'],
+  coast: ['#4aa9d8', '#8fd4ff'],
+=======
   water: ['#15326f', '#4ea0e3'],
   river: ['#2e67b3', '#75bbff'],
   coast: ['#3f9dca', '#efd57a'],
+>>>>>>> main
   grass: ['#4f8d3f', '#b9d47e'],
   forest: ['#0a4f33', '#4ea070'],
   wetland: ['#2b6241', '#62ab82'],
@@ -201,11 +211,19 @@ const getTerrainColor = (terrainType, elevation, moisture, heat) => {
   let color = blendHex(from, to, gradientMix);
   const terrainBase = HEX_CONFIG.terrains[terrainType];
   if (terrainBase) {
+<<<<<<< codex/update-world-map-tile-colors-go8jic
+    color = blendHex(color, terrainBase, family === 'coast' ? 0.28 : 0.22);
+  }
+  if (terrainType === '모래해변') {
+    const warmSand = blendHex('#e7cd78', '#f3df9f', clamp01((1 - moisture) * 0.6 + heat * 0.4));
+    color = blendHex(color, warmSand, 0.34);
+=======
     color = blendHex(color, terrainBase, family === 'coast' ? 0.32 : 0.22);
   }
   if (family === 'coast') {
     const warmSand = blendHex('#e7cd78', '#f3df9f', clamp01((1 - moisture) * 0.6 + heat * 0.4));
     color = blendHex(color, warmSand, 0.38);
+>>>>>>> main
   }
   return color;
 };
@@ -361,7 +379,7 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, rand
   }
   if (elevation > highlandStart) {
     if (heatBand === 'high' && moistureBand === 'high') return random < 0.6 ? '운무고원림' : '고산열대운무림';
-    if (heatBand === 'high' && moistureBand === 'low') return '붉은고원';
+    if (heatBand === 'high' && moistureBand === 'low') return random < 0.18 ? '붉은고원' : '구릉지';
     if (heatBand === 'low' && moistureBand === 'high') return random < 0.55 ? '한랭습윤고원' : '이끼고원숲';
     if (moistureBand === 'high') return '이끼고원숲';
     return '구릉지';
@@ -389,7 +407,7 @@ const rebalanceBiomeDiversity = (tiles, random, levels) => {
   const LAND_WATER = new Set(['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수']);
   const targetBiomes = [
     '맹그로브습지', '열대우림', '사막오아시스', '건조사막', '사바나평원',
-    '운무고원림', '이끼고원숲', '붉은고원', '한랭습윤고원',
+    '운무고원림', '이끼고원숲', '한랭습윤고원',
     '험준한산맥', '건조암봉산맥', '만년설산', '빙하설산', '고산열대운무림', '화산지대', '붉은대협곡'
   ];
 
@@ -425,7 +443,7 @@ const rebalanceBiomeDiversity = (tiles, random, levels) => {
   tryPromote('건조사막', (tile) => tile.heat > 0.63 && tile.moisture < 0.28);
   tryPromote('운무고원림', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat > 0.56 && tile.moisture > 0.58);
   tryPromote('이끼고원숲', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.moisture > 0.62);
-  tryPromote('붉은고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat > 0.58 && tile.moisture < 0.34);
+  tryPromote('붉은고원', (tile) => tile.elevation > levels.seaLevel + 0.14 && tile.heat > 0.64 && tile.moisture < 0.26);
   tryPromote('한랭습윤고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat < 0.42 && tile.moisture > 0.56);
   tryPromote('건조암봉산맥', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.moisture < 0.32);
   tryPromote('빙하설산', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat < 0.33 && tile.moisture > 0.52);

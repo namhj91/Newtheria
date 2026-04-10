@@ -1,4 +1,4 @@
-const WORLD_VERSION = 'ver.0.0.65(260410-월드맵기후레이어팝업추가)';
+const WORLD_VERSION = 'ver.0.0.66(260410-지형워프3축바이옴확장)';
 const MAP_SIZE = 200;
 
 const HEX_CONFIG = {
@@ -13,6 +13,8 @@ const HEX_CONFIG = {
   elevationFrequency: 0.0158,
   moistureFrequency: 0.0162,
   heatFrequency: 0.0105,
+  warpFrequency: 0.0068,
+  warpStrength: 18,
   biomePatchFrequency: 0.054,
   biomePatchStrength: 0.12,
   terrains: {
@@ -30,9 +32,17 @@ const HEX_CONFIG = {
     침엽수림: '#0f766e',
     태고의대수림: '#064e3b',
     열대우림: '#065f46',
+    맹그로브습지: '#166534',
     구릉지: '#90a86f',
+    운무고원림: '#3f7c65',
+    이끼고원숲: '#5b8f72',
+    한랭습윤고원: '#7f9c96',
+    붉은고원: '#b45309',
     붉은대협곡: '#9a3412',
     험준한산맥: '#52525b',
+    건조암봉산맥: '#6b7280',
+    고산열대운무림: '#2f855a',
+    빙하설산: '#dbeafe',
     화산지대: '#9c4b3a',
     만년설산: '#e6eef8',
     늪지대: '#4d7c0f',
@@ -238,20 +248,33 @@ const distanceToWater = (elevations, levels, width, height) => {
 const isWaterTerrain = (terrainType) => ['심해', '바다', '얕은해안', '산호초해안', '해안', '호수'].includes(terrainType);
 
 const classifyTerrain = (elevation, moisture, heat, nearSea, levels) => {
+  const mountainStart = Math.max(0.7, levels.seaLevel + 0.14);
+  const highlandStart = Math.max(0.58, levels.seaLevel + 0.08);
+
   if (elevation < levels.deepSeaLevel) return '심해';
   if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.7) return '바다';
   if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.25) return heat > 0.75 ? '산호초해안' : '얕은해안';
   if (elevation < levels.seaLevel) return nearSea ? '해안' : '얕은해안';
   if (elevation < levels.seaLevel + 0.01 && nearSea) return '모래해변';
 
-  if (elevation > 0.75) {
-    if (heat > 0.7 && moisture < 0.45) return elevation > 0.85 ? '붉은대협곡' : '화산지대';
-    if (heat < 0.35 || (moisture > 0.5 && elevation > 0.85)) return '만년설산';
+  if (elevation > mountainStart) {
+    if (heat > 0.72 && moisture < 0.35) return elevation > mountainStart + 0.12 ? '붉은대협곡' : '화산지대';
+    if (heat > 0.62 && moisture > 0.55) return '고산열대운무림';
+    if (heat < 0.3 && moisture > 0.55) return '빙하설산';
+    if (moisture < 0.25) return '건조암봉산맥';
+    if (heat < 0.35 || (moisture > 0.5 && elevation > mountainStart + 0.1)) return '만년설산';
     return '험준한산맥';
   }
-  if (elevation > 0.62) return '구릉지';
+  if (elevation > highlandStart) {
+    if (heat > 0.68 && moisture > 0.62) return '운무고원림';
+    if (heat > 0.64 && moisture < 0.3) return '붉은고원';
+    if (heat < 0.36 && moisture > 0.55) return '한랭습윤고원';
+    if (moisture > 0.65) return '이끼고원숲';
+    return '구릉지';
+  }
 
   if (heat > 0.65) {
+    if (moisture > 0.78 && (nearSea || elevation < levels.seaLevel + 0.08)) return '맹그로브습지';
     if (moisture > 0.6) return '열대우림';
     if (moisture < 0.3) return moisture > 0.22 && heat < 0.8 ? '사막오아시스' : '건조사막';
     return '사바나평원';
@@ -445,16 +468,21 @@ const buildScalarFields = (width, height, noiseContext) => {
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
-      const macroElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency, y * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
-      const regionalElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 2.6 + 37, y * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
-      const microElevation = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 5.5 - 13, y * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
-      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 8.8 + 59, y * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
-      const oceanScatter = fbmPerlin(noiseContext.elevation, x * HEX_CONFIG.elevationFrequency * 0.9 + 101, y * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
+      const warpX = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.warpFrequency + 71, y * HEX_CONFIG.warpFrequency - 29, 3, 2, 0.5);
+      const warpY = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.warpFrequency - 113, y * HEX_CONFIG.warpFrequency + 167, 3, 2, 0.5);
+      const wx = x + warpX * HEX_CONFIG.warpStrength;
+      const wy = y + warpY * HEX_CONFIG.warpStrength;
+
+      const macroElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency, wy * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
+      const regionalElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
+      const microElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
+      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
+      const oceanScatter = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
 
       const biomePatch = fbmPerlin(
         noiseContext.elevation,
-        x * HEX_CONFIG.biomePatchFrequency + 211,
-        y * HEX_CONFIG.biomePatchFrequency - 157,
+        wx * HEX_CONFIG.biomePatchFrequency + 211,
+        wy * HEX_CONFIG.biomePatchFrequency - 157,
         3,
         2.2,
         0.58
@@ -470,14 +498,14 @@ const buildScalarFields = (width, height, noiseContext) => {
       );
       elevations[idx] = elevation;
 
-      const heatLarge = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency, y * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
-      const heatDetail = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 4.1 + 12, y * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
-      const heatPatch = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.heatFrequency * 9.8 - 143, y * HEX_CONFIG.heatFrequency * 9.8 + 227, 3, 2.24, 0.58);
+      const heatLarge = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
+      const heatDetail = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 4.1 + 12, wy * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
+      const heatPatch = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 9.8 - 143, wy * HEX_CONFIG.heatFrequency * 9.8 + 227, 3, 2.24, 0.58);
       heats[idx] = clamp01(equatorBase * 0.5 + (heatLarge * 0.5 + 0.5) * 0.3 + (heatDetail * 0.5 + 0.5) * 0.14 + (heatPatch * 0.5 + 0.5) * 0.06);
 
-      const moistureLarge = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency, y * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
-      const moistureDetail = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 4.5 - 17, y * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
-      const moisturePatch = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.moistureFrequency * 10.2 + 71, y * HEX_CONFIG.moistureFrequency * 10.2 - 93, 3, 2.18, 0.6);
+      const moistureLarge = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency, wy * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
+      const moistureDetail = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 4.5 - 17, wy * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
+      const moisturePatch = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 10.2 + 71, wy * HEX_CONFIG.moistureFrequency * 10.2 - 93, 3, 2.18, 0.6);
       const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
       moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.56 + (moistureDetail * 0.5 + 0.5) * 0.24 + (moisturePatch * 0.5 + 0.5) * 0.1 + (1 - elevation) * 0.1 - elevationPenalty);
     }

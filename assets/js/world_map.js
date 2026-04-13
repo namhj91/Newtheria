@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.70(260410-붉은고원완화해양해안청색분리)';
+const WORLD_VERSION = 'ver.0.0.71(260413-사막군집화지형명단순화)';
 
 const MAP_SIZE = 200;
 
@@ -22,7 +22,7 @@ const HEX_CONFIG = {
   terrains: {
     심해: '#203b78',
     바다: '#2e5ca6',
-    산호초해안: '#0ea5e9',
+    산호해안: '#0ea5e9',
     얕은해안: '#38bdf8',
     해안: '#4a90d9',
     모래해변: '#d4c08f',
@@ -32,29 +32,29 @@ const HEX_CONFIG = {
     푸른평원: '#4ade80',
     울창한숲: '#15803d',
     침엽수림: '#0f766e',
-    태고의대수림: '#064e3b',
+    고대숲: '#064e3b',
     열대우림: '#065f46',
     맹그로브습지: '#166534',
     구릉지: '#90a86f',
     운무고원림: '#3f7c65',
     이끼고원숲: '#5b8f72',
-    한랭습윤고원: '#7f9c96',
+    한랭고원: '#7f9c96',
     붉은고원: '#a8783a',
     붉은대협곡: '#9a3412',
     험준한산맥: '#52525b',
-    건조암봉산맥: '#6b7280',
-    고산열대운무림: '#2f855a',
+    바위산맥: '#6b7280',
+    고산운무림: '#2f855a',
     빙하설산: '#dbeafe',
     화산지대: '#9c4b3a',
     만년설산: '#e6eef8',
     늪지대: '#4d7c0f',
-    얼어붙은툰드라: '#a1a1aa',
+    빙원: '#a1a1aa',
     건조사막: '#fde047',
     사막오아시스: '#34d399',
-    세계수중심: '#10b981',
-    고대용의둥지: '#9f1239',
-    빛나는수정동굴: '#6d28d9',
-    고대성소유적: '#94a3b8'
+    세계수: '#10b981',
+    용의둥지: '#9f1239',
+    수정동굴: '#6d28d9',
+    고대성소: '#94a3b8'
   }
 };
 
@@ -167,14 +167,14 @@ const createPerlin2D = (seed) => {
 
 const TERRAIN_FAMILY = {
   심해: 'water', 바다: 'water', 호수: 'water', 강: 'river',
-  산호초해안: 'coast', 얕은해안: 'coast', 해안: 'coast', 모래해변: 'coast',
+  산호해안: 'coast', 얕은해안: 'coast', 해안: 'coast', 모래해변: 'coast',
   푸른평원: 'grass', 사바나평원: 'grass', 구릉지: 'grass',
-  울창한숲: 'forest', 침엽수림: 'forest', 열대우림: 'forest', 태고의대수림: 'forest', 운무고원림: 'forest', 이끼고원숲: 'forest', 맹그로브습지: 'wetland',
+  울창한숲: 'forest', 침엽수림: 'forest', 열대우림: 'forest', 고대숲: 'forest', 운무고원림: 'forest', 이끼고원숲: 'forest', 맹그로브습지: 'wetland',
   늪지대: 'wetland', 사막오아시스: 'wetland',
   건조사막: 'arid', 붉은고원: 'arid', 붉은대협곡: 'arid',
-  험준한산맥: 'mountain', 건조암봉산맥: 'mountain', 화산지대: 'mountain', 고대용의둥지: 'mountain',
-  만년설산: 'snow', 빙하설산: 'snow', 한랭습윤고원: 'snow', 얼어붙은툰드라: 'snow',
-  세계수중심: 'special', 빛나는수정동굴: 'special', 고대성소유적: 'special', 고산열대운무림: 'special'
+  험준한산맥: 'mountain', 바위산맥: 'mountain', 화산지대: 'mountain', 용의둥지: 'mountain',
+  만년설산: 'snow', 빙하설산: 'snow', 한랭고원: 'snow', 빙원: 'snow',
+  세계수: 'special', 수정동굴: 'special', 고대성소: 'special', 고산운무림: 'special'
 };
 
 const FAMILY_GRADIENTS = {
@@ -192,7 +192,7 @@ const FAMILY_GRADIENTS = {
 
 const getTerrainColor = (terrainType, elevation, moisture, heat) => {
   const family = TERRAIN_FAMILY[terrainType] || 'special';
-  if (['세계수중심', '고대용의둥지', '빛나는수정동굴', '고대성소유적', '태고의대수림'].includes(terrainType)) {
+  if (['세계수', '용의둥지', '수정동굴', '고대성소', '고대숲'].includes(terrainType)) {
     return HEX_CONFIG.terrains[terrainType] || '#ffffff';
   }
   const [from, to] = FAMILY_GRADIENTS[family] || ['#6b7280', '#cbd5e1'];
@@ -313,7 +313,7 @@ const distanceToWater = (elevations, levels, width, height) => {
   return dist;
 };
 
-const isWaterTerrain = (terrainType) => ['심해', '바다', '얕은해안', '산호초해안', '해안', '호수'].includes(terrainType);
+const isWaterTerrain = (terrainType) => ['심해', '바다', '얕은해안', '산호해안', '해안', '호수'].includes(terrainType);
 
 const quantile = (values, ratio) => {
   if (!values.length) return 0;
@@ -346,7 +346,7 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, rand
 
   if (elevation < levels.deepSeaLevel) return '심해';
   if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.7) return '바다';
-  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.25) return heat > 0.75 ? '산호초해안' : '얕은해안';
+  if (elevation < levels.seaLevel - HEX_CONFIG.coastBand * 0.25) return heat > 0.75 ? '산호해안' : '얕은해안';
   if (elevation < levels.seaLevel) return nearSea ? '해안' : '얕은해안';
   if (elevation < levels.seaLevel + 0.01 && nearSea) return '모래해변';
 
@@ -355,17 +355,17 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, rand
   const heatBand = getBand(heat, bands.heat.low, bands.heat.high);
 
   if (elevation > mountainStart) {
-    if (heatBand === 'high' && moistureBand === 'high') return random < 0.48 ? '고산열대운무림' : '험준한산맥';
+    if (heatBand === 'high' && moistureBand === 'high') return random < 0.48 ? '고산운무림' : '험준한산맥';
     if (heatBand === 'low' && moistureBand === 'high') return random < 0.52 ? '빙하설산' : '만년설산';
-    if (moistureBand === 'low') return random < 0.55 ? '건조암봉산맥' : '험준한산맥';
+    if (moistureBand === 'low') return random < 0.55 ? '바위산맥' : '험준한산맥';
     if (heatBand === 'high' && moistureBand !== 'high') return random < 0.5 ? '화산지대' : '붉은대협곡';
     if (heatBand === 'low') return '만년설산';
     return '험준한산맥';
   }
   if (elevation > highlandStart) {
-    if (heatBand === 'high' && moistureBand === 'high') return random < 0.6 ? '운무고원림' : '고산열대운무림';
+    if (heatBand === 'high' && moistureBand === 'high') return random < 0.6 ? '운무고원림' : '고산운무림';
     if (heatBand === 'high' && moistureBand === 'low') return random < 0.18 ? '붉은고원' : '구릉지';
-    if (heatBand === 'low' && moistureBand === 'high') return random < 0.55 ? '한랭습윤고원' : '이끼고원숲';
+    if (heatBand === 'low' && moistureBand === 'high') return random < 0.55 ? '한랭고원' : '이끼고원숲';
     if (moistureBand === 'high') return '이끼고원숲';
     return '구릉지';
   }
@@ -375,7 +375,7 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, rand
       if (nearSea && random < 0.5) return '맹그로브습지';
       return random < 0.5 ? '열대우림' : '늪지대';
     }
-    if (moistureBand === 'low') return random < 0.4 ? '사막오아시스' : '건조사막';
+    if (moistureBand === 'low') return (!nearSea && random < 0.12) ? '사막오아시스' : '건조사막';
     return random < 0.6 ? '사바나평원' : '푸른평원';
   }
   if (heatBand === 'mid') {
@@ -383,17 +383,17 @@ const classifyTerrain = (elevation, moisture, heat, nearSea, levels, bands, rand
     if (moistureBand === 'low') return random < 0.6 ? '푸른평원' : '사바나평원';
     return random < 0.5 ? '푸른평원' : '울창한숲';
   }
-  if (moistureBand === 'high') return random < 0.6 ? '침엽수림' : '한랭습윤고원';
-  if (moistureBand === 'low') return random < 0.6 ? '얼어붙은툰드라' : '건조암봉산맥';
-  return random < 0.5 ? '침엽수림' : '얼어붙은툰드라';
+  if (moistureBand === 'high') return random < 0.6 ? '침엽수림' : '한랭고원';
+  if (moistureBand === 'low') return random < 0.6 ? '빙원' : '바위산맥';
+  return random < 0.5 ? '침엽수림' : '빙원';
 };
 
 const rebalanceBiomeDiversity = (tiles, random, levels) => {
-  const LAND_WATER = new Set(['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수']);
+  const LAND_WATER = new Set(['심해', '바다', '얕은해안', '산호해안', '해안', '모래해변', '호수']);
   const targetBiomes = [
-    '맹그로브습지', '열대우림', '사막오아시스', '건조사막', '사바나평원',
-    '운무고원림', '이끼고원숲', '한랭습윤고원',
-    '험준한산맥', '건조암봉산맥', '만년설산', '빙하설산', '고산열대운무림', '화산지대', '붉은대협곡'
+    '맹그로브습지', '열대우림', '건조사막', '사바나평원',
+    '운무고원림', '이끼고원숲', '한랭고원',
+    '험준한산맥', '바위산맥', '만년설산', '빙하설산', '고산운무림', '화산지대', '붉은대협곡'
   ];
 
   const counts = tiles.reduce((acc, tile) => {
@@ -424,15 +424,14 @@ const rebalanceBiomeDiversity = (tiles, random, levels) => {
 
   tryPromote('맹그로브습지', (tile) => tile.heat > 0.62 && tile.moisture > 0.6 && tile.elevation < levels.seaLevel + 0.08);
   tryPromote('열대우림', (tile) => tile.heat > 0.6 && tile.moisture > 0.58 && tile.elevation < levels.seaLevel + 0.16);
-  tryPromote('사막오아시스', (tile) => tile.heat > 0.62 && tile.moisture > 0.22 && tile.moisture < 0.36);
-  tryPromote('건조사막', (tile) => tile.heat > 0.63 && tile.moisture < 0.28);
+  tryPromote('건조사막', (tile) => tile.heat > 0.64 && tile.moisture < 0.26);
   tryPromote('운무고원림', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat > 0.56 && tile.moisture > 0.58);
   tryPromote('이끼고원숲', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.moisture > 0.62);
   tryPromote('붉은고원', (tile) => tile.elevation > levels.seaLevel + 0.14 && tile.heat > 0.64 && tile.moisture < 0.26);
-  tryPromote('한랭습윤고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat < 0.42 && tile.moisture > 0.56);
-  tryPromote('건조암봉산맥', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.moisture < 0.32);
+  tryPromote('한랭고원', (tile) => tile.elevation > levels.seaLevel + 0.1 && tile.heat < 0.42 && tile.moisture > 0.56);
+  tryPromote('바위산맥', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.moisture < 0.32);
   tryPromote('빙하설산', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat < 0.33 && tile.moisture > 0.52);
-  tryPromote('고산열대운무림', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat > 0.58 && tile.moisture > 0.52);
+  tryPromote('고산운무림', (tile) => tile.elevation > levels.seaLevel + 0.16 && tile.heat > 0.58 && tile.moisture > 0.52);
   tryPromote('화산지대', (tile) => tile.elevation > levels.seaLevel + 0.15 && tile.heat > 0.62 && tile.moisture < 0.48);
   tryPromote('붉은대협곡', (tile) => tile.elevation > levels.seaLevel + 0.18 && tile.heat > 0.6 && tile.moisture < 0.42);
 
@@ -441,12 +440,55 @@ const rebalanceBiomeDiversity = (tiles, random, levels) => {
   }
 };
 
+const clusterAridTiles = (tiles, width, height, levels) => {
+  const ARID_SET = new Set(['건조사막', '사막오아시스']);
+  const WATER_SET = new Set(['심해', '바다', '얕은해안', '산호해안', '해안', '모래해변', '호수', '강']);
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    const updates = [];
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * width + x;
+        const tile = tiles[idx];
+        const neighbors = getNeighbors(x, y, width, height).map(([nx, ny]) => tiles[ny * width + nx]);
+        const aridNeighbors = neighbors.filter((neighbor) => ARID_SET.has(neighbor.terrainType)).length;
+
+        if (tile.terrainType === '사막오아시스' && aridNeighbors >= 4) {
+          updates.push([idx, '건조사막']);
+          continue;
+        }
+
+        if (tile.terrainType === '건조사막' && aridNeighbors <= 1) {
+          const fallback = tile.moisture < 0.22 ? '구릉지' : '사바나평원';
+          updates.push([idx, fallback]);
+          continue;
+        }
+
+        if (!ARID_SET.has(tile.terrainType)
+          && !WATER_SET.has(tile.terrainType)
+          && aridNeighbors >= 4
+          && tile.heat > 0.6
+          && tile.moisture < 0.34
+          && tile.elevation < levels.seaLevel + 0.18) {
+          updates.push([idx, '건조사막']);
+        }
+      }
+    }
+
+    updates.forEach(([idx, terrainType]) => {
+      const tile = tiles[idx];
+      tile.terrainType = terrainType;
+      tile.color = getTerrainColor(terrainType, tile.elevation, tile.moisture, tile.heat);
+    });
+  }
+};
+
 const RESOURCE_RULES = [
   { id: 'herbs', terrains: ['푸른평원', '사바나평원'], prob: 0.06 },
-  { id: 'timber', terrains: ['울창한숲', '침엽수림', '태고의대수림', '열대우림'], prob: 0.08 },
+  { id: 'timber', terrains: ['울창한숲', '침엽수림', '고대숲', '열대우림'], prob: 0.08 },
   { id: 'obsidian', terrains: ['화산지대', '붉은대협곡'], prob: 0.05 },
-  { id: 'crystal', terrains: ['만년설산', '험준한산맥', '빛나는수정동굴'], prob: 0.035 },
-  { id: 'mana_bloom', terrains: ['사막오아시스', '세계수중심', '고대성소유적'], prob: 0.03 }
+  { id: 'crystal', terrains: ['만년설산', '험준한산맥', '수정동굴'], prob: 0.035 },
+  { id: 'mana_bloom', terrains: ['사막오아시스', '세계수', '고대성소'], prob: 0.03 }
 ];
 
 const assignTerrainResources = (tiles, random) => {
@@ -506,11 +548,11 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
   if (!landTiles.length) return;
 
   const worldTree = landTiles[Math.floor(random() * landTiles.length)];
-  worldTree.terrainType = '세계수중심';
+  worldTree.terrainType = '세계수';
   worldTree.specialTileType = 'world_tree';
   worldTree.manaSaturation = 100;
   worldTree.sparkleLight = 100;
-  worldTree.color = getTerrainColor('세계수중심', worldTree.elevation, worldTree.moisture, worldTree.heat);
+  worldTree.color = getTerrainColor('세계수', worldTree.elevation, worldTree.moisture, worldTree.heat);
 
   const ancientForestSize = Math.floor(random() * 20) + 30;
   const forestSeeds = [worldTree];
@@ -526,8 +568,8 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 
     if (!marked.has(key) && target && !isWaterTerrain(target.terrainType) && target.terrainType !== '호수') {
       marked.add(key);
-      target.terrainType = '태고의대수림';
-      target.color = getTerrainColor('태고의대수림', target.elevation, target.moisture, target.heat);
+      target.terrainType = '고대숲';
+      target.color = getTerrainColor('고대숲', target.elevation, target.moisture, target.heat);
       target.manaSaturation = Math.max(90, target.manaSaturation);
       forestSeeds.push(target);
     }
@@ -537,31 +579,31 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
   const peaks = landTiles.filter((tile) => ['험준한산맥', '화산지대', '붉은대협곡'].includes(tile.terrainType));
   if (peaks.length) {
     const dragonPeak = peaks.reduce((max, tile) => (tile.elevation > max.elevation ? tile : max), peaks[0]);
-    dragonPeak.terrainType = '고대용의둥지';
+    dragonPeak.terrainType = '용의둥지';
     dragonPeak.specialTileType = 'dragon_peak';
     dragonPeak.manaSaturation = 100;
     dragonPeak.sparkleLight = 100;
-    dragonPeak.color = getTerrainColor('고대용의둥지', dragonPeak.elevation, dragonPeak.moisture, dragonPeak.heat);
+    dragonPeak.color = getTerrainColor('용의둥지', dragonPeak.elevation, dragonPeak.moisture, dragonPeak.heat);
   }
 
-  const coldTiles = landTiles.filter((tile) => ['만년설산', '얼어붙은툰드라'].includes(tile.terrainType));
+  const coldTiles = landTiles.filter((tile) => ['만년설산', '빙원'].includes(tile.terrainType));
   if (coldTiles.length) {
     const cave = coldTiles[Math.floor(random() * coldTiles.length)];
-    cave.terrainType = '빛나는수정동굴';
+    cave.terrainType = '수정동굴';
     cave.specialTileType = 'crystal_cave';
     cave.manaSaturation = 100;
     cave.sparkleLight = 100;
-    cave.color = getTerrainColor('빛나는수정동굴', cave.elevation, cave.moisture, cave.heat);
+    cave.color = getTerrainColor('수정동굴', cave.elevation, cave.moisture, cave.heat);
   }
 
   const plains = landTiles.filter((tile) => ['푸른평원', '사막오아시스', '사바나평원'].includes(tile.terrainType));
   if (plains.length) {
     const monolith = plains[Math.floor(random() * plains.length)];
-    monolith.terrainType = '고대성소유적';
+    monolith.terrainType = '고대성소';
     monolith.specialTileType = 'ancient_monolith';
     monolith.manaSaturation = 100;
     monolith.sparkleLight = 100;
-    monolith.color = getTerrainColor('고대성소유적', monolith.elevation, monolith.moisture, monolith.heat);
+    monolith.color = getTerrainColor('고대성소', monolith.elevation, monolith.moisture, monolith.heat);
   }
 };
 
@@ -600,7 +642,7 @@ const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
       if (!current || current.elevation <= levels.seaLevel) break;
       if (current.terrainType === '강' && carvedLength > 10) break;
 
-      if (!['험준한산맥', '만년설산', '화산지대', '고대용의둥지'].includes(current.terrainType)) {
+      if (!['험준한산맥', '만년설산', '화산지대', '용의둥지'].includes(current.terrainType)) {
         current.terrainType = '강';
         current.color = getTerrainColor('강', current.elevation, current.moisture, current.heat);
         carvedLength += 1;
@@ -750,11 +792,12 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   const waterDist = distanceToWater(rawFields.elevations, levels, width, height);
 
   const tiles = buildTiles(width, height, rawFields, levels, waterDist, random);
+  clusterAridTiles(tiles, width, height, levels);
   convertSmallWaterBodiesToLakes(tiles, width, height, 200);
   assignTerrainResources(tiles, random);
   placeMythicLandmarks(tiles, random, width, height);
 
-  const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
+  const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
   const riverBudget = Math.max(8, Math.floor(30 * (0.28 + avgLandMoisture * 0.42) * (landTiles.length / tiles.length + 0.1)));
 
@@ -861,7 +904,7 @@ const renderWorld = (world) => {
   }, {});
 
   const landCount = Object.entries(terrainStat)
-    .filter(([name]) => !['심해', '바다', '얕은해안', '산호초해안', '해안', '모래해변', '호수'].includes(name))
+    .filter(([name]) => !['심해', '바다', '얕은해안', '산호해안', '해안', '모래해변', '호수'].includes(name))
     .reduce((sum, [, count]) => sum + count, 0);
 
   const riverCount = terrainStat.강 || 0;

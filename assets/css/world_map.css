@@ -52,6 +52,29 @@ body {
   background: rgba(59, 89, 141, 0.92);
 }
 
+.world-map-roll-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.world-map-roll-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(166, 193, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(16, 28, 50, 0.75);
+  color: #dce7ff;
+  font-size: 0.9rem;
+}
+
+.world-map-roll-settings input[type="range"] {
+  accent-color: #7fb2ff;
+}
+
 .meta {
   font-size: 0.92rem;
 }

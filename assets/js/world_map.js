@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.71(260413-사막군집화지형명단순화)';
+const WORLD_VERSION = 'ver.0.0.72(260414-리롤지형설정추가)';
 
 const MAP_SIZE = 200;
 
@@ -9,6 +9,7 @@ const HEX_CONFIG = {
   z: 0,
   size: 4,
   seaLevelRatio: 0.58,
+  elevationScale: 1,
   deepSeaOffset: 0.12,
   coastBand: 0.02,
   mountainLevel: 0.78,
@@ -65,6 +66,10 @@ const mapMeta = document.getElementById('mapMeta');
 const versionTag = document.getElementById('worldMapVersion');
 const layerButtons = [...document.querySelectorAll('.layer-button')];
 const tilePopup = document.getElementById('tilePopup');
+const seaLevelRatioInput = document.getElementById('seaLevelRatioInput');
+const seaLevelRatioValue = document.getElementById('seaLevelRatioValue');
+const elevationScaleInput = document.getElementById('elevationScaleInput');
+const elevationScaleValue = document.getElementById('elevationScaleValue');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -227,6 +232,22 @@ const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   }
 
   return sum / ampSum;
+};
+
+const applyRerollSettings = () => {
+  const seaLevelRatio = Number.parseFloat(seaLevelRatioInput?.value ?? `${HEX_CONFIG.seaLevelRatio}`);
+  const elevationScale = Number.parseFloat(elevationScaleInput?.value ?? `${HEX_CONFIG.elevationScale}`);
+  HEX_CONFIG.seaLevelRatio = Number.isFinite(seaLevelRatio) ? seaLevelRatio : HEX_CONFIG.seaLevelRatio;
+  HEX_CONFIG.elevationScale = Number.isFinite(elevationScale) ? elevationScale : HEX_CONFIG.elevationScale;
+};
+
+const updateRerollLabels = () => {
+  if (seaLevelRatioValue) {
+    seaLevelRatioValue.textContent = `${Math.round(HEX_CONFIG.seaLevelRatio * 100)}%`;
+  }
+  if (elevationScaleValue) {
+    elevationScaleValue.textContent = `${HEX_CONFIG.elevationScale.toFixed(2)}x`;
+  }
 };
 
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
@@ -701,7 +722,7 @@ const buildScalarFields = (width, height, noiseContext) => {
         + ruggedNoise * 0.08)
         - (oceanScatter * 0.5 + 0.5) * 0.09
         + biomePatch * HEX_CONFIG.biomePatchStrength
-      );
+      ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
 
       const heatLarge = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
@@ -912,6 +933,8 @@ const renderWorld = (world) => {
 };
 
 const generateAndRender = () => {
+  applyRerollSettings();
+  updateRerollLabels();
   const world = generateWorldMap(MAP_SIZE, MAP_SIZE);
   currentWorld = world;
   tilePopup.hidden = true;
@@ -992,5 +1015,15 @@ canvas.addEventListener('click', (event) => {
 
 versionTag.textContent = WORLD_VERSION;
 regenButton.addEventListener('click', generateAndRender);
+seaLevelRatioInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+elevationScaleInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+applyRerollSettings();
+updateRerollLabels();
 
 generateAndRender();

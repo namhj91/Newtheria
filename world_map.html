@@ -15,6 +15,18 @@
         <button id="regenButton" type="button">맵 다시 생성</button>
         <a href="./start_screen.html">시작 화면으로</a>
       </div>
+      <form class="world-map-roll-settings" aria-label="맵 리롤 설정">
+        <label>
+          해양 비율
+          <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
+          <span id="seaLevelRatioValue">58%</span>
+        </label>
+        <label>
+          고도 강도
+          <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" />
+          <span id="elevationScaleValue">1.00x</span>
+        </label>
+      </form>
       <div class="world-map-layer-controls" role="group" aria-label="기후 레이어 선택">
         <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
         <button type="button" class="layer-button" data-layer="elevation">고도</button>

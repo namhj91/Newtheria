@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.72(260414-리롤지형설정추가)';
+const WORLD_VERSION = 'ver.0.0.73(260414-해양비율보정로직수정)';
 
 const MAP_SIZE = 200;
 
@@ -297,10 +297,11 @@ const getAdaptiveSeaLevels = (elevations) => {
     return sorted[Math.max(0, Math.min(sorted.length - 1, idx))];
   };
 
-  let seaLevel = pick(HEX_CONFIG.seaLevelRatio);
+  const targetSeaRatio = clamp01(HEX_CONFIG.seaLevelRatio);
+  let seaLevel = pick(targetSeaRatio);
   const waterRatio = elevations.filter((v) => v < seaLevel).length / elevations.length;
-  if (waterRatio > 0.88) seaLevel = pick(0.54);
-  else if (waterRatio < 0.42) seaLevel = pick(0.7);
+  if (waterRatio > targetSeaRatio + 0.18) seaLevel = pick(Math.max(0.05, targetSeaRatio - 0.06));
+  else if (waterRatio < targetSeaRatio - 0.18) seaLevel = pick(Math.min(0.95, targetSeaRatio + 0.06));
 
   return { seaLevel, deepSeaLevel: seaLevel - HEX_CONFIG.deepSeaOffset };
 };

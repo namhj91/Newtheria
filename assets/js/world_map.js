@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.78(260415-월드맵정보팝업파라미터확장)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.79(260415-월드정보팝업디자인개선)';
 
 const MAP_SIZE = 200;
 
@@ -115,12 +115,12 @@ const updateCalendarMeta = () => {
   };
   const turnRuleLabel = calendarApi?.getTurnRuleLabel?.(worldTurnMode) || '일반 월드맵(1턴=1주)';
   calendarMeta.textContent = [
-    `턴 규칙: ${turnRuleLabel}`,
-    `달력: ${worldDate.year}년 ${worldDate.month}월 ${worldDate.week}주`,
-    `${info.seasonName} · ${info.seasonDesc}`,
-    `${info.monthName}(${info.monthDesc})`,
-    `${info.weekName}(${info.weekDesc})`
-  ].join(' | ');
+    `턴 규칙 · ${turnRuleLabel}`,
+    `현재 날짜 · ${worldDate.year}년 ${worldDate.month}월 ${worldDate.week}주`,
+    `절기 · ${info.seasonName} (${info.seasonDesc})`,
+    `월 룬 · ${info.monthName} (${info.monthDesc})`,
+    `주차 테마 · ${info.weekName} (${info.weekDesc})`
+  ].join('\n');
 };
 const hexToRgb = (hex) => {
   const normalized = hex.replace('#', '');
@@ -1009,7 +1009,12 @@ const renderWorld = (world) => {
     .reduce((sum, [, count]) => sum + count, 0);
 
   const riverCount = terrainStat.강 || 0;
-  mapMeta.textContent = `seed: ${seed} · hex: ${width}x${height} (${tiles.length.toLocaleString()} tiles) · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()} · 강 ${riverCount.toLocaleString()} · riverBudget ${riverBudget}`;
+  mapMeta.textContent = [
+    `시드 · ${seed}`,
+    `헥스 크기 · ${width}x${height} (${tiles.length.toLocaleString()} 타일)`,
+    `지형 분포 · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`,
+    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`
+  ].join('\n');
 };
 
 const generateAndRender = () => {

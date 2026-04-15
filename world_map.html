@@ -60,10 +60,22 @@
 
   <dialog id="worldInfoDialog" class="world-info-dialog" aria-label="월드 정보">
     <div class="world-info-dialog-inner">
+      <p class="world-info-kicker">WORLD BRIEFING</p>
       <h2>월드 정보</h2>
-      <p id="mapMeta" class="meta" aria-live="polite"></p>
-      <p id="calendarMeta" class="meta" aria-live="polite"></p>
-      <button id="metaCloseButton" type="button">닫기</button>
+      <p class="world-info-subtitle">현재 생성된 세계의 핵심 데이터를 한눈에 확인하세요.</p>
+      <section class="world-info-grid">
+        <article class="world-info-card">
+          <h3>지도 요약</h3>
+          <p id="mapMeta" class="meta" aria-live="polite"></p>
+        </article>
+        <article class="world-info-card">
+          <h3>달력 요약</h3>
+          <p id="calendarMeta" class="meta" aria-live="polite"></p>
+        </article>
+      </section>
+      <div class="world-info-actions">
+        <button id="metaCloseButton" type="button">닫기</button>
+      </div>
     </div>
   </dialog>
 

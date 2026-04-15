@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.73(260414-해양비율보정로직수정)';
+const WORLD_VERSION = 'ver.0.0.76(260415-턴진행규칙모드분리)';
 
 const MAP_SIZE = 200;
 
@@ -63,6 +63,7 @@ const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
+const calendarMeta = document.getElementById('calendarMeta');
 const versionTag = document.getElementById('worldMapVersion');
 const layerButtons = [...document.querySelectorAll('.layer-button')];
 const tilePopup = document.getElementById('tilePopup');
@@ -81,11 +82,33 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+const calendarApi = window.NewtheriaCalendar;
+const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
+const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const quintic = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+const updateCalendarMeta = () => {
+  if (!calendarMeta) return;
+  const info = calendarApi?.getCalendarInfo?.(worldDate) || {
+    seasonName: '아르케의 절기(겨울)',
+    seasonDesc: '테마: 천사 / 심판, 지혜, 침묵',
+    monthName: '로고스',
+    monthDesc: '진리와 언령의 룬',
+    weekName: '태동(胎動)',
+    weekDesc: '마력이 막 깨어나는 주'
+  };
+  const turnRuleLabel = calendarApi?.getTurnRuleLabel?.(worldTurnMode) || '일반 월드맵(1턴=1주)';
+  calendarMeta.textContent = [
+    `턴 규칙: ${turnRuleLabel}`,
+    `달력: ${worldDate.year}년 ${worldDate.month}월 ${worldDate.week}주`,
+    `${info.seasonName} · ${info.seasonDesc}`,
+    `${info.monthName}(${info.monthDesc})`,
+    `${info.weekName}(${info.weekDesc})`
+  ].join(' | ');
+};
 const hexToRgb = (hex) => {
   const normalized = hex.replace('#', '');
   const value = normalized.length === 3
@@ -1015,6 +1038,7 @@ canvas.addEventListener('click', (event) => {
 });
 
 versionTag.textContent = WORLD_VERSION;
+updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();

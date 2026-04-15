@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.76(260415-턴진행규칙모드분리)';
+const WORLD_VERSION = 'ver.0.0.77(260415-산맥능선지형강화)';
 
 const MAP_SIZE = 200;
 
@@ -18,6 +18,9 @@ const HEX_CONFIG = {
   heatFrequency: 0.0105,
   warpFrequency: 0.0068,
   warpStrength: 18,
+  ridgeFrequency: 0.0092,
+  ridgeDetailFrequency: 0.023,
+  ridgeStrength: 0.24,
   biomePatchFrequency: 0.054,
   biomePatchStrength: 0.12,
   terrains: {
@@ -255,6 +258,27 @@ const fbmPerlin = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   }
 
   return sum / ampSum;
+};
+
+const ridgedNoise = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
+  let sum = 0;
+  let amp = 0.55;
+  let freq = 1;
+  let ampSum = 0;
+  let weight = 1;
+
+  for (let i = 0; i < octaves; i += 1) {
+    const sample = 1 - Math.abs(noise2D(x * freq, y * freq));
+    const ridge = sample * sample;
+    const signal = ridge * weight;
+    sum += signal * amp;
+    ampSum += amp;
+    weight = clamp01(signal * 1.85);
+    freq *= lacunarity;
+    amp *= gain;
+  }
+
+  return ampSum === 0 ? 0 : sum / ampSum;
 };
 
 const applyRerollSettings = () => {
@@ -728,6 +752,8 @@ const buildScalarFields = (width, height, noiseContext) => {
       const regionalElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
       const microElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
       const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
+      const macroRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeFrequency + 181, wy * HEX_CONFIG.ridgeFrequency - 127, 4, 2.05, 0.58);
+      const detailRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeDetailFrequency - 311, wy * HEX_CONFIG.ridgeDetailFrequency + 89, 3, 2.2, 0.55);
       const oceanScatter = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
 
       const biomePatch = fbmPerlin(
@@ -743,7 +769,9 @@ const buildScalarFields = (width, height, noiseContext) => {
         ((macroElevation * 0.5 + 0.5) * 0.56
         + (regionalElevation * 0.5 + 0.5) * 0.24
         + (microElevation * 0.5 + 0.5) * 0.12
-        + ruggedNoise * 0.08)
+        + ruggedNoise * 0.08
+        + macroRidge * HEX_CONFIG.ridgeStrength
+        + detailRidge * HEX_CONFIG.ridgeStrength * 0.34)
         - (oceanScatter * 0.5 + 0.5) * 0.09
         + biomePatch * HEX_CONFIG.biomePatchStrength
       ) ** HEX_CONFIG.elevationScale;

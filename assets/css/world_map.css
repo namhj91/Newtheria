@@ -142,3 +142,41 @@ canvas {
   opacity: 0.9;
   font-weight: 600;
 }
+
+.world-info-dialog {
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  border-radius: 12px;
+  background: rgba(11, 18, 34, 0.98);
+  color: #e9f0ff;
+  padding: 0;
+  width: min(780px, 92vw);
+}
+
+.world-info-dialog::backdrop {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.world-info-dialog-inner {
+  padding: 18px 18px 16px;
+}
+
+.world-info-dialog h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.world-info-dialog .meta {
+  margin-top: 10px;
+  line-height: 1.45;
+  color: #d8e5ff;
+}
+
+#metaCloseButton {
+  margin-top: 14px;
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  background: rgba(34, 53, 89, 0.8);
+  color: #f1f5ff;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}

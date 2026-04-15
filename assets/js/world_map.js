@@ -1,5 +1,5 @@
 
-const WORLD_VERSION = 'ver.0.0.77(260415-산맥능선지형강화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.78(260415-월드맵정보팝업파라미터확장)';
 
 const MAP_SIZE = 200;
 
@@ -21,6 +21,7 @@ const HEX_CONFIG = {
   ridgeFrequency: 0.0092,
   ridgeDetailFrequency: 0.023,
   ridgeStrength: 0.24,
+  riverBudgetScale: 1,
   biomePatchFrequency: 0.054,
   biomePatchStrength: 0.12,
   terrains: {
@@ -68,12 +69,21 @@ const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
 const calendarMeta = document.getElementById('calendarMeta');
 const versionTag = document.getElementById('worldMapVersion');
+const metaToggleButton = document.getElementById('metaToggleButton');
+const worldInfoDialog = document.getElementById('worldInfoDialog');
+const metaCloseButton = document.getElementById('metaCloseButton');
 const layerButtons = [...document.querySelectorAll('.layer-button')];
 const tilePopup = document.getElementById('tilePopup');
 const seaLevelRatioInput = document.getElementById('seaLevelRatioInput');
 const seaLevelRatioValue = document.getElementById('seaLevelRatioValue');
 const elevationScaleInput = document.getElementById('elevationScaleInput');
 const elevationScaleValue = document.getElementById('elevationScaleValue');
+const warpStrengthInput = document.getElementById('warpStrengthInput');
+const warpStrengthValue = document.getElementById('warpStrengthValue');
+const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
+const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
+const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
+const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -284,8 +294,14 @@ const ridgedNoise = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
 const applyRerollSettings = () => {
   const seaLevelRatio = Number.parseFloat(seaLevelRatioInput?.value ?? `${HEX_CONFIG.seaLevelRatio}`);
   const elevationScale = Number.parseFloat(elevationScaleInput?.value ?? `${HEX_CONFIG.elevationScale}`);
+  const warpStrength = Number.parseFloat(warpStrengthInput?.value ?? `${HEX_CONFIG.warpStrength}`);
+  const ridgeStrength = Number.parseFloat(ridgeStrengthInput?.value ?? `${HEX_CONFIG.ridgeStrength}`);
+  const riverBudgetScale = Number.parseFloat(riverBudgetScaleInput?.value ?? `${HEX_CONFIG.riverBudgetScale}`);
   HEX_CONFIG.seaLevelRatio = Number.isFinite(seaLevelRatio) ? seaLevelRatio : HEX_CONFIG.seaLevelRatio;
   HEX_CONFIG.elevationScale = Number.isFinite(elevationScale) ? elevationScale : HEX_CONFIG.elevationScale;
+  HEX_CONFIG.warpStrength = Number.isFinite(warpStrength) ? warpStrength : HEX_CONFIG.warpStrength;
+  HEX_CONFIG.ridgeStrength = Number.isFinite(ridgeStrength) ? ridgeStrength : HEX_CONFIG.ridgeStrength;
+  HEX_CONFIG.riverBudgetScale = Number.isFinite(riverBudgetScale) ? riverBudgetScale : HEX_CONFIG.riverBudgetScale;
 };
 
 const updateRerollLabels = () => {
@@ -294,6 +310,15 @@ const updateRerollLabels = () => {
   }
   if (elevationScaleValue) {
     elevationScaleValue.textContent = `${HEX_CONFIG.elevationScale.toFixed(2)}x`;
+  }
+  if (warpStrengthValue) {
+    warpStrengthValue.textContent = `${Math.round(HEX_CONFIG.warpStrength)}`;
+  }
+  if (ridgeStrengthValue) {
+    ridgeStrengthValue.textContent = `${HEX_CONFIG.ridgeStrength.toFixed(2)}`;
+  }
+  if (riverBudgetScaleValue) {
+    riverBudgetScaleValue.textContent = `${HEX_CONFIG.riverBudgetScale.toFixed(2)}x`;
   }
 };
 
@@ -872,7 +897,10 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
 
   const landTiles = tiles.filter((tile) => !['심해', '바다', '얕은해안', '산호해안', '해안', '모래해변', '호수'].includes(tile.terrainType));
   const avgLandMoisture = landTiles.length ? landTiles.reduce((sum, tile) => sum + tile.moisture, 0) / landTiles.length : 0;
-  const riverBudget = Math.max(8, Math.floor(30 * (0.28 + avgLandMoisture * 0.42) * (landTiles.length / tiles.length + 0.1)));
+  const riverBudget = Math.max(8, Math.floor(30
+    * (0.28 + avgLandMoisture * 0.42)
+    * (landTiles.length / tiles.length + 0.1)
+    * HEX_CONFIG.riverBudgetScale));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
 
@@ -993,6 +1021,25 @@ const generateAndRender = () => {
   renderWorld(world);
 };
 
+const updateVersionTag = async () => {
+  let version = WORLD_VERSION_FALLBACK;
+
+  try {
+    const response = await fetch('./docs/99_변경이력.md', { cache: 'no-store' });
+    if (response.ok) {
+      const changelogText = await response.text();
+      const matched = changelogText.match(/^##\s+(ver\.[^\n]+)/m);
+      if (matched?.[1]) {
+        version = matched[1].trim();
+      }
+    }
+  } catch (error) {
+    console.warn('변경 이력에서 버전 정보를 불러오지 못했습니다.', error);
+  }
+
+  versionTag.textContent = version;
+};
+
 const cubeRound = (x, y, z) => {
   let rx = Math.round(x);
   let ry = Math.round(y);
@@ -1065,7 +1112,21 @@ canvas.addEventListener('click', (event) => {
   showTilePopup(tile, offsetX, offsetY);
 });
 
-versionTag.textContent = WORLD_VERSION;
+metaToggleButton?.addEventListener('click', () => {
+  if (!worldInfoDialog) return;
+  worldInfoDialog.showModal();
+  metaToggleButton.setAttribute('aria-expanded', 'true');
+});
+
+metaCloseButton?.addEventListener('click', () => {
+  if (!worldInfoDialog) return;
+  worldInfoDialog.close();
+});
+
+worldInfoDialog?.addEventListener('close', () => {
+  metaToggleButton?.setAttribute('aria-expanded', 'false');
+});
+
 updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
 seaLevelRatioInput?.addEventListener('input', () => {
@@ -1076,7 +1137,20 @@ elevationScaleInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();
 });
+warpStrengthInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+ridgeStrengthInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+riverBudgetScaleInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
 applyRerollSettings();
 updateRerollLabels();
+updateVersionTag();
 
 generateAndRender();

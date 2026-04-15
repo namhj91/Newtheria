@@ -13,6 +13,7 @@
       <p>지상계(z=0) 200×200 기준 랜덤 월드 생성 (헥스 타일)</p>
       <div class="world-map-actions">
         <button id="regenButton" type="button">맵 다시 생성</button>
+        <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
         <a href="./start_screen.html">시작 화면으로</a>
       </div>
       <form class="world-map-roll-settings" aria-label="맵 리롤 설정">
@@ -26,6 +27,21 @@
           <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" />
           <span id="elevationScaleValue">1.00x</span>
         </label>
+        <label>
+          지형 워프 강도
+          <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" />
+          <span id="warpStrengthValue">18</span>
+        </label>
+        <label>
+          산맥 강도
+          <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
+          <span id="ridgeStrengthValue">0.24</span>
+        </label>
+        <label>
+          강 생성 밀도
+          <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" />
+          <span id="riverBudgetScaleValue">1.00x</span>
+        </label>
       </form>
       <div class="world-map-layer-controls" role="group" aria-label="기후 레이어 선택">
         <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
@@ -33,8 +49,6 @@
         <button type="button" class="layer-button" data-layer="moisture">습도</button>
         <button type="button" class="layer-button" data-layer="heat">온도</button>
       </div>
-      <p id="mapMeta" class="meta" aria-live="polite"></p>
-      <p id="calendarMeta" class="meta" aria-live="polite"></p>
       <p id="worldMapVersion" class="meta version"></p>
     </header>
 
@@ -43,6 +57,15 @@
       <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
     </section>
   </main>
+
+  <dialog id="worldInfoDialog" class="world-info-dialog" aria-label="월드 정보">
+    <div class="world-info-dialog-inner">
+      <h2>월드 정보</h2>
+      <p id="mapMeta" class="meta" aria-live="polite"></p>
+      <p id="calendarMeta" class="meta" aria-live="polite"></p>
+      <button id="metaCloseButton" type="button">닫기</button>
+    </div>
+  </dialog>
 
   <script src="./assets/js/calendar.js"></script>
   <script src="./assets/js/world_map.js"></script>

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.80(260419-월드맵생성화면추가)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.81(260420-시작화면별항해전환연출추가)';
 
 const DEFAULT_MAP_SIZE = 200;
 

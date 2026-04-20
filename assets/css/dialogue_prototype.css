@@ -79,6 +79,25 @@
   line-height: 1.55;
   color: var(--dialogue-text-main);
 }
+.dialogue-prototype__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dialogue-prototype__choice {
+  border: 1px solid rgba(185, 205, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(30, 44, 88, 0.62);
+  color: #edf3ff;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.dialogue-prototype__choice:hover {
+  border-color: rgba(234, 243, 255, 0.72);
+}
 
 .dialogue-prototype__next {
   position: absolute;

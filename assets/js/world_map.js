@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.7(260420-테스트모드허브추가)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.9(260420-대화프로토타입주석보강)';
 
 const MAP_SIZE = 200;
 

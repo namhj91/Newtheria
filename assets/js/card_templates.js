@@ -7,6 +7,8 @@
   const DEFAULT_BEHAVIOR = {
     cardVerticalStep: 14,
     dragThresholdPx: 5,
+    longPressMs: 440,
+    longPressMoveTolerancePx: 8,
     hoverPushMax: 44,
     hoverLiftY: -14,
     hoverScale: 1.03,
@@ -60,7 +62,25 @@
       pendingDy: 0,
       frameRequest: null,
       moved: false,
-      dragging: false
+      dragging: false,
+      longPressTimer: null,
+      longPressTriggered: false
+    };
+
+    const clearLongPressTimer = () => {
+      if (dragState.longPressTimer === null) return;
+      window.clearTimeout(dragState.longPressTimer);
+      dragState.longPressTimer = null;
+    };
+
+    const startLongPressTimer = (card) => {
+      clearLongPressTimer();
+      dragState.longPressTimer = window.setTimeout(() => {
+        if (!dragState.card || dragState.card !== card || dragState.dragging || dragState.moved) return;
+        dragState.longPressTriggered = true;
+        card.classList.toggle('is-flipped');
+        card.dataset.consumeClick = 'true';
+      }, config.longPressMs);
     };
 
     const scheduleDragRender = () => {
@@ -192,8 +212,10 @@
           dragState.pendingDy = 0;
           dragState.moved = false;
           dragState.dragging = false;
+          dragState.longPressTriggered = false;
 
           card.setPointerCapture(e.pointerId);
+          startLongPressTimer(card);
         });
 
         card.addEventListener('pointermove', (e) => {
@@ -201,8 +223,12 @@
 
           const dx = e.clientX - dragState.startX;
           const dy = e.clientY - dragState.startY;
+          if (Math.hypot(dx, dy) > config.longPressMoveTolerancePx) {
+            clearLongPressTimer();
+          }
           if (Math.hypot(dx, dy) > config.dragThresholdPx) {
             dragState.moved = true;
+            clearLongPressTimer();
             if (!dragState.dragging) {
               dragState.dragging = true;
               dragState.card.classList.add('dragging');
@@ -223,7 +249,9 @@
 
           const draggedCard = dragState.card;
           const wasDragging = dragState.dragging;
+          const wasLongPress = dragState.longPressTriggered;
           const droppedOnDiscard = dragState.moved && shouldDiscardDrop({ card: draggedCard, event: e });
+          clearLongPressTimer();
           clearDragFrame();
           draggedCard.releasePointerCapture(e.pointerId);
           if (droppedOnDiscard) {
@@ -235,7 +263,7 @@
             }
             layoutCards();
             onCardDiscarded(draggedCard, cards);
-          } else {
+          } else if (wasDragging) {
             resetDraggedCard(draggedCard);
           }
 
@@ -243,8 +271,12 @@
           dragState.card = null;
           dragState.moved = false;
           dragState.dragging = false;
+          dragState.longPressTriggered = false;
           if (wasDragging) {
             onDragStateChange(false, { card: draggedCard, event: e, moved: false, discarded: droppedOnDiscard });
+          }
+          if (wasLongPress) {
+            onDragMove({ card: draggedCard, event: e, moved: false, longPress: true });
           }
         };
 
@@ -272,6 +304,12 @@
         });
 
         card.addEventListener('click', (e) => {
+          if (card.dataset.consumeClick === 'true') {
+            card.dataset.consumeClick = 'false';
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
           if (!dragState.moved) return;
           e.preventDefault();
           e.stopPropagation();

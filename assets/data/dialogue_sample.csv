@@ -1,0 +1,6 @@
+scene,anchor,speaker,line,backgroundUrl
+intro,start,??? ,"별빛이 잦아드는 밤, 당신의 선택이 새로운 길을 엽니다.",https://picsum.photos/id/1015/1920/1080
+intro,choice,여사제,"당신은 운명을 믿나요? 아니면 스스로 길을 개척하나요?",https://picsum.photos/id/1025/1920/1080
+intro,end,여사제,"CSV 파일에서 불러온 대사 프로토타입입니다.",https://picsum.photos/id/1043/1920/1080
+chapter1,start,기록관,"이제 1장 대사를 시작합니다.",https://picsum.photos/id/1039/1920/1080
+chapter1,end,기록관,"1장 대사는 여기까지입니다.",https://picsum.photos/id/1041/1920/1080

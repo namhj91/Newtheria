@@ -10,6 +10,7 @@ const CARD_MENU_ITEMS = [
 ];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
+const testModeEntryButton = document.getElementById('testModeEntry');
 const discardZone = document.getElementById('discardZone');
 const rootStyle = document.documentElement.style;
 let discardController = null;
@@ -281,6 +282,9 @@ const bindStaticEvents = () => {
   staticEventsBound = true;
 
   eggButton.addEventListener('click', () => reroll.play());
+  testModeEntryButton?.addEventListener('click', () => {
+    window.location.href = './test_mode.html';
+  });
   window.addEventListener('resize', () => {
     applyResponsiveUiTuning();
     discardController?.cacheRect();

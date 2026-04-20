@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대화 프로토타입 임시 테스트</title>
+  <link rel="stylesheet" href="./assets/css/dialogue_prototype.css" />
+  <style>
+    body { margin: 0; background: #070b17; color: #f2f4ff; font-family: "Pretendard", "Noto Sans KR", sans-serif; }
+    .test-controls {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      z-index: 60;
+      display: grid;
+      gap: 8px;
+      width: min(420px, calc(100vw - 24px));
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(8, 12, 24, 0.84);
+      border: 1px solid rgba(152, 174, 255, 0.28);
+      backdrop-filter: blur(8px);
+    }
+    .test-controls label { font-size: 0.85rem; opacity: 0.9; }
+    .test-controls input, .test-controls button {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(152, 174, 255, 0.35);
+      background: rgba(22, 30, 56, 0.8);
+      color: inherit;
+    }
+    .test-controls button { cursor: pointer; }
+    .test-controls .hint { font-size: 0.78rem; opacity: 0.72; line-height: 1.35; }
+  </style>
+</head>
+<body>
+  <section class="test-controls">
+    <label for="csvUrl">CSV URL</label>
+    <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.csv" />
+
+    <label for="sceneTag">scene/tag (예: intro, chapter1)</label>
+    <input id="sceneTag" type="text" value="intro" />
+
+    <label for="anchorId">anchor (예: start, choice)</label>
+    <input id="anchorId" type="text" value="start" />
+
+    <label for="backgroundUrl">기본 배경 URL(비우면 CSV 열 우선)</label>
+    <input id="backgroundUrl" type="text" value="https://picsum.photos/id/1015/1920/1080" />
+
+    <label for="csvFile">CSV 파일 직접 선택(.csv)</label>
+    <input id="csvFile" type="file" accept=".csv,text/csv" />
+
+    <button id="reloadFromUrl" type="button">조건으로 다시 불러오기</button>
+    <p class="hint">CSV 헤더 예시: <code>scene</code>, <code>anchor</code>, <code>speaker</code>, <code>line</code>, <code>backgroundUrl</code><br/>한글 헤더도 지원: <code>태그/장면/씬</code>, <code>앵커/포인트</code>, <code>인물명</code>, <code>대사</code>, <code>배경</code></p>
+  </section>
+
+  <div id="prototypeMount"></div>
+
+  <script src="./assets/js/dialogue_prototype.js"></script>
+  <script>
+    const mount = document.getElementById('prototypeMount');
+    const csvUrlInput = document.getElementById('csvUrl');
+    const sceneTagInput = document.getElementById('sceneTag');
+    const anchorIdInput = document.getElementById('anchorId');
+    const backgroundInput = document.getElementById('backgroundUrl');
+    const csvFileInput = document.getElementById('csvFile');
+    const reloadButton = document.getElementById('reloadFromUrl');
+
+    const getFilters = () => ({
+      sceneTag: sceneTagInput.value.trim(),
+      anchorId: anchorIdInput.value.trim()
+    });
+
+    const prototype = window.NewtheriaDialoguePrototype.createDialoguePrototype({
+      mount,
+      csvUrl: csvUrlInput.value,
+      ...getFilters(),
+      backgroundUrl: backgroundInput.value,
+      onSkip: () => {
+        alert('SKIP 클릭됨 (테스트)');
+      },
+      onError: (error) => {
+        console.error(error);
+      }
+    });
+
+    reloadButton.addEventListener('click', async () => {
+      await prototype.loadFromCsvUrl(csvUrlInput.value, getFilters());
+    });
+
+    csvFileInput.addEventListener('change', async (event) => {
+      const [file] = event.target.files;
+      if (!file) return;
+      await prototype.loadFromCsvFile(file, getFilters());
+    });
+  </script>
+</body>
+</html>

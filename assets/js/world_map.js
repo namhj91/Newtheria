@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.87(260420-카드클릭오버레이제외)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.88(260420-카드하단드롭삭제)';
 
 const MAP_SIZE = 200;
 

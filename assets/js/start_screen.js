@@ -309,12 +309,6 @@ const bindEvents = () => {
 
     overlay.classList.add('play');
     setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
-
-    if (card.dataset.route === 'new') {
-      setTimeout(() => {
-        window.location.href = './world_generation.html';
-      }, UI.rerollOverlayMs);
-    }
   });
 
   cards.forEach((card) => {

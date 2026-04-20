@@ -42,18 +42,23 @@ body {
   z-index: 18;
 }
 .discard-dropzone {
-  bottom: 0;
+  left: 50%;
+  right: auto;
+  bottom: 12px;
+  width: min(420px, calc(100vw - 28px));
   min-height: 112px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  padding: 0 16px;
+  border-radius: 18px;
   font-weight: 700;
   letter-spacing: .08em;
   color: rgba(239, 245, 255, .84);
-  border-top: 1px solid rgba(189, 209, 255, .28);
+  border: 1px solid rgba(189, 209, 255, .28);
   background: linear-gradient(180deg, rgba(20, 31, 61, 0.3), rgba(8, 14, 30, 0.8));
-  transform: translateY(20px);
+  transform: translate(-50%, 20px);
   z-index: 20;
 }
 .discard-dropzone .discard-icon {
@@ -61,7 +66,7 @@ body {
 }
 .discard-dropzone.is-hot {
   color: rgba(255, 231, 231, .98);
-  border-top-color: rgba(255, 132, 132, .9);
+  border-color: rgba(255, 132, 132, .9);
   background: linear-gradient(180deg, rgba(95, 31, 41, 0.52), rgba(44, 11, 18, 0.92));
 }
 body.drag-discard-active .drag-discard-overlay,
@@ -69,7 +74,7 @@ body.drag-discard-active .discard-dropzone {
   opacity: 1;
 }
 body.drag-discard-active .discard-dropzone {
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 .stars::before, .stars::after, .twinkle::before, .twinkle::after {
   content: ""; position: absolute; inset: -20%; background-repeat: no-repeat; background-size: cover;
@@ -294,8 +299,9 @@ body.reduced-effects .twinkle {
   .card-fan-card { left: 50%; top: 0; margin-left: calc(var(--card-w) / -2); }
   .meta { font-size: .8rem; }
   .discard-dropzone {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     min-height: 96px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    width: min(360px, calc(100vw - 20px));
   }
 }
 

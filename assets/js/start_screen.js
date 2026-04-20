@@ -12,7 +12,9 @@ const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
 const discardZone = document.getElementById('discardZone');
 const rootStyle = document.documentElement.style;
-let discardZoneRect = null;
+let discardController = null;
+let rerollController = null;
+let isRerolling = false;
 
 const UI = {
   cardVerticalStep: 14,
@@ -217,123 +219,9 @@ const performanceMode = {
 
 const reroll = {
   async play() {
-    if (menu.classList.contains('rerolling')) return;
-
-    menu.classList.remove('selecting');
-    layout.applyCardTransforms();
-    cards.forEach((c) => c.classList.remove('active'));
-    menu.classList.add('rerolling');
-
-    // 1) Flip cards to the back before shuffling
-    cards.forEach((card) => card.classList.add('is-flipped'));
-    await Promise.all(cards.map((card) => {
-      const inner = card.querySelector('.card-fan-card-inner');
-      return inner.animate([
-        { transform: 'rotateY(0deg)' },
-        { transform: 'rotateY(180deg)' }
-      ], { duration: UI.reroll.flipToBackMs, easing: 'ease-in-out' }).finished;
-    }));
-
-    // 2) Collect to center as an overlapped, slightly messy deck
-    const stackTransforms = cards.map((_, i) => {
-      const direction = i % 2 === 0 ? 1 : -1;
-      const tx = Math.round((Math.random() * UI.stack.txRange + UI.stack.txMin) * direction);
-      const ty = Math.round(Math.random() * UI.stack.tyRange - UI.stack.tyCenterOffset);
-      const rot = ((Math.random() * UI.stack.rotRange) - UI.stack.rotCenterOffset).toFixed(2);
-      return `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
-    });
-
-    await Promise.all(cards.map((card, i) => card.animate([
-      { transform: card.dataset.baseTransform },
-      { transform: stackTransforms[i] }
-    ], { duration: UI.reroll.collectMs, easing: 'cubic-bezier(0.16, 0.84, 0.44, 1)' }).finished));
-    cards.forEach((card, i) => {
-      card.style.transform = stackTransforms[i];
-    });
-
-    // 3) Rotate each card 3 times, reversing direction every turn
-    await Promise.all(cards.map((card, i) => {
-      const spinLayer = card.querySelector('.card-fan-card-spin');
-      const direction = i % 2 === 0 ? 1 : -1;
-      const turn = direction * UI.stack.spinTurnsDeg;
-      return spinLayer.animate([
-        { transform: 'rotate(0deg)' },
-        { transform: `rotate(${turn}deg)`, offset: 1 / UI.stack.spinCycles },
-        { transform: 'rotate(0deg)', offset: 2 / UI.stack.spinCycles },
-        { transform: `rotate(${turn}deg)`, offset: 1 }
-      ], { duration: UI.reroll.spinMs, easing: 'ease-in-out' }).finished;
-    }));
-
-    // 4) Shuffle and spread to fan layout (cards stay back-facing)
-    layout.shuffleCardOrder();
-    layout.layoutCards();
-    await Promise.all(cards.map((card, i) => {
-      const target = card.dataset.baseTransform;
-      return card.animate([
-        { transform: stackTransforms[i] },
-        { transform: target }
-      ], { duration: UI.reroll.spreadBaseMs + i * UI.reroll.spreadStepMs, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
-    }));
-
-    // 5) Flip back to front one by one after shuffle
-    for (const card of cards) {
-      const inner = card.querySelector('.card-fan-card-inner');
-      await inner.animate([
-        { transform: 'rotateY(180deg)' },
-        { transform: 'rotateY(0deg)' }
-      ], { duration: UI.reroll.flipToFrontMs, easing: 'ease-in-out' }).finished;
-
-      card.classList.remove('is-flipped');
-      card.style.transform = card.dataset.baseTransform;
-    }
-
-    menu.classList.remove('rerolling');
+    if (!rerollController) return;
+    await rerollController.play();
   }
-};
-
-const updateDiscardHotState = (isHot) => {
-  if (!discardZone) return;
-  discardZone.classList.toggle('is-hot', isHot);
-};
-
-const cacheDiscardZoneRect = () => {
-  if (!discardZone) {
-    discardZoneRect = null;
-    return null;
-  }
-  discardZoneRect = discardZone.getBoundingClientRect();
-  return discardZoneRect;
-};
-
-const getDiscardZoneRect = () => discardZoneRect || cacheDiscardZoneRect();
-
-const getDiscardZoneHitState = (pointerEvent) => {
-  const zoneRect = getDiscardZoneRect();
-  if (!zoneRect) {
-    return { inside: false, near: false };
-  }
-
-  const clampedX = Math.max(zoneRect.left, Math.min(pointerEvent.clientX, zoneRect.right));
-  const clampedY = Math.max(zoneRect.top, Math.min(pointerEvent.clientY, zoneRect.bottom));
-  const dx = pointerEvent.clientX - clampedX;
-  const dy = pointerEvent.clientY - clampedY;
-  const distanceSq = (dx * dx) + (dy * dy);
-  const revealDistanceSq = UI.discardRevealDistancePx * UI.discardRevealDistancePx;
-
-  return {
-    inside: distanceSq === 0,
-    near: distanceSq <= revealDistanceSq
-  };
-};
-
-const isPointerInDiscardZone = (pointerEvent) => {
-  const hitState = getDiscardZoneHitState(pointerEvent);
-  return hitState.inside;
-};
-
-const isPointerNearDiscardZone = (pointerEvent) => {
-  const hitState = getDiscardZoneHitState(pointerEvent);
-  return hitState.near;
 };
 
 const restoreCardsForStartScreen = () => {
@@ -344,42 +232,39 @@ const restoreCardsForStartScreen = () => {
 };
 
 const bindCardInteractions = () => {
+  const cardTemplateApi = window.NewtheriaCardTemplates;
+  discardController = cardTemplateApi?.createDiscardZoneController
+    ? cardTemplateApi.createDiscardZoneController({
+      zone: discardZone,
+      revealDistancePx: UI.discardRevealDistancePx
+    })
+    : null;
+
   cardFanBehavior?.bindInteractions({
-    isLocked: () => menu.classList.contains('rerolling'),
-    shouldDiscardDrop: ({ event }) => isPointerInDiscardZone(event),
+    isLocked: () => isRerolling,
+    shouldDiscardDrop: ({ event }) => discardController?.shouldDiscardDrop({ event }) || false,
     onDragStateChange: (isDragging) => {
-      document.body.classList.toggle('drag-discard-active', isDragging);
+      discardController?.onDragStateChange(isDragging);
       if (isDragging && isMobileViewport) {
         layout.applyCardTransforms();
       }
-      if (isDragging) {
-        cacheDiscardZoneRect();
-      }
-      if (!isDragging) {
-        document.body.classList.remove('drag-discard-visible');
-        updateDiscardHotState(false);
-        discardZoneRect = null;
-      }
     },
     onDragMove: ({ event, moved }) => {
-      if (!moved) {
-        document.body.classList.remove('drag-discard-visible');
-        updateDiscardHotState(false);
-        return;
-      }
-      document.body.classList.toggle('drag-discard-visible', isPointerNearDiscardZone(event));
-      updateDiscardHotState(isPointerInDiscardZone(event));
+      discardController?.onDragMove({ event, moved });
     },
     onCardDiscarded: (_, renderedCards) => {
-      document.body.classList.remove('drag-discard-visible');
-      updateDiscardHotState(false);
+      discardController?.reset();
       if (renderedCards.length === 0) {
         restoreCardsForStartScreen();
       }
     },
     onCardSelected: (card, renderedCards) => {
-      renderedCards.forEach((c) => c.classList.remove('active'));
-      card.classList.add('active');
+      if (cardTemplateApi?.setActiveCard) {
+        cardTemplateApi.setActiveCard(renderedCards, card);
+      } else {
+        renderedCards.forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+      }
       if (isMobileViewport) {
         layout.applyCardTransforms(card);
       }
@@ -394,10 +279,10 @@ const bindStaticEvents = () => {
   eggButton.addEventListener('click', () => reroll.play());
   window.addEventListener('resize', () => {
     applyResponsiveUiTuning();
-    cacheDiscardZoneRect();
+    discardController?.cacheRect();
     layout.layoutCards();
   });
-  window.addEventListener('scroll', cacheDiscardZoneRect, { passive: true });
+  window.addEventListener('scroll', () => discardController?.cacheRect(), { passive: true });
   document.addEventListener('pointerdown', (e) => {
     if (!isMobileViewport) return;
     if (e.target.closest('.card-fan-card')) return;
@@ -407,9 +292,33 @@ const bindStaticEvents = () => {
 };
 
 const bootstrap = () => {
+  const cardTemplateApi = window.NewtheriaCardTemplates;
   applyResponsiveUiTuning();
   initializeCards();
   bindCardInteractions();
+  rerollController = cardTemplateApi?.createCardFanReroll
+    ? cardTemplateApi.createCardFanReroll({
+      menu,
+      getCards: () => cards,
+      layout,
+      timing: UI.reroll,
+      stack: UI.stack,
+      isLocked: () => isRerolling,
+      setLocked: (locked) => {
+        isRerolling = locked;
+        menu.classList.toggle('rerolling', locked);
+      },
+      beforePlay: (renderedCards) => {
+        menu.classList.remove('selecting');
+        layout.applyCardTransforms();
+        if (cardTemplateApi?.setActiveCard) {
+          cardTemplateApi.setActiveCard(renderedCards);
+        } else {
+          renderedCards.forEach((card) => card.classList.remove('active'));
+        }
+      }
+    })
+    : null;
   bindStaticEvents();
   performanceMode.applyStarAnimationMode();
   layout.layoutCards();

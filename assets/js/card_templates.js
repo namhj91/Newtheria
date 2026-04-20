@@ -16,6 +16,24 @@
     hoverDistanceRatioFar: 0.28,
     settleMs: 420
   };
+  const DEFAULT_REROLL = {
+    flipToBackMs: 280,
+    collectMs: 360,
+    spinMs: 1080,
+    spreadBaseMs: 420,
+    spreadStepMs: 40,
+    flipToFrontMs: 200
+  };
+  const DEFAULT_STACK = {
+    txMin: 4,
+    txRange: 20,
+    tyRange: 18,
+    tyCenterOffset: 9,
+    rotRange: 6,
+    rotCenterOffset: 3,
+    spinTurnsDeg: 360,
+    spinCycles: 3
+  };
 
   const buildCardMarkup = ({ icon, label, desc, brand, sigil }) => `
     <span class="card-fan-card-spin">
@@ -328,9 +346,192 @@
     };
   };
 
+  const setActiveCard = (cards = [], activeCard = null) => {
+    cards.forEach((card) => card.classList.toggle('active', card === activeCard));
+  };
+
+  const createCardFanReroll = ({
+    menu,
+    getCards,
+    layout,
+    timing = {},
+    stack = {},
+    isLocked = () => false,
+    setLocked = () => {},
+    beforePlay = () => {},
+    afterPlay = () => {}
+  }) => {
+    const rerollTiming = { ...DEFAULT_REROLL, ...timing };
+    const stackConfig = { ...DEFAULT_STACK, ...stack };
+
+    const randomStackTransform = (_, i) => {
+      const direction = i % 2 === 0 ? 1 : -1;
+      const tx = Math.round((Math.random() * stackConfig.txRange + stackConfig.txMin) * direction);
+      const ty = Math.round(Math.random() * stackConfig.tyRange - stackConfig.tyCenterOffset);
+      const rot = ((Math.random() * stackConfig.rotRange) - stackConfig.rotCenterOffset).toFixed(2);
+      return `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+    };
+
+    const play = async () => {
+      if (!menu || isLocked()) return;
+      const cards = getCards();
+      if (!cards.length) return;
+
+      setLocked(true);
+      try {
+        beforePlay(cards);
+
+        cards.forEach((card) => card.classList.add('is-flipped'));
+        await Promise.all(cards.map((card) => {
+          const inner = card.querySelector('.card-fan-card-inner');
+          return inner.animate([
+            { transform: 'rotateY(0deg)' },
+            { transform: 'rotateY(180deg)' }
+          ], { duration: rerollTiming.flipToBackMs, easing: 'ease-in-out' }).finished;
+        }));
+
+        const stackTransforms = cards.map(randomStackTransform);
+        await Promise.all(cards.map((card, i) => card.animate([
+          { transform: card.dataset.baseTransform },
+          { transform: stackTransforms[i] }
+        ], { duration: rerollTiming.collectMs, easing: 'cubic-bezier(0.16, 0.84, 0.44, 1)' }).finished));
+        cards.forEach((card, i) => {
+          card.style.transform = stackTransforms[i];
+        });
+
+        await Promise.all(cards.map((card, i) => {
+          const spinLayer = card.querySelector('.card-fan-card-spin');
+          const direction = i % 2 === 0 ? 1 : -1;
+          const turn = direction * stackConfig.spinTurnsDeg;
+          return spinLayer.animate([
+            { transform: 'rotate(0deg)' },
+            { transform: `rotate(${turn}deg)`, offset: 1 / stackConfig.spinCycles },
+            { transform: 'rotate(0deg)', offset: 2 / stackConfig.spinCycles },
+            { transform: `rotate(${turn}deg)`, offset: 1 }
+          ], { duration: rerollTiming.spinMs, easing: 'ease-in-out' }).finished;
+        }));
+
+        layout.shuffleCardOrder();
+        const shuffledCards = getCards();
+        layout.layoutCards();
+        await Promise.all(shuffledCards.map((card, i) => {
+          const target = card.dataset.baseTransform;
+          return card.animate([
+            { transform: stackTransforms[i] },
+            { transform: target }
+          ], { duration: rerollTiming.spreadBaseMs + i * rerollTiming.spreadStepMs, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
+        }));
+
+        for (const card of shuffledCards) {
+          const inner = card.querySelector('.card-fan-card-inner');
+          await inner.animate([
+            { transform: 'rotateY(180deg)' },
+            { transform: 'rotateY(0deg)' }
+          ], { duration: rerollTiming.flipToFrontMs, easing: 'ease-in-out' }).finished;
+          card.classList.remove('is-flipped');
+          card.style.transform = card.dataset.baseTransform;
+        }
+
+        afterPlay(shuffledCards);
+      } finally {
+        setLocked(false);
+      }
+    };
+
+    return { play };
+  };
+
+  const createDiscardZoneController = ({
+    zone,
+    documentBody = document.body,
+    revealDistancePx = 150,
+    activeClassName = 'drag-discard-active',
+    visibleClassName = 'drag-discard-visible',
+    hotClassName = 'is-hot'
+  } = {}) => {
+    let cachedRect = null;
+
+    const updateHotState = (isHot) => {
+      if (!zone) return;
+      zone.classList.toggle(hotClassName, isHot);
+    };
+
+    const cacheRect = () => {
+      if (!zone) {
+        cachedRect = null;
+        return null;
+      }
+      cachedRect = zone.getBoundingClientRect();
+      return cachedRect;
+    };
+
+    const getRect = () => cachedRect || cacheRect();
+
+    const getHitState = (pointerEvent) => {
+      const rect = getRect();
+      if (!rect || !pointerEvent) {
+        return { inside: false, near: false };
+      }
+      const clampedX = Math.max(rect.left, Math.min(pointerEvent.clientX, rect.right));
+      const clampedY = Math.max(rect.top, Math.min(pointerEvent.clientY, rect.bottom));
+      const dx = pointerEvent.clientX - clampedX;
+      const dy = pointerEvent.clientY - clampedY;
+      const distanceSq = (dx * dx) + (dy * dy);
+      const revealDistanceSq = revealDistancePx * revealDistancePx;
+      return {
+        inside: distanceSq === 0,
+        near: distanceSq <= revealDistanceSq
+      };
+    };
+
+    const reset = () => {
+      documentBody.classList.remove(visibleClassName);
+      documentBody.classList.remove(activeClassName);
+      updateHotState(false);
+      cachedRect = null;
+    };
+
+    const onDragStateChange = (isDragging) => {
+      documentBody.classList.toggle(activeClassName, isDragging);
+      if (isDragging) {
+        cacheRect();
+        return;
+      }
+      documentBody.classList.remove(visibleClassName);
+      updateHotState(false);
+      cachedRect = null;
+    };
+
+    const onDragMove = ({ event, moved }) => {
+      if (!moved) {
+        documentBody.classList.remove(visibleClassName);
+        updateHotState(false);
+        return;
+      }
+      const hit = getHitState(event);
+      documentBody.classList.toggle(visibleClassName, hit.near);
+      updateHotState(hit.inside);
+    };
+
+    const shouldDiscardDrop = ({ event }) => getHitState(event).inside;
+    const isNear = (event) => getHitState(event).near;
+
+    return {
+      cacheRect,
+      reset,
+      onDragMove,
+      onDragStateChange,
+      shouldDiscardDrop,
+      isNear
+    };
+  };
+
   global.NewtheriaCardTemplates = {
     createCardFanCard,
     renderCardFanCards,
-    createCardFanBehavior
+    createCardFanBehavior,
+    createCardFanReroll,
+    createDiscardZoneController,
+    setActiveCard
   };
 }(window));

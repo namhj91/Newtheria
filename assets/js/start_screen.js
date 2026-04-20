@@ -1,5 +1,6 @@
 const menu = document.getElementById('menu');
 let cards = [];
+let isMobileViewport = false;
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },
@@ -44,6 +45,17 @@ const UI = {
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
 let cardFanBehavior = null;
+const MOBILE_BREAKPOINT = 760;
+
+const applyResponsiveUiTuning = () => {
+  isMobileViewport = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+  UI.cardVerticalStep = isMobileViewport ? 10 : 14;
+  UI.hoverPushMax = isMobileViewport ? 18 : 44;
+  UI.hoverLiftY = isMobileViewport ? -8 : -14;
+  UI.hoverScale = isMobileViewport ? 1.01 : 1.03;
+  UI.hoverDistanceRatioNear = isMobileViewport ? 0.44 : 0.56;
+  UI.hoverDistanceRatioFar = isMobileViewport ? 0.22 : 0.28;
+};
 
 const initializeCards = () => {
   const cardTemplateApi = window.NewtheriaCardTemplates;
@@ -281,10 +293,14 @@ const bindEvents = () => {
   });
 
   eggButton.addEventListener('click', () => reroll.play());
-  window.addEventListener('resize', () => layout.layoutCards());
+  window.addEventListener('resize', () => {
+    applyResponsiveUiTuning();
+    layout.layoutCards();
+  });
 };
 
 const bootstrap = () => {
+  applyResponsiveUiTuning();
   initializeCards();
   bindEvents();
   performanceMode.applyStarAnimationMode();

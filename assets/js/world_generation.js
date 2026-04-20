@@ -1,33 +1,89 @@
 const worldGenerationForm = document.getElementById('worldGenerationForm');
 
+const worldWidthInput = document.getElementById('worldWidthInput');
+const worldHeightInput = document.getElementById('worldHeightInput');
 const seaLevelRatioInput = document.getElementById('seaLevelRatioInput');
-const seaLevelRatioValue = document.getElementById('seaLevelRatioValue');
 const elevationScaleInput = document.getElementById('elevationScaleInput');
-const elevationScaleValue = document.getElementById('elevationScaleValue');
 const warpStrengthInput = document.getElementById('warpStrengthInput');
-const warpStrengthValue = document.getElementById('warpStrengthValue');
 const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
-const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
 const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
-const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+const worldSeedInput = document.getElementById('worldSeedInput');
 
-const updateLabels = () => {
-  seaLevelRatioValue.textContent = `${Math.round(Number(seaLevelRatioInput.value) * 100)}%`;
-  elevationScaleValue.textContent = `${Number(elevationScaleInput.value).toFixed(2)}x`;
-  warpStrengthValue.textContent = String(Math.round(Number(warpStrengthInput.value)));
-  ridgeStrengthValue.textContent = Number(ridgeStrengthInput.value).toFixed(2);
-  riverBudgetScaleValue.textContent = `${Number(riverBudgetScaleInput.value).toFixed(2)}x`;
+const summaryMapSize = document.getElementById('summaryMapSize');
+const summarySeaLevel = document.getElementById('summarySeaLevel');
+const summaryTerrain = document.getElementById('summaryTerrain');
+const summaryRiver = document.getElementById('summaryRiver');
+const summarySeed = document.getElementById('summarySeed');
+
+const tabButtons = [...document.querySelectorAll('.tab-button')];
+const tabPanels = [...document.querySelectorAll('.tab-panel')];
+const optionCards = [...document.querySelectorAll('.option-card')];
+
+const activateTab = (tabName) => {
+  tabButtons.forEach((button) => {
+    const isActive = button.dataset.tab === tabName;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
+  });
+
+  tabPanels.forEach((panel) => {
+    const isActive = panel.id === `tab-${tabName}`;
+    panel.classList.toggle('active', isActive);
+    panel.hidden = !isActive;
+  });
 };
 
-[
-  seaLevelRatioInput,
-  elevationScaleInput,
-  warpStrengthInput,
-  ridgeStrengthInput,
-  riverBudgetScaleInput
-].forEach((input) => {
-  input?.addEventListener('input', updateLabels);
+const setActiveCard = (target, activeCard) => {
+  optionCards
+    .filter((card) => card.dataset.target === target)
+    .forEach((card) => card.classList.toggle('active', card === activeCard));
+};
+
+const updateSummary = () => {
+  summaryMapSize.textContent = `${worldWidthInput.value} x ${worldHeightInput.value}`;
+  summarySeaLevel.textContent = `${Math.round(Number(seaLevelRatioInput.value) * 100)}%`;
+  summaryTerrain.textContent = `고도 ${Number(elevationScaleInput.value).toFixed(2)}x · 워프 ${Math.round(Number(warpStrengthInput.value))} · 산맥 ${Number(ridgeStrengthInput.value).toFixed(2)}`;
+  summaryRiver.textContent = `${Number(riverBudgetScaleInput.value).toFixed(2)}x`;
+
+  const rawSeed = String(worldSeedInput?.value || '').trim();
+  summarySeed.textContent = rawSeed || '랜덤';
+};
+
+tabButtons.forEach((button) => {
+  button.addEventListener('click', () => activateTab(button.dataset.tab));
 });
+
+optionCards.forEach((card) => {
+  card.addEventListener('click', () => {
+    const target = card.dataset.target;
+    if (!target) return;
+
+    setActiveCard(target, card);
+
+    if (target === 'mapSize') {
+      worldWidthInput.value = card.dataset.width;
+      worldHeightInput.value = card.dataset.height;
+    }
+
+    if (target === 'seaLevel') {
+      seaLevelRatioInput.value = card.dataset.value;
+    }
+
+    if (target === 'terrainPreset') {
+      elevationScaleInput.value = card.dataset.elevation;
+      warpStrengthInput.value = card.dataset.warp;
+      ridgeStrengthInput.value = card.dataset.ridge;
+    }
+
+    if (target === 'riverBudget') {
+      riverBudgetScaleInput.value = card.dataset.value;
+    }
+
+    updateSummary();
+  });
+});
+
+worldSeedInput?.addEventListener('input', updateSummary);
 
 worldGenerationForm?.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -48,4 +104,4 @@ worldGenerationForm?.addEventListener('submit', (event) => {
   window.location.href = `./world_map.html?${params.toString()}`;
 });
 
-updateLabels();
+updateSummary();

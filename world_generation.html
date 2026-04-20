@@ -7,58 +7,157 @@
   <link rel="stylesheet" href="./assets/css/world_generation.css" />
 </head>
 <body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="twinkle" aria-hidden="true"></div>
+
   <main class="world-gen-screen">
     <header class="world-gen-header">
-      <p class="kicker">NEW JOURNEY</p>
-      <h1>월드맵 생성</h1>
-      <p>새로운 여정을 시작하기 전에 세계의 기본 파라미터를 설정하세요.</p>
+      <p class="kicker">ARCANA OF CREATION</p>
+      <h1>타로 월드맵 생성</h1>
+      <p>카드를 고르며 세계의 운명을 조율하세요.</p>
     </header>
 
+    <section class="selection-summary" aria-label="선택한 월드 생성 값">
+      <article class="summary-card">
+        <span>맵 크기</span>
+        <strong id="summaryMapSize">200 x 200</strong>
+      </article>
+      <article class="summary-card">
+        <span>해양 비율</span>
+        <strong id="summarySeaLevel">58%</strong>
+      </article>
+      <article class="summary-card">
+        <span>지형 강도</span>
+        <strong id="summaryTerrain">고도 1.00x · 워프 18 · 산맥 0.24</strong>
+      </article>
+      <article class="summary-card">
+        <span>강 밀도</span>
+        <strong id="summaryRiver">1.00x</strong>
+      </article>
+      <article class="summary-card">
+        <span>시드</span>
+        <strong id="summarySeed">랜덤</strong>
+      </article>
+    </section>
+
+    <section class="tab-zone" aria-label="월드 생성 카테고리">
+      <div class="tab-buttons" role="tablist" aria-label="생성 설정 탭">
+        <button type="button" class="tab-button active" role="tab" aria-selected="true" aria-controls="tab-scale" data-tab="scale">맵 규모</button>
+        <button type="button" class="tab-button" role="tab" aria-selected="false" aria-controls="tab-terrain" data-tab="terrain">해양 · 지형</button>
+        <button type="button" class="tab-button" role="tab" aria-selected="false" aria-controls="tab-river-seed" data-tab="river-seed">수계 · 시드</button>
+      </div>
+    </section>
+
     <form id="worldGenerationForm" class="world-gen-form" aria-label="월드 생성 설정">
-      <label>
-        맵 가로(헥스)
-        <input id="worldWidthInput" name="width" type="number" min="80" max="320" step="10" value="200" />
-      </label>
-      <label>
-        맵 세로(헥스)
-        <input id="worldHeightInput" name="height" type="number" min="80" max="320" step="10" value="200" />
-      </label>
-      <label>
-        시드(선택)
-        <input id="worldSeedInput" name="seed" type="text" inputmode="numeric" placeholder="비워두면 랜덤 시드" />
-      </label>
-      <label>
-        해양 비율
-        <input id="seaLevelRatioInput" name="seaLevelRatio" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
-        <span id="seaLevelRatioValue">58%</span>
-      </label>
-      <label>
-        고도 강도
-        <input id="elevationScaleInput" name="elevationScale" type="range" min="0.75" max="1.35" step="0.01" value="1" />
-        <span id="elevationScaleValue">1.00x</span>
-      </label>
-      <label>
-        지형 워프 강도
-        <input id="warpStrengthInput" name="warpStrength" type="range" min="6" max="32" step="1" value="18" />
-        <span id="warpStrengthValue">18</span>
-      </label>
-      <label>
-        산맥 강도
-        <input id="ridgeStrengthInput" name="ridgeStrength" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
-        <span id="ridgeStrengthValue">0.24</span>
-      </label>
-      <label>
-        강 생성 밀도
-        <input id="riverBudgetScaleInput" name="riverBudgetScale" type="range" min="0.4" max="2" step="0.05" value="1" />
-        <span id="riverBudgetScaleValue">1.00x</span>
-      </label>
+      <input id="worldWidthInput" name="width" type="hidden" value="200" />
+      <input id="worldHeightInput" name="height" type="hidden" value="200" />
+      <input id="seaLevelRatioInput" name="seaLevelRatio" type="hidden" value="0.58" />
+      <input id="elevationScaleInput" name="elevationScale" type="hidden" value="1" />
+      <input id="warpStrengthInput" name="warpStrength" type="hidden" value="18" />
+      <input id="ridgeStrengthInput" name="ridgeStrength" type="hidden" value="0.24" />
+      <input id="riverBudgetScaleInput" name="riverBudgetScale" type="hidden" value="1" />
+
+      <section id="tab-scale" class="tab-panel active" role="tabpanel">
+        <h2>맵 규모 카드</h2>
+        <div class="card-grid two">
+          <button type="button" class="tarot-card option-card active" data-target="mapSize" data-width="160" data-height="160">
+            <span class="card-title">황혼 소아르카나</span>
+            <span class="card-value">160 x 160</span>
+            <span class="card-desc">빠르게 탐험 가능한 압축형 월드</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="mapSize" data-width="200" data-height="200">
+            <span class="card-title">별자리 정식 덱</span>
+            <span class="card-value">200 x 200</span>
+            <span class="card-desc">균형 잡힌 기본 탐험 규모</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="mapSize" data-width="240" data-height="240">
+            <span class="card-title">심연 메이저 아르카나</span>
+            <span class="card-value">240 x 240</span>
+            <span class="card-desc">대륙 다양성이 커지는 장기 플레이</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="mapSize" data-width="280" data-height="280">
+            <span class="card-title">운명의 대천문</span>
+            <span class="card-value">280 x 280</span>
+            <span class="card-desc">초대형 세계, 깊은 탐험과 확장</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="tab-terrain" class="tab-panel" role="tabpanel" hidden>
+        <h2>해양 · 지형 카드</h2>
+        <h3>해양 비율</h3>
+        <div class="card-grid three">
+          <button type="button" class="tarot-card option-card" data-target="seaLevel" data-value="0.48">
+            <span class="card-title">절제</span>
+            <span class="card-value">48%</span>
+            <span class="card-desc">대륙 중심 · 해양 적음</span>
+          </button>
+          <button type="button" class="tarot-card option-card active" data-target="seaLevel" data-value="0.58">
+            <span class="card-title">별</span>
+            <span class="card-value">58%</span>
+            <span class="card-desc">표준 균형</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="seaLevel" data-value="0.68">
+            <span class="card-title">달</span>
+            <span class="card-value">68%</span>
+            <span class="card-desc">군도형 · 바다 넓음</span>
+          </button>
+        </div>
+
+        <h3>지형 강도</h3>
+        <div class="card-grid three">
+          <button type="button" class="tarot-card option-card" data-target="terrainPreset" data-elevation="0.9" data-warp="14" data-ridge="0.18">
+            <span class="card-title">사제</span>
+            <span class="card-value">완만</span>
+            <span class="card-desc">부드러운 지형, 낮은 산맥 밀도</span>
+          </button>
+          <button type="button" class="tarot-card option-card active" data-target="terrainPreset" data-elevation="1" data-warp="18" data-ridge="0.24">
+            <span class="card-title">전차</span>
+            <span class="card-value">균형</span>
+            <span class="card-desc">표준 고도/워프/산맥 구성</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="terrainPreset" data-elevation="1.2" data-warp="24" data-ridge="0.34">
+            <span class="card-title">탑</span>
+            <span class="card-value">격변</span>
+            <span class="card-desc">험준한 지형과 강한 산맥 분포</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="tab-river-seed" class="tab-panel" role="tabpanel" hidden>
+        <h2>수계 · 시드 카드</h2>
+        <h3>강 생성 밀도</h3>
+        <div class="card-grid three">
+          <button type="button" class="tarot-card option-card" data-target="riverBudget" data-value="0.75">
+            <span class="card-title">은둔자</span>
+            <span class="card-value">0.75x</span>
+            <span class="card-desc">강이 드문 건조한 세계</span>
+          </button>
+          <button type="button" class="tarot-card option-card active" data-target="riverBudget" data-value="1">
+            <span class="card-title">정의</span>
+            <span class="card-value">1.00x</span>
+            <span class="card-desc">표준 강 분포</span>
+          </button>
+          <button type="button" class="tarot-card option-card" data-target="riverBudget" data-value="1.4">
+            <span class="card-title">여황제</span>
+            <span class="card-value">1.40x</span>
+            <span class="card-desc">풍부한 수계와 하천 네트워크</span>
+          </button>
+        </div>
+
+        <label class="seed-field" for="worldSeedInput">
+          시드 룬(선택)
+          <input id="worldSeedInput" name="seed" type="text" inputmode="numeric" placeholder="비워두면 랜덤 운명" />
+        </label>
+      </section>
 
       <div class="world-gen-actions">
         <a href="./start_screen.html">취소</a>
-        <button type="submit">이 설정으로 월드 생성</button>
+        <button type="submit">이 카드로 월드 창조</button>
       </div>
     </form>
   </main>
+
   <script src="./assets/js/world_generation.js"></script>
 </body>
 </html>

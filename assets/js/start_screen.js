@@ -46,6 +46,7 @@ const UI = {
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
 let cardFanBehavior = null;
+let staticEventsBound = false;
 const MOBILE_BREAKPOINT = 760;
 
 const applyResponsiveUiTuning = () => {
@@ -280,18 +281,25 @@ const reroll = {
   }
 };
 
-const bindEvents = () => {
-  const updateDiscardHotState = (isHot) => {
-    if (!discardZone) return;
-    discardZone.classList.toggle('is-hot', isHot);
-  };
+const updateDiscardHotState = (isHot) => {
+  if (!discardZone) return;
+  discardZone.classList.toggle('is-hot', isHot);
+};
 
-  const isPointerInDiscardZone = (pointerEvent) => {
-    if (!discardZone) return false;
-    const zoneRect = discardZone.getBoundingClientRect();
-    return pointerEvent.clientY >= zoneRect.top;
-  };
+const isPointerInDiscardZone = (pointerEvent) => {
+  if (!discardZone) return false;
+  const zoneRect = discardZone.getBoundingClientRect();
+  return pointerEvent.clientY >= zoneRect.top;
+};
 
+const restoreCardsForStartScreen = () => {
+  menu.classList.remove('selecting');
+  initializeCards();
+  bindCardInteractions();
+  layout.layoutCards();
+};
+
+const bindCardInteractions = () => {
   cardFanBehavior?.bindInteractions({
     isLocked: () => menu.classList.contains('rerolling'),
     shouldDiscardDrop: ({ event }) => isPointerInDiscardZone(event),
@@ -308,8 +316,11 @@ const bindEvents = () => {
       }
       updateDiscardHotState(isPointerInDiscardZone(event));
     },
-    onCardDiscarded: () => {
+    onCardDiscarded: (_, renderedCards) => {
       updateDiscardHotState(false);
+      if (renderedCards.length === 0) {
+        restoreCardsForStartScreen();
+      }
     },
     onCardSelected: (card, renderedCards) => {
       menu.classList.add('selecting');
@@ -317,6 +328,11 @@ const bindEvents = () => {
       card.classList.add('active');
     }
   });
+};
+
+const bindStaticEvents = () => {
+  if (staticEventsBound) return;
+  staticEventsBound = true;
 
   eggButton.addEventListener('click', () => reroll.play());
   window.addEventListener('resize', () => {
@@ -328,7 +344,8 @@ const bindEvents = () => {
 const bootstrap = () => {
   applyResponsiveUiTuning();
   initializeCards();
-  bindEvents();
+  bindCardInteractions();
+  bindStaticEvents();
   performanceMode.applyStarAnimationMode();
   layout.layoutCards();
 };

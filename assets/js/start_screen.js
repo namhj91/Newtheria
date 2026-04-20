@@ -18,6 +18,8 @@ const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
   dragThresholdPx: 5,
+  longPressMs: 440,
+  longPressMoveTolerancePx: 8,
   discardRevealDistancePx: 0,
   hoverPushMax: 44,
   hoverLiftY: -14,
@@ -54,6 +56,9 @@ const MOBILE_BREAKPOINT = 760;
 const applyResponsiveUiTuning = () => {
   isMobileViewport = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
   UI.cardVerticalStep = isMobileViewport ? 10 : 14;
+  UI.dragThresholdPx = isMobileViewport ? 9 : 5;
+  UI.longPressMs = isMobileViewport ? 360 : 440;
+  UI.longPressMoveTolerancePx = isMobileViewport ? 12 : 8;
   UI.discardRevealDistancePx = isMobileViewport ? 110 : 150;
   UI.hoverPushMax = isMobileViewport ? 18 : 44;
   UI.hoverLiftY = isMobileViewport ? -8 : -14;
@@ -77,6 +82,8 @@ const initializeCards = () => {
       ui: {
         cardVerticalStep: UI.cardVerticalStep,
         dragThresholdPx: UI.dragThresholdPx,
+        longPressMs: UI.longPressMs,
+        longPressMoveTolerancePx: UI.longPressMoveTolerancePx,
         hoverPushMax: UI.hoverPushMax,
         hoverLiftY: UI.hoverLiftY,
         hoverScale: UI.hoverScale,
@@ -342,6 +349,9 @@ const bindCardInteractions = () => {
     shouldDiscardDrop: ({ event }) => isPointerInDiscardZone(event),
     onDragStateChange: (isDragging) => {
       document.body.classList.toggle('drag-discard-active', isDragging);
+      if (isDragging && isMobileViewport) {
+        layout.applyCardTransforms();
+      }
       if (isDragging) {
         cacheDiscardZoneRect();
       }
@@ -370,6 +380,9 @@ const bindCardInteractions = () => {
     onCardSelected: (card, renderedCards) => {
       renderedCards.forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
+      if (isMobileViewport) {
+        layout.applyCardTransforms(card);
+      }
     }
   });
 };
@@ -385,6 +398,12 @@ const bindStaticEvents = () => {
     layout.layoutCards();
   });
   window.addEventListener('scroll', cacheDiscardZoneRect, { passive: true });
+  document.addEventListener('pointerdown', (e) => {
+    if (!isMobileViewport) return;
+    if (e.target.closest('.card-fan-card')) return;
+    cards.forEach((card) => card.classList.remove('active'));
+    layout.applyCardTransforms();
+  });
 };
 
 const bootstrap = () => {

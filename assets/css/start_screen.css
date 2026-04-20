@@ -12,6 +12,8 @@
   --twinkle-a: radial-gradient(circle at 35% 75%, rgba(255, 255, 255, .9) 0 1.8px, transparent 3px);
   --twinkle-b: radial-gradient(circle at 64% 22%, rgba(164, 190, 255, .82) 0 1.7px, transparent 2.9px);
   --twinkle-c: radial-gradient(circle at 45% 48%, rgba(112, 239, 255, .8) 0 2.4px, transparent 4.2px);
+  --warp-x: 50vw;
+  --warp-y: 45vh;
 }
 * { box-sizing: border-box; }
 body {
@@ -25,7 +27,7 @@ body {
     radial-gradient(circle at 82% 12%, rgba(107, 59, 199, 0.16), transparent 30%),
     linear-gradient(160deg, var(--bg-1), var(--bg-2));
 }
-.stars, .twinkle, .overlay { position: fixed; inset: 0; pointer-events: none; }
+.stars, .twinkle, .warp-field, .jump-flare, .overlay { position: fixed; inset: 0; pointer-events: none; }
 .stars::before, .stars::after, .twinkle::before, .twinkle::after {
   content: ""; position: absolute; inset: -20%; background-repeat: no-repeat; background-size: cover;
 }
@@ -38,6 +40,49 @@ body {
 }
 .twinkle::before { background-image: var(--twinkle-a), var(--twinkle-c); animation: pulse 4.4s ease-in-out infinite; }
 .twinkle::after { background-image: var(--twinkle-b); animation: pulse 7.2s ease-in-out infinite reverse; opacity: .64; }
+
+.warp-field {
+  opacity: 0;
+  background-image: var(--stars-b), var(--stars-c), var(--twinkle-c);
+  mix-blend-mode: screen;
+  transform-origin: var(--warp-x) var(--warp-y);
+}
+.warp-field.play {
+  animation: warpFieldBurst .92s cubic-bezier(0.1, 0.62, 0.2, 1) forwards;
+}
+
+.jump-flare {
+  opacity: 0;
+  transform-origin: var(--warp-x) var(--warp-y);
+}
+.jump-flare::before,
+.jump-flare::after {
+  content: "";
+  position: absolute;
+  left: var(--warp-x);
+  top: var(--warp-y);
+  width: 148px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.98), transparent);
+  box-shadow: 0 0 18px rgba(169, 222, 255, 0.95);
+  transform: translate(-50%, -50%) scaleX(0.1);
+}
+.jump-flare::after {
+  width: 2px;
+  height: 148px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.98), transparent);
+  transform: translate(-50%, -50%) scaleY(0.1);
+}
+.jump-flare.play {
+  animation: flarePop .92s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
+}
+.jump-flare.play::before {
+  animation: flareCrossX .92s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
+}
+.jump-flare.play::after {
+  animation: flareCrossY .92s cubic-bezier(0.2, 0.72, 0.2, 1) forwards;
+}
 .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
 .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
 .logo h1 { margin: 0; letter-spacing: .12em; font-size: clamp(2rem, 5.4vw, 4rem); }
@@ -231,6 +276,30 @@ body {
 
 @keyframes drift { from { transform: translate3d(0,0,0);} to { transform: translate3d(-240px,-170px,0);} }
 @keyframes pulse { 0%,100%{opacity:.38;} 50%{opacity:.92;} }
+@keyframes flarePop {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  70% { opacity: 0.68; }
+  100% { opacity: 0; }
+}
+@keyframes flareCrossX {
+  0% { transform: translate(-50%, -50%) scaleX(0.08); }
+  24% { transform: translate(-50%, -50%) scaleX(1.2); }
+  70% { transform: translate(-50%, -50%) scaleX(0.72); }
+  100% { transform: translate(-50%, -50%) scaleX(1.8); opacity: 0; }
+}
+@keyframes flareCrossY {
+  0% { transform: translate(-50%, -50%) scaleY(0.08); }
+  24% { transform: translate(-50%, -50%) scaleY(1.2); }
+  70% { transform: translate(-50%, -50%) scaleY(0.72); }
+  100% { transform: translate(-50%, -50%) scaleY(1.8); opacity: 0; }
+}
+@keyframes warpFieldBurst {
+  0% { opacity: 0; transform: scale(1); }
+  18% { opacity: 0.78; }
+  62% { opacity: 0.46; }
+  100% { opacity: 0; transform: scale(2.05); }
+}
 
 @media (max-width: 760px) {
   :root { --card-w: min(38vw, 184px); --fan-gap: 52px; --fan-tilt: 9deg; }

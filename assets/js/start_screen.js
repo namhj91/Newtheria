@@ -1,12 +1,17 @@
 const menu = document.getElementById('menu');
 let cards = [...menu.querySelectorAll('.card-fan-card')];
+const starsLayer = document.querySelector('.stars');
+const twinkleLayer = document.querySelector('.twinkle');
 const overlay = document.querySelector('.overlay');
+const jumpFlare = document.querySelector('.jump-flare');
+const warpField = document.querySelector('.warp-field');
 const eggButton = document.getElementById('easterEgg');
 const rootStyle = document.documentElement.style;
 
 const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
+  routeTransitionMs: 920,
   dragThresholdPx: 5,
   hoverPushMax: 44,
   hoverLiftY: -14,
@@ -34,6 +39,10 @@ const UI = {
   }
 };
 
+const ROUTES = {
+  new: './world_generation.html'
+};
+
 const dragState = {
   pointerId: null,
   card: null,
@@ -42,6 +51,10 @@ const dragState = {
   offsetX: 0,
   offsetY: 0,
   moved: false
+};
+
+const transitionState = {
+  busy: false
 };
 
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
@@ -114,23 +127,31 @@ const layout = {
 };
 
 const effects = {
-  createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) {
+  navigationAnchors: [],
+
+  createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette, collectAnchors = false }) {
     const gradients = [];
 
     for (let i = 0; i < count; i += 1) {
-      const x = randomBetween(0, 100).toFixed(2);
-      const y = randomBetween(0, 100).toFixed(2);
+      const x = randomBetween(0, 100);
+      const y = randomBetween(0, 100);
       const radius = randomBetween(minRadius, maxRadius);
       const fadeRadius = radius + randomBetween(0.9, 1.8);
       const alpha = randomBetween(alphaMin, alphaMax).toFixed(2);
       const color = palette[Math.floor(Math.random() * palette.length)];
-      gradients.push(`radial-gradient(circle at ${x}% ${y}%, rgba(${color}, ${alpha}) 0 ${radius.toFixed(2)}px, transparent ${fadeRadius.toFixed(2)}px)`);
+      gradients.push(`radial-gradient(circle at ${x.toFixed(2)}% ${y.toFixed(2)}%, rgba(${color}, ${alpha}) 0 ${radius.toFixed(2)}px, transparent ${fadeRadius.toFixed(2)}px)`);
+
+      if (collectAnchors) {
+        this.navigationAnchors.push({ xPercent: x, yPercent: y });
+      }
     }
 
     return gradients.join(', ');
   },
 
   applyStarField() {
+    this.navigationAnchors = [];
+
     rootStyle.setProperty('--stars-a', this.createStarLayer({
       count: 340,
       minRadius: 0.28,
@@ -155,7 +176,8 @@ const effects = {
       maxRadius: 2.7,
       alphaMin: 0.42,
       alphaMax: 0.84,
-      palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255']
+      palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255'],
+      collectAnchors: true
     }));
 
     rootStyle.setProperty('--twinkle-a', this.createStarLayer({
@@ -182,9 +204,76 @@ const effects = {
       maxRadius: 3.2,
       alphaMin: 0.35,
       alphaMax: 0.8,
-      palette: ['138, 242, 255', '117, 230, 255']
+      palette: ['138, 242, 255', '117, 230, 255'],
+      collectAnchors: true
     }));
+  },
 
+  pickNavigationStar() {
+    if (!this.navigationAnchors.length) {
+      return {
+        x: Math.round(window.innerWidth * 0.5),
+        y: Math.round(window.innerHeight * 0.45)
+      };
+    }
+
+    const centerX = 50;
+    const centerY = 46;
+    const sorted = [...this.navigationAnchors].sort((a, b) => {
+      const da = Math.hypot(a.xPercent - centerX, a.yPercent - centerY);
+      const db = Math.hypot(b.xPercent - centerX, b.yPercent - centerY);
+      return da - db;
+    });
+    const candidatePool = sorted.slice(0, Math.min(12, sorted.length));
+    const picked = candidatePool[Math.floor(Math.random() * candidatePool.length)] || sorted[0];
+
+    return {
+      x: Math.round((picked.xPercent / 100) * window.innerWidth),
+      y: Math.round((picked.yPercent / 100) * window.innerHeight)
+    };
+  },
+
+  playStarWarp() {
+    const anchor = this.pickNavigationStar();
+    rootStyle.setProperty('--warp-x', `${anchor.x}px`);
+    rootStyle.setProperty('--warp-y', `${anchor.y}px`);
+
+    jumpFlare.classList.remove('play');
+    void jumpFlare.offsetWidth;
+    jumpFlare.classList.add('play');
+
+    warpField.classList.remove('play');
+    void warpField.offsetWidth;
+    warpField.classList.add('play');
+
+    starsLayer.animate([
+      { transform: 'translateZ(0) scale(1)', opacity: 1, offset: 0 },
+      { transform: 'translateZ(0) scale(1.06)', opacity: 1, offset: 0.26 },
+      { transform: 'translateZ(0) scale(1.52)', opacity: 0.7, offset: 1 }
+    ], {
+      duration: UI.routeTransitionMs,
+      easing: 'cubic-bezier(0.12, 0.64, 0.2, 1)',
+      fill: 'forwards'
+    });
+
+    twinkleLayer.animate([
+      { transform: 'translateZ(0) scale(1)', opacity: 1, offset: 0 },
+      { transform: 'translateZ(0) scale(1.18)', opacity: 0.96, offset: 0.3 },
+      { transform: 'translateZ(0) scale(1.88)', opacity: 0.18, offset: 1 }
+    ], {
+      duration: UI.routeTransitionMs,
+      easing: 'cubic-bezier(0.09, 0.61, 0.18, 1)',
+      fill: 'forwards'
+    });
+
+    overlay.classList.add('play');
+    setTimeout(() => {
+      overlay.classList.remove('play');
+      jumpFlare.classList.remove('play');
+      warpField.classList.remove('play');
+    }, UI.routeTransitionMs);
+
+    return new Promise((resolve) => setTimeout(resolve, UI.routeTransitionMs));
   }
 };
 
@@ -299,27 +388,29 @@ const drag = {
 };
 
 const bindEvents = () => {
-  menu.addEventListener('click', (e) => {
+  menu.addEventListener('click', async (e) => {
     const card = e.target.closest('.card-fan-card');
-    if (!card || menu.classList.contains('rerolling')) return;
+    if (!card || menu.classList.contains('rerolling') || transitionState.busy) return;
 
     menu.classList.add('selecting');
     cards.forEach((c) => c.classList.remove('active'));
     card.classList.add('active');
 
-    overlay.classList.add('play');
-    setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
+    transitionState.busy = true;
+    await effects.playStarWarp();
 
-    if (card.dataset.route === 'new') {
-      setTimeout(() => {
-        window.location.href = './world_generation.html';
-      }, UI.rerollOverlayMs);
+    const target = ROUTES[card.dataset.route];
+    if (target) {
+      window.location.href = target;
+      return;
     }
+
+    transitionState.busy = false;
   });
 
   cards.forEach((card) => {
     card.addEventListener('pointerdown', (e) => {
-      if (menu.classList.contains('rerolling')) return;
+      if (menu.classList.contains('rerolling') || transitionState.busy) return;
 
       dragState.pointerId = e.pointerId;
       dragState.card = card;
@@ -338,22 +429,22 @@ const bindEvents = () => {
     card.addEventListener('pointercancel', (e) => drag.onPointerUp(e));
 
     card.addEventListener('mouseenter', () => {
-      if (menu.classList.contains('rerolling')) return;
+      if (menu.classList.contains('rerolling') || transitionState.busy) return;
       layout.applyCardTransforms(card);
     });
 
     card.addEventListener('mouseleave', () => {
-      if (menu.classList.contains('rerolling')) return;
+      if (menu.classList.contains('rerolling') || transitionState.busy) return;
       layout.applyCardTransforms();
     });
 
     card.addEventListener('focus', () => {
-      if (menu.classList.contains('rerolling')) return;
+      if (menu.classList.contains('rerolling') || transitionState.busy) return;
       layout.applyCardTransforms(card);
     });
 
     card.addEventListener('blur', () => {
-      if (menu.classList.contains('rerolling')) return;
+      if (menu.classList.contains('rerolling') || transitionState.busy) return;
       layout.applyCardTransforms();
     });
 

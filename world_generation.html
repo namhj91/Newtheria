@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria 월드 생성</title>
+  <link rel="stylesheet" href="./assets/css/world_generation.css" />
+</head>
+<body>
+  <main class="world-gen-screen">
+    <header class="world-gen-header">
+      <p class="kicker">NEW JOURNEY</p>
+      <h1>월드맵 생성</h1>
+      <p>새로운 여정을 시작하기 전에 세계의 기본 파라미터를 설정하세요.</p>
+    </header>
+
+    <form id="worldGenerationForm" class="world-gen-form" aria-label="월드 생성 설정">
+      <label>
+        맵 가로(헥스)
+        <input id="worldWidthInput" name="width" type="number" min="80" max="320" step="10" value="200" />
+      </label>
+      <label>
+        맵 세로(헥스)
+        <input id="worldHeightInput" name="height" type="number" min="80" max="320" step="10" value="200" />
+      </label>
+      <label>
+        시드(선택)
+        <input id="worldSeedInput" name="seed" type="text" inputmode="numeric" placeholder="비워두면 랜덤 시드" />
+      </label>
+      <label>
+        해양 비율
+        <input id="seaLevelRatioInput" name="seaLevelRatio" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
+        <span id="seaLevelRatioValue">58%</span>
+      </label>
+      <label>
+        고도 강도
+        <input id="elevationScaleInput" name="elevationScale" type="range" min="0.75" max="1.35" step="0.01" value="1" />
+        <span id="elevationScaleValue">1.00x</span>
+      </label>
+      <label>
+        지형 워프 강도
+        <input id="warpStrengthInput" name="warpStrength" type="range" min="6" max="32" step="1" value="18" />
+        <span id="warpStrengthValue">18</span>
+      </label>
+      <label>
+        산맥 강도
+        <input id="ridgeStrengthInput" name="ridgeStrength" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
+        <span id="ridgeStrengthValue">0.24</span>
+      </label>
+      <label>
+        강 생성 밀도
+        <input id="riverBudgetScaleInput" name="riverBudgetScale" type="range" min="0.4" max="2" step="0.05" value="1" />
+        <span id="riverBudgetScaleValue">1.00x</span>
+      </label>
+
+      <div class="world-gen-actions">
+        <a href="./start_screen.html">취소</a>
+        <button type="submit">이 설정으로 월드 생성</button>
+      </div>
+    </form>
+  </main>
+  <script src="./assets/js/world_generation.js"></script>
+</body>
+</html>

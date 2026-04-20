@@ -1,0 +1,100 @@
+:root {
+  color-scheme: dark;
+  --bg: #050816;
+  --bg-card: rgba(14, 23, 46, 0.88);
+  --line: rgba(148, 163, 184, 0.35);
+  --text: #e6edf8;
+  --muted: #9fb2d3;
+  --accent: #60a5fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.2), transparent 42%),
+    radial-gradient(circle at 85% 20%, rgba(14, 165, 233, 0.18), transparent 45%),
+    var(--bg);
+  color: var(--text);
+  font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+}
+
+.world-gen-screen {
+  width: min(920px, 92vw);
+  margin: 44px auto;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg-card);
+  backdrop-filter: blur(8px);
+}
+
+.world-gen-header h1 {
+  margin: 4px 0 8px;
+}
+
+.world-gen-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.kicker {
+  letter-spacing: 0.2em;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.world-gen-form {
+  margin-top: 24px;
+  display: grid;
+  gap: 14px;
+}
+
+.world-gen-form label {
+  display: grid;
+  gap: 6px;
+  color: #dbeafe;
+  font-size: 0.95rem;
+}
+
+.world-gen-form input {
+  width: 100%;
+}
+
+.world-gen-form input[type="number"],
+.world-gen-form input[type="text"] {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(125, 156, 205, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text);
+}
+
+.world-gen-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.world-gen-actions a,
+.world-gen-actions button {
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(125, 156, 205, 0.55);
+  background: rgba(15, 23, 42, 0.75);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.world-gen-actions button {
+  background: linear-gradient(120deg, #2563eb, #0ea5e9);
+  border: none;
+  font-weight: 600;
+}

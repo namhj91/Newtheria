@@ -1,5 +1,12 @@
 const menu = document.getElementById('menu');
-let cards = [...menu.querySelectorAll('.card-fan-card')];
+let cards = [];
+
+const CARD_MENU_ITEMS = [
+  { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },
+  { route: 'continue', icon: '📜', label: '어떤 모험가의 일지', desc: '기록된 여정을 이어서 진행합니다.' },
+  { route: 'codex', icon: '📚', label: '대륙견문록', desc: '인물·지리·전승 문서를 열람합니다.' },
+  { route: 'mods', icon: '⚙️', label: '신의 섭리', desc: '모드 및 확장 규칙을 조정합니다.' }
+];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
 const rootStyle = document.documentElement.style;
@@ -34,82 +41,54 @@ const UI = {
   }
 };
 
-const dragState = {
-  pointerId: null,
-  card: null,
-  startX: 0,
-  startY: 0,
-  offsetX: 0,
-  offsetY: 0,
-  moved: false
-};
-
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
-const layout = {
-  calcHoverPush(distance) {
-    if (distance <= 0) return 0;
-    if (distance === 1) return UI.hoverPushMax;
-    if (distance === 2) return Math.round(UI.hoverPushMax * UI.hoverDistanceRatioNear);
-    return Math.round(UI.hoverPushMax * UI.hoverDistanceRatioFar);
-  },
+let cardFanBehavior = null;
 
-  applyCardTransforms(hoveredCard = null) {
-    cards.forEach((card, i) => {
-      const baseTransform = card.dataset.baseTransform || 'translate(0px, 0px) rotate(0deg)';
-      card.classList.toggle('is-hovered', card === hoveredCard);
+const initializeCards = () => {
+  const cardTemplateApi = window.NewtheriaCardTemplates;
+  if (cardTemplateApi?.renderCardFanCards) {
+    cards = cardTemplateApi.renderCardFanCards(menu, CARD_MENU_ITEMS);
+  } else {
+    cards = [...menu.querySelectorAll('.card-fan-card')];
+  }
 
-      if (card.classList.contains('dragging')) return;
-
-      let shiftX = 0;
-      let hoverY = 0;
-      let hoverScale = 1;
-
-      if (hoveredCard) {
-        const hoveredIndex = cards.indexOf(hoveredCard);
-        if (i !== hoveredIndex) {
-          const direction = i < hoveredIndex ? -1 : 1;
-          const distance = Math.abs(i - hoveredIndex);
-          shiftX = direction * this.calcHoverPush(distance);
-        } else {
-          hoverY = UI.hoverLiftY;
-          hoverScale = UI.hoverScale;
-        }
+  cardFanBehavior = cardTemplateApi?.createCardFanBehavior
+    ? cardTemplateApi.createCardFanBehavior({
+      menu,
+      cards,
+      ui: {
+        cardVerticalStep: UI.cardVerticalStep,
+        dragThresholdPx: UI.dragThresholdPx,
+        hoverPushMax: UI.hoverPushMax,
+        hoverLiftY: UI.hoverLiftY,
+        hoverScale: UI.hoverScale,
+        hoverDistanceRatioNear: UI.hoverDistanceRatioNear,
+        hoverDistanceRatioFar: UI.hoverDistanceRatioFar,
+        settleMs: UI.reroll.settleMs
       }
+    })
+    : null;
+};
 
-      card.style.transform = `${baseTransform} translateX(${shiftX}px) translateY(${hoverY}px) scale(${hoverScale})`;
-    });
+const layout = {
+  applyCardTransforms(hoveredCard = null) {
+    if (cardFanBehavior?.applyCardTransforms) {
+      cardFanBehavior.applyCardTransforms(hoveredCard);
+    }
   },
 
   layoutCards() {
-    const mid = (cards.length - 1) / 2;
-    const rootComputedStyle = getComputedStyle(document.documentElement);
-    const fanGap = parseFloat(rootComputedStyle.getPropertyValue('--fan-gap'));
-    const fanTilt = parseFloat(rootComputedStyle.getPropertyValue('--fan-tilt'));
-
-    cards.forEach((card, i) => {
-      const offset = i - mid;
-      const tx = offset * fanGap;
-      const ty = Math.abs(offset) * UI.cardVerticalStep;
-      const rot = offset * fanTilt;
-
-      card.style.setProperty('--tx', `${tx}px`);
-      card.style.setProperty('--ty', `${ty}px`);
-      card.style.setProperty('--rot', `${rot}deg`);
-      card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
-      card.style.transform = card.dataset.baseTransform;
-      card.style.zIndex = String(100 + (cards.length - i));
-    });
-
-    this.applyCardTransforms();
+    if (cardFanBehavior?.layoutCards) {
+      cardFanBehavior.layoutCards();
+    }
   },
 
   shuffleCardOrder() {
-    for (let i = cards.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cards[i], cards[j]] = [cards[j], cards[i]];
+    if (cardFanBehavior?.shuffleCardOrder) {
+      cardFanBehavior.shuffleCardOrder();
+      cards = cardFanBehavior.getCards();
     }
-    cards.forEach((card) => menu.appendChild(card));
   }
 };
 
@@ -288,99 +267,17 @@ const reroll = {
   }
 };
 
-const drag = {
-  resetDraggedCard(card) {
-    card.classList.remove('dragging');
-    card.style.transition = 'transform .4s cubic-bezier(0.18, 0.9, 0.35, 1.2)';
-    card.style.transform = card.dataset.baseTransform;
-
-    window.setTimeout(() => {
-      card.style.transition = '';
-      layout.applyCardTransforms(menu.querySelector('.card-fan-card.is-hovered'));
-    }, UI.reroll.settleMs);
-  },
-
-  onPointerMove(e) {
-    if (!dragState.card || dragState.pointerId !== e.pointerId) return;
-
-    const dx = e.clientX - dragState.startX;
-    const dy = e.clientY - dragState.startY;
-    if (Math.hypot(dx, dy) > UI.dragThresholdPx) dragState.moved = true;
-
-    dragState.card.style.transform = `translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
-  },
-
-  onPointerUp(e) {
-    if (!dragState.card || dragState.pointerId !== e.pointerId) return;
-
-    const card = dragState.card;
-    card.releasePointerCapture(e.pointerId);
-    this.resetDraggedCard(card);
-
-    dragState.pointerId = null;
-    dragState.card = null;
-  }
-};
-
 const bindEvents = () => {
-  menu.addEventListener('click', (e) => {
-    const card = e.target.closest('.card-fan-card');
-    if (!card || menu.classList.contains('rerolling')) return;
+  cardFanBehavior?.bindInteractions({
+    isLocked: () => menu.classList.contains('rerolling'),
+    onCardSelected: (card, renderedCards) => {
+      menu.classList.add('selecting');
+      renderedCards.forEach((c) => c.classList.remove('active'));
+      card.classList.add('active');
 
-    menu.classList.add('selecting');
-    cards.forEach((c) => c.classList.remove('active'));
-    card.classList.add('active');
-
-    overlay.classList.add('play');
-    setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
-  });
-
-  cards.forEach((card) => {
-    card.addEventListener('pointerdown', (e) => {
-      if (menu.classList.contains('rerolling')) return;
-
-      dragState.pointerId = e.pointerId;
-      dragState.card = card;
-      dragState.startX = e.clientX;
-      dragState.startY = e.clientY;
-      dragState.offsetX = parseFloat(card.style.getPropertyValue('--tx')) || 0;
-      dragState.offsetY = parseFloat(card.style.getPropertyValue('--ty')) || 0;
-      dragState.moved = false;
-
-      card.classList.add('dragging');
-      card.setPointerCapture(e.pointerId);
-    });
-
-    card.addEventListener('pointermove', (e) => drag.onPointerMove(e));
-    card.addEventListener('pointerup', (e) => drag.onPointerUp(e));
-    card.addEventListener('pointercancel', (e) => drag.onPointerUp(e));
-
-    card.addEventListener('mouseenter', () => {
-      if (menu.classList.contains('rerolling')) return;
-      layout.applyCardTransforms(card);
-    });
-
-    card.addEventListener('mouseleave', () => {
-      if (menu.classList.contains('rerolling')) return;
-      layout.applyCardTransforms();
-    });
-
-    card.addEventListener('focus', () => {
-      if (menu.classList.contains('rerolling')) return;
-      layout.applyCardTransforms(card);
-    });
-
-    card.addEventListener('blur', () => {
-      if (menu.classList.contains('rerolling')) return;
-      layout.applyCardTransforms();
-    });
-
-    card.addEventListener('click', (e) => {
-      if (!dragState.moved) return;
-      e.preventDefault();
-      e.stopPropagation();
-      dragState.moved = false;
-    });
+      overlay.classList.add('play');
+      setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
+    }
   });
 
   eggButton.addEventListener('click', () => reroll.play());
@@ -388,6 +285,7 @@ const bindEvents = () => {
 };
 
 const bootstrap = () => {
+  initializeCards();
   bindEvents();
   performanceMode.applyStarAnimationMode();
   layout.layoutCards();

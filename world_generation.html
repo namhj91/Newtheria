@@ -11,47 +11,175 @@
     <header class="world-gen-header">
       <p class="kicker">NEW JOURNEY</p>
       <h1>월드맵 생성</h1>
-      <p>새로운 여정을 시작하기 전에 세계의 기본 파라미터를 설정하세요.</p>
+      <p>카드를 선택해 세계의 기본 파라미터를 구성하세요.</p>
     </header>
 
+    <section class="world-gen-summary" aria-label="현재 설정 요약">
+      <article class="summary-pill">
+        <span class="summary-label">맵 크기</span>
+        <strong id="summaryMapSize">200×200</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">시드</span>
+        <strong id="summarySeed">랜덤</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">해양 비율</span>
+        <strong id="summarySeaLevel">58%</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">고도 강도</span>
+        <strong id="summaryElevation">1.00x</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">지형 워프</span>
+        <strong id="summaryWarp">18</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">산맥 강도</span>
+        <strong id="summaryRidge">0.24</strong>
+      </article>
+      <article class="summary-pill">
+        <span class="summary-label">강 밀도</span>
+        <strong id="summaryRiver">1.00x</strong>
+      </article>
+    </section>
+
+    <nav class="world-gen-tabs" aria-label="월드 생성 항목 탭">
+      <button class="world-tab is-active" type="button" data-tab="size">맵 크기</button>
+      <button class="world-tab" type="button" data-tab="seed">시드</button>
+      <button class="world-tab" type="button" data-tab="terrain">지형 스케일</button>
+      <button class="world-tab" type="button" data-tab="detail">세부 패턴</button>
+    </nav>
+
     <form id="worldGenerationForm" class="world-gen-form" aria-label="월드 생성 설정">
-      <label>
-        맵 가로(헥스)
-        <input id="worldWidthInput" name="width" type="number" min="80" max="320" step="10" value="200" />
-      </label>
-      <label>
-        맵 세로(헥스)
-        <input id="worldHeightInput" name="height" type="number" min="80" max="320" step="10" value="200" />
-      </label>
-      <label>
-        시드(선택)
-        <input id="worldSeedInput" name="seed" type="text" inputmode="numeric" placeholder="비워두면 랜덤 시드" />
-      </label>
-      <label>
-        해양 비율
-        <input id="seaLevelRatioInput" name="seaLevelRatio" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
-        <span id="seaLevelRatioValue">58%</span>
-      </label>
-      <label>
-        고도 강도
-        <input id="elevationScaleInput" name="elevationScale" type="range" min="0.75" max="1.35" step="0.01" value="1" />
-        <span id="elevationScaleValue">1.00x</span>
-      </label>
-      <label>
-        지형 워프 강도
-        <input id="warpStrengthInput" name="warpStrength" type="range" min="6" max="32" step="1" value="18" />
-        <span id="warpStrengthValue">18</span>
-      </label>
-      <label>
-        산맥 강도
-        <input id="ridgeStrengthInput" name="ridgeStrength" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
-        <span id="ridgeStrengthValue">0.24</span>
-      </label>
-      <label>
-        강 생성 밀도
-        <input id="riverBudgetScaleInput" name="riverBudgetScale" type="range" min="0.4" max="2" step="0.05" value="1" />
-        <span id="riverBudgetScaleValue">1.00x</span>
-      </label>
+      <input id="worldWidthInput" name="width" type="hidden" value="200" />
+      <input id="worldHeightInput" name="height" type="hidden" value="200" />
+      <input id="seaLevelRatioInput" name="seaLevelRatio" type="hidden" value="0.58" />
+      <input id="elevationScaleInput" name="elevationScale" type="hidden" value="1" />
+      <input id="warpStrengthInput" name="warpStrength" type="hidden" value="18" />
+      <input id="ridgeStrengthInput" name="ridgeStrength" type="hidden" value="0.24" />
+      <input id="riverBudgetScaleInput" name="riverBudgetScale" type="hidden" value="1" />
+
+      <section class="world-tab-panel is-active" data-panel="size" aria-label="맵 크기 선택 카드">
+        <button class="option-card" type="button" data-group="map-size" data-width="160" data-height="160">
+          <span class="option-title">탐험가</span>
+          <span class="option-value">160 × 160</span>
+          <span class="option-desc">빠른 생성, 집중형 대륙.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="map-size" data-width="200" data-height="200">
+          <span class="option-title">표준</span>
+          <span class="option-value">200 × 200</span>
+          <span class="option-desc">균형 잡힌 세계 규모.</span>
+        </button>
+        <button class="option-card" type="button" data-group="map-size" data-width="260" data-height="260">
+          <span class="option-title">연대기</span>
+          <span class="option-value">260 × 260</span>
+          <span class="option-desc">넓은 항로와 다양한 생태권.</span>
+        </button>
+      </section>
+
+      <section class="world-tab-panel" data-panel="seed" aria-label="시드 선택 카드">
+        <button class="option-card is-selected" type="button" data-group="seed-mode" data-seed-mode="random">
+          <span class="option-title">랜덤 시드</span>
+          <span class="option-value">자동 생성</span>
+          <span class="option-desc">매번 새로운 세계를 맞이합니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="seed-mode" data-seed-mode="fixed">
+          <span class="option-title">고정 시드</span>
+          <span class="option-value">직접 입력</span>
+          <span class="option-desc">동일 조건의 세계를 반복 생성합니다.</span>
+        </button>
+        <label class="option-card seed-input-card" for="worldSeedInput">
+          <span class="option-title">시드 값</span>
+          <input id="worldSeedInput" name="seed" type="text" inputmode="numeric" placeholder="숫자 시드 입력" />
+          <span class="option-desc">고정 시드를 선택했을 때만 적용됩니다.</span>
+        </label>
+      </section>
+
+      <section class="world-tab-panel" data-panel="terrain" aria-label="지형 스케일 선택 카드">
+        <button class="option-card" type="button" data-group="sea-level" data-sea-level="0.52">
+          <span class="option-title">대륙 중심</span>
+          <span class="option-value">해양 52%</span>
+          <span class="option-desc">육지 비중이 높아 확장 플레이에 유리합니다.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="sea-level" data-sea-level="0.58">
+          <span class="option-title">균형 해양</span>
+          <span class="option-value">해양 58%</span>
+          <span class="option-desc">현재 기본 월드 규격입니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="sea-level" data-sea-level="0.66">
+          <span class="option-title">군도 세계</span>
+          <span class="option-value">해양 66%</span>
+          <span class="option-desc">바다 항로와 섬 탐험 중심입니다.</span>
+        </button>
+
+        <button class="option-card" type="button" data-group="elevation" data-elevation="0.9">
+          <span class="option-title">완만 지형</span>
+          <span class="option-value">0.90x</span>
+          <span class="option-desc">평원과 완만한 지형 위주로 형성됩니다.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="elevation" data-elevation="1.0">
+          <span class="option-title">기준 지형</span>
+          <span class="option-value">1.00x</span>
+          <span class="option-desc">표준 고도 대비를 유지합니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="elevation" data-elevation="1.18">
+          <span class="option-title">극적 지형</span>
+          <span class="option-value">1.18x</span>
+          <span class="option-desc">산맥과 고지대의 존재감이 커집니다.</span>
+        </button>
+      </section>
+
+      <section class="world-tab-panel" data-panel="detail" aria-label="세부 패턴 선택 카드">
+        <button class="option-card" type="button" data-group="warp" data-warp="12">
+          <span class="option-title">안정형 워프</span>
+          <span class="option-value">12</span>
+          <span class="option-desc">지형 경계가 부드럽고 예측 가능합니다.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="warp" data-warp="18">
+          <span class="option-title">표준 워프</span>
+          <span class="option-value">18</span>
+          <span class="option-desc">기본 지형 왜곡 강도입니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="warp" data-warp="26">
+          <span class="option-title">역동형 워프</span>
+          <span class="option-value">26</span>
+          <span class="option-desc">기묘한 해안선과 경계가 자주 발생합니다.</span>
+        </button>
+
+        <button class="option-card" type="button" data-group="ridge" data-ridge="0.18">
+          <span class="option-title">완만 산맥</span>
+          <span class="option-value">0.18</span>
+          <span class="option-desc">산맥 출현 빈도와 강도가 낮습니다.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="ridge" data-ridge="0.24">
+          <span class="option-title">표준 산맥</span>
+          <span class="option-value">0.24</span>
+          <span class="option-desc">기본 능선 분포를 유지합니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="ridge" data-ridge="0.34">
+          <span class="option-title">험준 산맥</span>
+          <span class="option-value">0.34</span>
+          <span class="option-desc">고산 지대와 협곡이 더 자주 나타납니다.</span>
+        </button>
+
+        <button class="option-card" type="button" data-group="river" data-river="0.8">
+          <span class="option-title">건조 수계</span>
+          <span class="option-value">0.80x</span>
+          <span class="option-desc">강 생성 수가 줄어드는 분포입니다.</span>
+        </button>
+        <button class="option-card is-selected" type="button" data-group="river" data-river="1.0">
+          <span class="option-title">표준 수계</span>
+          <span class="option-value">1.00x</span>
+          <span class="option-desc">현재 기본 강 생성 밀도입니다.</span>
+        </button>
+        <button class="option-card" type="button" data-group="river" data-river="1.3">
+          <span class="option-title">풍부 수계</span>
+          <span class="option-value">1.30x</span>
+          <span class="option-desc">강과 하천이 촘촘하게 생성됩니다.</span>
+        </button>
+      </section>
 
       <div class="world-gen-actions">
         <a href="./start_screen.html">취소</a>

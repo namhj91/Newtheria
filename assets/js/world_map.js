@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.102(260420-대사csv외부불러오기지원)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.103(260420-프롤로그대화창신비분위기개선)';
 
 const MAP_SIZE = 200;
 

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.79(260415-월드정보팝업디자인개선)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.86(260420-시작화면카드풀이식JS기반)';
 
 const MAP_SIZE = 200;
 

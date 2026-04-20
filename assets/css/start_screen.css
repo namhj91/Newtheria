@@ -238,13 +238,320 @@ body.reduced-effects .twinkle {
 @keyframes drift { from { transform: translate3d(0,0,0);} to { transform: translate3d(-240px,-170px,0);} }
 @keyframes pulse { 0%,100%{opacity:.38;} 50%{opacity:.92;} }
 
+/* ================================================== */
+/* 카드 팬 UI 전면 이식 (JS 상태 기반) */
+/* ================================================== */
+:root {
+  --card-fan-w: 190px;
+  --card-fan-h: calc(var(--card-fan-w) * 1.618);
+}
+
+.card-fan-wrap {
+  justify-content: flex-start;
+}
+
+.card-fan-wrap.center {
+  justify-content: center;
+}
+
+.card-fan {
+  height: calc(var(--card-fan-h) + 140px);
+  width: min(860px, 92vw);
+  perspective: 1600px;
+}
+
+.card-fan-card {
+  left: 50%;
+  top: 50%;
+  width: var(--card-fan-w);
+  height: var(--card-fan-h);
+  transform: var(--base-transform, translate(-50%, -50%));
+  transform-origin: center center;
+  border-radius: 18px;
+  box-shadow: 0 18px 32px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform 280ms cubic-bezier(0.18, 0.78, 0.34, 1), box-shadow 260ms ease, border-color 260ms ease, filter .25s ease, opacity .25s ease;
+}
+
+.card-fan-card-spin {
+  transform-style: preserve-3d;
+}
+
+.card-fan-card-inner {
+  transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: none;
+}
+
+.card-fan-card.is-flipped .card-fan-card-inner {
+  transform: rotateY(180deg);
+}
+
+.card-fan-card-face {
+  border-radius: 18px;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid rgba(71, 85, 105, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.card-fan-card-face::after {
+  inset: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.card-fan-front {
+  background: linear-gradient(160deg, #0f172a, #020617);
+}
+
+.card-fan-back {
+  transform: rotateY(180deg);
+  background: radial-gradient(circle at 20% 20%, #12354d, #020617 60%);
+  color: rgba(226, 232, 240, 0.85);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.card-fan-back .sigil {
+  font-size: 30px;
+  margin-bottom: 8px;
+  letter-spacing: 0;
+}
+
+.card-fan-back .brand {
+  letter-spacing: .18em;
+}
+
+.card-fan-card:hover {
+  box-shadow: 0 28px 48px rgba(2, 6, 23, 0.75), 0 0 30px rgba(56, 189, 248, 0.15);
+}
+
+.card-fan-card:hover .card-fan-card-face {
+  border-color: rgba(56, 189, 248, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.card-fan[data-card-fan-locked="true"] .card-fan-card:not(.active),
+.card-fan[data-shuffling="true"] .card-fan-card:not(.active) {
+  pointer-events: none;
+}
+
+.card-fan[data-card-fan-locked="true"] .card-fan-card:hover,
+.card-fan[data-shuffling="true"] .card-fan-card:hover {
+  box-shadow: 0 18px 32px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.card-fan[data-card-fan-locked="true"] .card-fan-card:hover .card-fan-card-face,
+.card-fan[data-shuffling="true"] .card-fan-card:hover .card-fan-card-face {
+  border-color: rgba(71, 85, 105, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.card-fan-card.active .card-fan-card-face {
+  border-color: rgba(56, 189, 248, 0.9);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.card-fan-card.is-special .card-fan-card-face {
+  border-color: #a855f7;
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.card-fan-card.is-special .card-fan-card-face::after {
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.card-fan-card.is-spinning {
+  animation: cardFanSpinY 560ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  box-shadow: none;
+}
+
+.card-fan-card.is-spinning:hover,
+.card-fan.is-deck-flip .card-fan-card,
+.card-fan-card.is-flipped {
+  box-shadow: none;
+}
+
+.card-fan.is-gathering .card-fan-card {
+  animation: cardFanGather 520ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation-delay: var(--shuffle-delay, 0ms);
+}
+
+.card-fan.is-spreading .card-fan-card {
+  animation: cardFanSpread 980ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation-delay: var(--shuffle-delay, 0ms);
+}
+
+.card-fan.is-rotating .card-fan-card-spin {
+  animation-name: cardFanRotateOnce;
+  animation-duration: var(--shuffle-turn-ms, 180ms);
+  animation-iteration-count: var(--shuffle-turns, 3);
+  animation-direction: alternate;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-delay: var(--shuffle-delay, 0ms);
+}
+
+.card-fan.is-deck-flip .card-fan-card-inner {
+  transition-duration: 360ms;
+  transition-delay: 0ms;
+  transition-timing-function: cubic-bezier(0.18, 0.86, 0.32, 1);
+}
+
+@keyframes cardFanGather {
+  0% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%));
+  }
+
+  100% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%)) translateX(var(--stack-x, 0px)) translateY(var(--stack-y, 0px)) rotate(var(--stack-rot, 0deg)) scale(var(--stack-scale, 0.92));
+  }
+}
+
+@keyframes cardFanSpread {
+  0% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%)) translateX(var(--stack-x, 0px)) translateY(var(--stack-y, 0px)) rotate(var(--stack-rot, 0deg)) scale(var(--stack-scale, 0.92));
+  }
+
+  48% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%)) translateX(var(--stack-x, 0px)) translateY(var(--stack-y, 0px)) rotate(var(--stack-rot, 0deg)) scale(var(--stack-scale, 0.92));
+  }
+
+  78% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%)) translateX(var(--release-x, 0px)) translateY(var(--release-y, 0px)) rotate(calc(var(--stack-rot, 0deg) * 0.2)) scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+    transform: var(--base-transform, translate(-50%, -50%));
+  }
+}
+
+@keyframes cardFanRotateOnce {
+  0% {
+    transform: rotate(0deg) scale(0.98);
+  }
+
+  100% {
+    transform: rotate(calc(var(--shuffle-dir, 1) * 360deg)) scale(1);
+  }
+}
+
+@keyframes cardFanSpinY {
+  0% {
+    transform: var(--spin-base, var(--base-transform, translate(-50%, -50%))) rotateY(0deg);
+  }
+
+  100% {
+    transform: var(--spin-base, var(--base-transform, translate(-50%, -50%))) rotateY(360deg);
+  }
+}
+
+/* 던전 카드 3D 뒤집기/오라 효과 이식 */
+#dungeon-cards-container {
+  perspective: 2000px;
+}
+
+.dungeon-card {
+  width: 16rem;
+  height: 24rem;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: translateY(0px) scale(1) rotateY(0deg);
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+}
+
+.dungeon-card:hover {
+  transform: translateY(-15px) scale(1.03) rotateY(0deg);
+}
+
+.dungeon-card.flipped {
+  transform: translateY(0px) scale(1) rotateY(180deg);
+}
+
+.dungeon-card.flipped:hover {
+  transform: translateY(-15px) scale(1.03) rotateY(180deg);
+}
+
+.card-face {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 0.75rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-back {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  transform: rotateY(0deg);
+  z-index: 2;
+}
+
+.card-front {
+  background: #1e293b;
+  transform: rotateY(180deg);
+  z-index: 1;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.card-glow-rose { --glow-color: rgba(225, 29, 72, 0.9); }
+.card-glow-amber { --glow-color: rgba(245, 158, 11, 0.9); }
+.card-glow-emerald { --glow-color: rgba(16, 185, 129, 0.9); }
+.card-glow-purple { --glow-color: rgba(168, 85, 247, 0.9); }
+.card-glow-slate { --glow-color: rgba(100, 116, 139, 0.7); }
+
+.card-back.intensity-1 {
+  box-shadow: 0 0 20px var(--glow-color);
+}
+
+.card-back.intensity-2 {
+  box-shadow: 0 0 35px var(--glow-color);
+  animation: cardPulse 2s infinite alternate;
+}
+
+.card-back.intensity-3 {
+  box-shadow: 0 0 60px var(--glow-color), inset 0 0 25px var(--glow-color);
+  animation: cardPulse 1s infinite alternate;
+}
+
+@keyframes cardPulse {
+  0% {
+    box-shadow: 0 0 25px var(--glow-color);
+  }
+
+  100% {
+    box-shadow: 0 0 50px var(--glow-color), 0 0 15px rgba(255, 255, 255, 0.6);
+  }
+}
+
 @media (max-width: 760px) {
   :root { --card-w: min(40vw, 184px); --fan-gap: 46px; --fan-tilt: 8deg; }
+  :root { --card-fan-w: 160px; }
   body { overflow-x: hidden; overflow-y: auto; }
   .screen { padding: 30px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .logo p { margin-top: 8px; line-height: 1.35; letter-spacing: .09em; }
-  .card-fan { width: min(660px, 100%); height: min(56svh, 390px); }
-  .card-fan-card { left: 50%; top: 0; margin-left: calc(var(--card-w) / -2); }
+  .card-fan-wrap { justify-content: center; }
+  .card-fan { width: min(660px, 100%); height: calc(var(--card-fan-h) + 120px); }
+  .card-fan-card { margin-left: 0; }
   .meta { font-size: .8rem; }
 }
 

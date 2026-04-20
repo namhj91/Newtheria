@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.88(260420-카드하단드롭삭제)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.89(260420-시작화면카드전부버림시기본복원)';
 
 const MAP_SIZE = 200;
 

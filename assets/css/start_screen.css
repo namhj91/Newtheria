@@ -38,6 +38,11 @@ body {
 }
 .twinkle::before { background-image: var(--twinkle-a), var(--twinkle-c); animation: pulse 4.4s ease-in-out infinite; }
 .twinkle::after { background-image: var(--twinkle-b); animation: pulse 7.2s ease-in-out infinite reverse; opacity: .64; }
+
+body.reduced-effects .stars,
+body.reduced-effects .twinkle {
+  display: none;
+}
 .screen { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 44px 24px 18px; }
 .logo { text-align: center; text-shadow: 0 0 24px rgba(136, 170, 255, .6); }
 .logo h1 { margin: 0; letter-spacing: .12em; font-size: clamp(2rem, 5.4vw, 4rem); }

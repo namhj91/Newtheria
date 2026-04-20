@@ -68,7 +68,7 @@
 
     const applyCardTransforms = (hoveredCard = null) => {
       cards.forEach((card, i) => {
-        const baseTransform = card.dataset.baseTransform || 'translate(0px, 0px) rotate(0deg)';
+        const baseTransform = card.dataset.baseTransform || 'translate(-50%, -50%) translate(0px, 0px) rotate(0deg)';
         card.classList.toggle('is-hovered', card === hoveredCard);
 
         if (card.classList.contains('dragging')) return;
@@ -118,7 +118,7 @@
         card.style.setProperty('--tx', `${tx}px`);
         card.style.setProperty('--ty', `${ty}px`);
         card.style.setProperty('--rot', `${rot}deg`);
-        card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+        card.dataset.baseTransform = `translate(-50%, -50%) translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
         card.style.transform = card.dataset.baseTransform;
         card.style.zIndex = String(100 + (cards.length - i));
       });
@@ -175,7 +175,7 @@
           const dy = e.clientY - dragState.startY;
           if (Math.hypot(dx, dy) > config.dragThresholdPx) dragState.moved = true;
 
-          dragState.card.style.transform = `translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
+          dragState.card.style.transform = `translate(-50%, -50%) translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
         });
 
         const releaseDrag = (e) => {

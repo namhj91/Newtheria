@@ -3,6 +3,8 @@ let cards = [...menu.querySelectorAll('.card-fan-card')];
 const starsLayer = document.querySelector('.stars');
 const twinkleLayer = document.querySelector('.twinkle');
 const overlay = document.querySelector('.overlay');
+const screen = document.querySelector('.screen');
+const logo = document.querySelector('.logo');
 const jumpFlare = document.querySelector('.jump-flare');
 const warpField = document.querySelector('.warp-field');
 const eggButton = document.getElementById('easterEgg');
@@ -11,7 +13,7 @@ const rootStyle = document.documentElement.style;
 const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
-  routeTransitionMs: 920,
+  routeTransitionMs: 1480,
   dragThresholdPx: 5,
   hoverPushMax: 44,
   hoverLiftY: -14,
@@ -247,22 +249,44 @@ const effects = {
     warpField.classList.add('play');
 
     starsLayer.animate([
-      { transform: 'translateZ(0) scale(1)', opacity: 1, offset: 0 },
-      { transform: 'translateZ(0) scale(1.06)', opacity: 1, offset: 0.26 },
-      { transform: 'translateZ(0) scale(1.52)', opacity: 0.7, offset: 1 }
+      { transform: 'translateZ(0) scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0 },
+      { transform: 'translateZ(0) scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.16 },
+      { transform: 'translateZ(0) scale(1.16)', opacity: 0.98, filter: 'blur(0.35px)', offset: 0.48 },
+      { transform: 'translateZ(0) scale(1.95)', opacity: 0.36, filter: 'blur(1.6px)', offset: 1 }
     ], {
       duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.12, 0.64, 0.2, 1)',
+      easing: 'cubic-bezier(0.2, 0.56, 0.1, 1)',
       fill: 'forwards'
     });
 
     twinkleLayer.animate([
-      { transform: 'translateZ(0) scale(1)', opacity: 1, offset: 0 },
-      { transform: 'translateZ(0) scale(1.18)', opacity: 0.96, offset: 0.3 },
-      { transform: 'translateZ(0) scale(1.88)', opacity: 0.18, offset: 1 }
+      { transform: 'translateZ(0) scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0 },
+      { transform: 'translateZ(0) scale(1.08)', opacity: 0.98, filter: 'blur(0.2px)', offset: 0.24 },
+      { transform: 'translateZ(0) scale(1.42)', opacity: 0.82, filter: 'blur(0.85px)', offset: 0.62 },
+      { transform: 'translateZ(0) scale(2.22)', opacity: 0.08, filter: 'blur(2px)', offset: 1 }
     ], {
       duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.09, 0.61, 0.18, 1)',
+      easing: 'cubic-bezier(0.12, 0.5, 0.08, 1)',
+      fill: 'forwards'
+    });
+
+    screen.animate([
+      { transform: 'translate3d(0, 0, 0) scale(1)', filter: 'brightness(1)', opacity: 1, offset: 0 },
+      { transform: 'translate3d(0, -4px, 0) scale(1.01)', filter: 'brightness(1.04)', opacity: 1, offset: 0.3 },
+      { transform: 'translate3d(0, -18px, 0) scale(1.04)', filter: 'brightness(1.12)', opacity: 0.54, offset: 1 }
+    ], {
+      duration: UI.routeTransitionMs,
+      easing: 'cubic-bezier(0.16, 0.64, 0.14, 1)',
+      fill: 'forwards'
+    });
+
+    logo.animate([
+      { transform: 'translateY(0)', opacity: 1, filter: 'blur(0px)', offset: 0 },
+      { transform: 'translateY(-6px)', opacity: 0.92, filter: 'blur(0.2px)', offset: 0.36 },
+      { transform: 'translateY(-16px)', opacity: 0.2, filter: 'blur(1.2px)', offset: 1 }
+    ], {
+      duration: UI.routeTransitionMs,
+      easing: 'cubic-bezier(0.14, 0.58, 0.15, 1)',
       fill: 'forwards'
     });
 
@@ -461,6 +485,7 @@ const bindEvents = () => {
 };
 
 const bootstrap = () => {
+  rootStyle.setProperty('--route-ms', `${UI.routeTransitionMs}ms`);
   bindEvents();
   effects.applyStarField();
   layout.layoutCards();

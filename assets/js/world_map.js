@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.81(260420-시작화면별항해전환연출추가)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.82(260420-시작화면워프연출다이내믹개선)';
 
 const DEFAULT_MAP_SIZE = 200;
 

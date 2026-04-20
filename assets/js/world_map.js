@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.79(260415-월드정보팝업디자인개선)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.83(260420-월드맵작성페이지신규)';
 
 const MAP_SIZE = 200;
 

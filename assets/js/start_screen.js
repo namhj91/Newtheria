@@ -11,6 +11,15 @@ const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
 const rootStyle = document.documentElement.style;
 
+
+const ROUTE_PATHS = {
+  new: './world_map_builder.html',
+  continue: './world_map.html',
+  codex: './docs/README.md',
+  mods: './docs/11_모드시스템규칙.md'
+};
+
+
 const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
@@ -276,7 +285,14 @@ const bindEvents = () => {
       card.classList.add('active');
 
       overlay.classList.add('play');
-      setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
+
+      const targetPath = ROUTE_PATHS[card.dataset.route];
+      setTimeout(() => {
+        overlay.classList.remove('play');
+        if (targetPath) {
+          window.location.href = targetPath;
+        }
+      }, UI.rerollOverlayMs);
     }
   });
 

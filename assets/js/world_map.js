@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.92(260420-카드선택딤해제복구)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.93(260420-모바일우측드래그랙완화)';
 
 const MAP_SIZE = 200;
 

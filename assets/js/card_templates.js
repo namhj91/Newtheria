@@ -56,8 +56,26 @@
       startY: 0,
       offsetX: 0,
       offsetY: 0,
+      pendingDx: 0,
+      pendingDy: 0,
+      frameRequest: null,
       moved: false,
       dragging: false
+    };
+
+    const scheduleDragRender = () => {
+      if (!dragState.card || dragState.frameRequest !== null) return;
+      dragState.frameRequest = window.requestAnimationFrame(() => {
+        dragState.frameRequest = null;
+        if (!dragState.card) return;
+        dragState.card.style.transform = `translate(${dragState.offsetX + dragState.pendingDx}px, ${dragState.offsetY + dragState.pendingDy}px) rotate(0deg)`;
+      });
+    };
+
+    const clearDragFrame = () => {
+      if (dragState.frameRequest === null) return;
+      window.cancelAnimationFrame(dragState.frameRequest);
+      dragState.frameRequest = null;
     };
 
     const calcHoverPush = (distance) => {
@@ -170,6 +188,8 @@
           dragState.startY = e.clientY;
           dragState.offsetX = parseFloat(card.style.getPropertyValue('--tx')) || 0;
           dragState.offsetY = parseFloat(card.style.getPropertyValue('--ty')) || 0;
+          dragState.pendingDx = 0;
+          dragState.pendingDy = 0;
           dragState.moved = false;
           dragState.dragging = false;
 
@@ -192,7 +212,9 @@
 
           if (!dragState.dragging) return;
 
-          dragState.card.style.transform = `translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
+          dragState.pendingDx = dx;
+          dragState.pendingDy = dy;
+          scheduleDragRender();
           onDragMove({ card: dragState.card, event: e, moved: dragState.moved });
         });
 
@@ -202,6 +224,7 @@
           const draggedCard = dragState.card;
           const wasDragging = dragState.dragging;
           const droppedOnDiscard = dragState.moved && shouldDiscardDrop({ card: draggedCard, event: e });
+          clearDragFrame();
           draggedCard.releasePointerCapture(e.pointerId);
           if (droppedOnDiscard) {
             draggedCard.classList.remove('dragging');

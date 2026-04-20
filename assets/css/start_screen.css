@@ -258,6 +258,7 @@ body.reduced-effects .twinkle {
 .card-fan.rerolling .card-fan-card { pointer-events: none; }
 .card-fan-card.dragging {
   transition: none;
+  will-change: transform;
   z-index: 40;
   box-shadow: 0 0 26px rgba(127,162,255,.45), 0 16px 28px rgba(0,0,0,.3);
 }

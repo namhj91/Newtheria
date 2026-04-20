@@ -349,7 +349,12 @@ const bindEvents = () => {
     card.classList.add('active');
 
     overlay.classList.add('play');
-    setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
+    setTimeout(() => {
+      overlay.classList.remove('play');
+      if (card.dataset.route === 'new') {
+        window.location.href = './world_map_builder.html';
+      }
+    }, UI.rerollOverlayMs);
   });
 
   cards.forEach((card) => {

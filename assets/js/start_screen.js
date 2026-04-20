@@ -10,6 +10,7 @@ const CARD_MENU_ITEMS = [
 ];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
+const discardZone = document.getElementById('discardZone');
 const rootStyle = document.documentElement.style;
 
 const UI = {
@@ -280,8 +281,36 @@ const reroll = {
 };
 
 const bindEvents = () => {
+  const updateDiscardHotState = (isHot) => {
+    if (!discardZone) return;
+    discardZone.classList.toggle('is-hot', isHot);
+  };
+
+  const isPointerInDiscardZone = (pointerEvent) => {
+    if (!discardZone) return false;
+    const zoneRect = discardZone.getBoundingClientRect();
+    return pointerEvent.clientY >= zoneRect.top;
+  };
+
   cardFanBehavior?.bindInteractions({
     isLocked: () => menu.classList.contains('rerolling'),
+    shouldDiscardDrop: ({ event }) => isPointerInDiscardZone(event),
+    onDragStateChange: (isDragging) => {
+      document.body.classList.toggle('drag-discard-active', isDragging);
+      if (!isDragging) {
+        updateDiscardHotState(false);
+      }
+    },
+    onDragMove: ({ event, moved }) => {
+      if (!moved) {
+        updateDiscardHotState(false);
+        return;
+      }
+      updateDiscardHotState(isPointerInDiscardZone(event));
+    },
+    onCardDiscarded: () => {
+      updateDiscardHotState(false);
+    },
     onCardSelected: (card, renderedCards) => {
       menu.classList.add('selecting');
       renderedCards.forEach((c) => c.classList.remove('active'));

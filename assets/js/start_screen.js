@@ -17,6 +17,7 @@ const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
   dragThresholdPx: 5,
+  discardRevealDistancePx: 0,
   hoverPushMax: 44,
   hoverLiftY: -14,
   hoverScale: 1.03,
@@ -52,6 +53,7 @@ const MOBILE_BREAKPOINT = 760;
 const applyResponsiveUiTuning = () => {
   isMobileViewport = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
   UI.cardVerticalStep = isMobileViewport ? 10 : 14;
+  UI.discardRevealDistancePx = isMobileViewport ? 110 : 150;
   UI.hoverPushMax = isMobileViewport ? 18 : 44;
   UI.hoverLiftY = isMobileViewport ? -8 : -14;
   UI.hoverScale = isMobileViewport ? 1.01 : 1.03;
@@ -297,6 +299,17 @@ const isPointerInDiscardZone = (pointerEvent) => {
   );
 };
 
+const isPointerNearDiscardZone = (pointerEvent) => {
+  if (!discardZone) return false;
+  const zoneRect = discardZone.getBoundingClientRect();
+  const nearestX = Math.max(zoneRect.left, Math.min(pointerEvent.clientX, zoneRect.right));
+  const nearestY = Math.max(zoneRect.top, Math.min(pointerEvent.clientY, zoneRect.bottom));
+  const dx = pointerEvent.clientX - nearestX;
+  const dy = pointerEvent.clientY - nearestY;
+  const distance = Math.hypot(dx, dy);
+  return distance <= UI.discardRevealDistancePx;
+};
+
 const restoreCardsForStartScreen = () => {
   menu.classList.remove('selecting');
   initializeCards();
@@ -311,17 +324,21 @@ const bindCardInteractions = () => {
     onDragStateChange: (isDragging) => {
       document.body.classList.toggle('drag-discard-active', isDragging);
       if (!isDragging) {
+        document.body.classList.remove('drag-discard-visible');
         updateDiscardHotState(false);
       }
     },
     onDragMove: ({ event, moved }) => {
       if (!moved) {
+        document.body.classList.remove('drag-discard-visible');
         updateDiscardHotState(false);
         return;
       }
+      document.body.classList.toggle('drag-discard-visible', isPointerNearDiscardZone(event));
       updateDiscardHotState(isPointerInDiscardZone(event));
     },
     onCardDiscarded: (_, renderedCards) => {
+      document.body.classList.remove('drag-discard-visible');
       updateDiscardHotState(false);
       if (renderedCards.length === 0) {
         restoreCardsForStartScreen();

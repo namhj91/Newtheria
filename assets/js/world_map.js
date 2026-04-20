@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.98(260420-시작별속도광량개별점멸)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.102(260420-대사csv외부불러오기지원)';
 
 const MAP_SIZE = 200;
 

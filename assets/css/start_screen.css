@@ -244,6 +244,7 @@ body.reduced-effects .twinkle {
   .screen { padding: 30px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .logo p { margin-top: 8px; line-height: 1.35; letter-spacing: .09em; }
   .card-fan { width: min(660px, 100%); height: min(56svh, 390px); }
+  .card-fan-card { left: 50%; top: 0; margin-left: calc(var(--card-w) / -2); }
   .meta { font-size: .8rem; }
 }
 

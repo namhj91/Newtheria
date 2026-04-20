@@ -12,6 +12,7 @@ const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
 const discardZone = document.getElementById('discardZone');
 const rootStyle = document.documentElement.style;
+let discardZoneRect = null;
 
 const UI = {
   cardVerticalStep: 14,
@@ -288,26 +289,44 @@ const updateDiscardHotState = (isHot) => {
   discardZone.classList.toggle('is-hot', isHot);
 };
 
+const cacheDiscardZoneRect = () => {
+  if (!discardZone) {
+    discardZoneRect = null;
+    return null;
+  }
+  discardZoneRect = discardZone.getBoundingClientRect();
+  return discardZoneRect;
+};
+
+const getDiscardZoneRect = () => discardZoneRect || cacheDiscardZoneRect();
+
+const getDiscardZoneHitState = (pointerEvent) => {
+  const zoneRect = getDiscardZoneRect();
+  if (!zoneRect) {
+    return { inside: false, near: false };
+  }
+
+  const clampedX = Math.max(zoneRect.left, Math.min(pointerEvent.clientX, zoneRect.right));
+  const clampedY = Math.max(zoneRect.top, Math.min(pointerEvent.clientY, zoneRect.bottom));
+  const dx = pointerEvent.clientX - clampedX;
+  const dy = pointerEvent.clientY - clampedY;
+  const distanceSq = (dx * dx) + (dy * dy);
+  const revealDistanceSq = UI.discardRevealDistancePx * UI.discardRevealDistancePx;
+
+  return {
+    inside: distanceSq === 0,
+    near: distanceSq <= revealDistanceSq
+  };
+};
+
 const isPointerInDiscardZone = (pointerEvent) => {
-  if (!discardZone) return false;
-  const zoneRect = discardZone.getBoundingClientRect();
-  return (
-    pointerEvent.clientX >= zoneRect.left
-    && pointerEvent.clientX <= zoneRect.right
-    && pointerEvent.clientY >= zoneRect.top
-    && pointerEvent.clientY <= zoneRect.bottom
-  );
+  const hitState = getDiscardZoneHitState(pointerEvent);
+  return hitState.inside;
 };
 
 const isPointerNearDiscardZone = (pointerEvent) => {
-  if (!discardZone) return false;
-  const zoneRect = discardZone.getBoundingClientRect();
-  const nearestX = Math.max(zoneRect.left, Math.min(pointerEvent.clientX, zoneRect.right));
-  const nearestY = Math.max(zoneRect.top, Math.min(pointerEvent.clientY, zoneRect.bottom));
-  const dx = pointerEvent.clientX - nearestX;
-  const dy = pointerEvent.clientY - nearestY;
-  const distance = Math.hypot(dx, dy);
-  return distance <= UI.discardRevealDistancePx;
+  const hitState = getDiscardZoneHitState(pointerEvent);
+  return hitState.near;
 };
 
 const restoreCardsForStartScreen = () => {
@@ -323,9 +342,13 @@ const bindCardInteractions = () => {
     shouldDiscardDrop: ({ event }) => isPointerInDiscardZone(event),
     onDragStateChange: (isDragging) => {
       document.body.classList.toggle('drag-discard-active', isDragging);
+      if (isDragging) {
+        cacheDiscardZoneRect();
+      }
       if (!isDragging) {
         document.body.classList.remove('drag-discard-visible');
         updateDiscardHotState(false);
+        discardZoneRect = null;
       }
     },
     onDragMove: ({ event, moved }) => {
@@ -358,8 +381,10 @@ const bindStaticEvents = () => {
   eggButton.addEventListener('click', () => reroll.play());
   window.addEventListener('resize', () => {
     applyResponsiveUiTuning();
+    cacheDiscardZoneRect();
     layout.layoutCards();
   });
+  window.addEventListener('scroll', cacheDiscardZoneRect, { passive: true });
 };
 
 const bootstrap = () => {

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.82(260420-시작화면워프연출다이내믹개선)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.80(260419-월드맵생성화면추가)';
 
 const DEFAULT_MAP_SIZE = 200;
 

@@ -1,19 +1,12 @@
 const menu = document.getElementById('menu');
 let cards = [...menu.querySelectorAll('.card-fan-card')];
-const starsLayer = document.querySelector('.stars');
-const twinkleLayer = document.querySelector('.twinkle');
 const overlay = document.querySelector('.overlay');
-const screen = document.querySelector('.screen');
-const logo = document.querySelector('.logo');
-const jumpFlare = document.querySelector('.jump-flare');
-const warpField = document.querySelector('.warp-field');
 const eggButton = document.getElementById('easterEgg');
 const rootStyle = document.documentElement.style;
 
 const UI = {
   cardVerticalStep: 14,
   rerollOverlayMs: 620,
-  routeTransitionMs: 1480,
   dragThresholdPx: 5,
   hoverPushMax: 44,
   hoverLiftY: -14,
@@ -41,10 +34,6 @@ const UI = {
   }
 };
 
-const ROUTES = {
-  new: './world_generation.html'
-};
-
 const dragState = {
   pointerId: null,
   card: null,
@@ -53,10 +42,6 @@ const dragState = {
   offsetX: 0,
   offsetY: 0,
   moved: false
-};
-
-const transitionState = {
-  busy: false
 };
 
 const randomBetween = (min, max) => Math.random() * (max - min) + min;
@@ -129,31 +114,23 @@ const layout = {
 };
 
 const effects = {
-  navigationAnchors: [],
-
-  createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette, collectAnchors = false }) {
+  createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) {
     const gradients = [];
 
     for (let i = 0; i < count; i += 1) {
-      const x = randomBetween(0, 100);
-      const y = randomBetween(0, 100);
+      const x = randomBetween(0, 100).toFixed(2);
+      const y = randomBetween(0, 100).toFixed(2);
       const radius = randomBetween(minRadius, maxRadius);
       const fadeRadius = radius + randomBetween(0.9, 1.8);
       const alpha = randomBetween(alphaMin, alphaMax).toFixed(2);
       const color = palette[Math.floor(Math.random() * palette.length)];
-      gradients.push(`radial-gradient(circle at ${x.toFixed(2)}% ${y.toFixed(2)}%, rgba(${color}, ${alpha}) 0 ${radius.toFixed(2)}px, transparent ${fadeRadius.toFixed(2)}px)`);
-
-      if (collectAnchors) {
-        this.navigationAnchors.push({ xPercent: x, yPercent: y });
-      }
+      gradients.push(`radial-gradient(circle at ${x}% ${y}%, rgba(${color}, ${alpha}) 0 ${radius.toFixed(2)}px, transparent ${fadeRadius.toFixed(2)}px)`);
     }
 
     return gradients.join(', ');
   },
 
   applyStarField() {
-    this.navigationAnchors = [];
-
     rootStyle.setProperty('--stars-a', this.createStarLayer({
       count: 340,
       minRadius: 0.28,
@@ -178,8 +155,7 @@ const effects = {
       maxRadius: 2.7,
       alphaMin: 0.42,
       alphaMax: 0.84,
-      palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255'],
-      collectAnchors: true
+      palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255']
     }));
 
     rootStyle.setProperty('--twinkle-a', this.createStarLayer({
@@ -206,98 +182,9 @@ const effects = {
       maxRadius: 3.2,
       alphaMin: 0.35,
       alphaMax: 0.8,
-      palette: ['138, 242, 255', '117, 230, 255'],
-      collectAnchors: true
+      palette: ['138, 242, 255', '117, 230, 255']
     }));
-  },
 
-  pickNavigationStar() {
-    if (!this.navigationAnchors.length) {
-      return {
-        x: Math.round(window.innerWidth * 0.5),
-        y: Math.round(window.innerHeight * 0.45)
-      };
-    }
-
-    const centerX = 50;
-    const centerY = 46;
-    const sorted = [...this.navigationAnchors].sort((a, b) => {
-      const da = Math.hypot(a.xPercent - centerX, a.yPercent - centerY);
-      const db = Math.hypot(b.xPercent - centerX, b.yPercent - centerY);
-      return da - db;
-    });
-    const candidatePool = sorted.slice(0, Math.min(12, sorted.length));
-    const picked = candidatePool[Math.floor(Math.random() * candidatePool.length)] || sorted[0];
-
-    return {
-      x: Math.round((picked.xPercent / 100) * window.innerWidth),
-      y: Math.round((picked.yPercent / 100) * window.innerHeight)
-    };
-  },
-
-  playStarWarp() {
-    const anchor = this.pickNavigationStar();
-    rootStyle.setProperty('--warp-x', `${anchor.x}px`);
-    rootStyle.setProperty('--warp-y', `${anchor.y}px`);
-
-    jumpFlare.classList.remove('play');
-    void jumpFlare.offsetWidth;
-    jumpFlare.classList.add('play');
-
-    warpField.classList.remove('play');
-    void warpField.offsetWidth;
-    warpField.classList.add('play');
-
-    starsLayer.animate([
-      { transform: 'translateZ(0) scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0 },
-      { transform: 'translateZ(0) scale(0.98)', opacity: 1, filter: 'blur(0px)', offset: 0.16 },
-      { transform: 'translateZ(0) scale(1.16)', opacity: 0.98, filter: 'blur(0.35px)', offset: 0.48 },
-      { transform: 'translateZ(0) scale(1.95)', opacity: 0.36, filter: 'blur(1.6px)', offset: 1 }
-    ], {
-      duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.2, 0.56, 0.1, 1)',
-      fill: 'forwards'
-    });
-
-    twinkleLayer.animate([
-      { transform: 'translateZ(0) scale(1)', opacity: 1, filter: 'blur(0px)', offset: 0 },
-      { transform: 'translateZ(0) scale(1.08)', opacity: 0.98, filter: 'blur(0.2px)', offset: 0.24 },
-      { transform: 'translateZ(0) scale(1.42)', opacity: 0.82, filter: 'blur(0.85px)', offset: 0.62 },
-      { transform: 'translateZ(0) scale(2.22)', opacity: 0.08, filter: 'blur(2px)', offset: 1 }
-    ], {
-      duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.12, 0.5, 0.08, 1)',
-      fill: 'forwards'
-    });
-
-    screen.animate([
-      { transform: 'translate3d(0, 0, 0) scale(1)', filter: 'brightness(1)', opacity: 1, offset: 0 },
-      { transform: 'translate3d(0, -4px, 0) scale(1.01)', filter: 'brightness(1.04)', opacity: 1, offset: 0.3 },
-      { transform: 'translate3d(0, -18px, 0) scale(1.04)', filter: 'brightness(1.12)', opacity: 0.54, offset: 1 }
-    ], {
-      duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.16, 0.64, 0.14, 1)',
-      fill: 'forwards'
-    });
-
-    logo.animate([
-      { transform: 'translateY(0)', opacity: 1, filter: 'blur(0px)', offset: 0 },
-      { transform: 'translateY(-6px)', opacity: 0.92, filter: 'blur(0.2px)', offset: 0.36 },
-      { transform: 'translateY(-16px)', opacity: 0.2, filter: 'blur(1.2px)', offset: 1 }
-    ], {
-      duration: UI.routeTransitionMs,
-      easing: 'cubic-bezier(0.14, 0.58, 0.15, 1)',
-      fill: 'forwards'
-    });
-
-    overlay.classList.add('play');
-    setTimeout(() => {
-      overlay.classList.remove('play');
-      jumpFlare.classList.remove('play');
-      warpField.classList.remove('play');
-    }, UI.routeTransitionMs);
-
-    return new Promise((resolve) => setTimeout(resolve, UI.routeTransitionMs));
   }
 };
 
@@ -412,29 +299,27 @@ const drag = {
 };
 
 const bindEvents = () => {
-  menu.addEventListener('click', async (e) => {
+  menu.addEventListener('click', (e) => {
     const card = e.target.closest('.card-fan-card');
-    if (!card || menu.classList.contains('rerolling') || transitionState.busy) return;
+    if (!card || menu.classList.contains('rerolling')) return;
 
     menu.classList.add('selecting');
     cards.forEach((c) => c.classList.remove('active'));
     card.classList.add('active');
 
-    transitionState.busy = true;
-    await effects.playStarWarp();
+    overlay.classList.add('play');
+    setTimeout(() => overlay.classList.remove('play'), UI.rerollOverlayMs);
 
-    const target = ROUTES[card.dataset.route];
-    if (target) {
-      window.location.href = target;
-      return;
+    if (card.dataset.route === 'new') {
+      setTimeout(() => {
+        window.location.href = './world_generation.html';
+      }, UI.rerollOverlayMs);
     }
-
-    transitionState.busy = false;
   });
 
   cards.forEach((card) => {
     card.addEventListener('pointerdown', (e) => {
-      if (menu.classList.contains('rerolling') || transitionState.busy) return;
+      if (menu.classList.contains('rerolling')) return;
 
       dragState.pointerId = e.pointerId;
       dragState.card = card;
@@ -453,22 +338,22 @@ const bindEvents = () => {
     card.addEventListener('pointercancel', (e) => drag.onPointerUp(e));
 
     card.addEventListener('mouseenter', () => {
-      if (menu.classList.contains('rerolling') || transitionState.busy) return;
+      if (menu.classList.contains('rerolling')) return;
       layout.applyCardTransforms(card);
     });
 
     card.addEventListener('mouseleave', () => {
-      if (menu.classList.contains('rerolling') || transitionState.busy) return;
+      if (menu.classList.contains('rerolling')) return;
       layout.applyCardTransforms();
     });
 
     card.addEventListener('focus', () => {
-      if (menu.classList.contains('rerolling') || transitionState.busy) return;
+      if (menu.classList.contains('rerolling')) return;
       layout.applyCardTransforms(card);
     });
 
     card.addEventListener('blur', () => {
-      if (menu.classList.contains('rerolling') || transitionState.busy) return;
+      if (menu.classList.contains('rerolling')) return;
       layout.applyCardTransforms();
     });
 
@@ -485,7 +370,6 @@ const bindEvents = () => {
 };
 
 const bootstrap = () => {
-  rootStyle.setProperty('--route-ms', `${UI.routeTransitionMs}ms`);
   bindEvents();
   effects.applyStarField();
   layout.layoutCards();

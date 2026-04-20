@@ -56,7 +56,8 @@
       startY: 0,
       offsetX: 0,
       offsetY: 0,
-      moved: false
+      moved: false,
+      dragging: false
     };
 
     const calcHoverPush = (distance) => {
@@ -170,10 +171,9 @@
           dragState.offsetX = parseFloat(card.style.getPropertyValue('--tx')) || 0;
           dragState.offsetY = parseFloat(card.style.getPropertyValue('--ty')) || 0;
           dragState.moved = false;
+          dragState.dragging = false;
 
-          card.classList.add('dragging');
           card.setPointerCapture(e.pointerId);
-          onDragStateChange(true, { card, event: e, moved: false });
         });
 
         card.addEventListener('pointermove', (e) => {
@@ -181,7 +181,16 @@
 
           const dx = e.clientX - dragState.startX;
           const dy = e.clientY - dragState.startY;
-          if (Math.hypot(dx, dy) > config.dragThresholdPx) dragState.moved = true;
+          if (Math.hypot(dx, dy) > config.dragThresholdPx) {
+            dragState.moved = true;
+            if (!dragState.dragging) {
+              dragState.dragging = true;
+              dragState.card.classList.add('dragging');
+              onDragStateChange(true, { card: dragState.card, event: e, moved: true });
+            }
+          }
+
+          if (!dragState.dragging) return;
 
           dragState.card.style.transform = `translate(${dragState.offsetX + dx}px, ${dragState.offsetY + dy}px) rotate(0deg)`;
           onDragMove({ card: dragState.card, event: e, moved: dragState.moved });
@@ -191,6 +200,7 @@
           if (!dragState.card || dragState.pointerId !== e.pointerId) return;
 
           const draggedCard = dragState.card;
+          const wasDragging = dragState.dragging;
           const droppedOnDiscard = dragState.moved && shouldDiscardDrop({ card: draggedCard, event: e });
           draggedCard.releasePointerCapture(e.pointerId);
           if (droppedOnDiscard) {
@@ -209,7 +219,10 @@
           dragState.pointerId = null;
           dragState.card = null;
           dragState.moved = false;
-          onDragStateChange(false, { card: draggedCard, event: e, moved: false, discarded: droppedOnDiscard });
+          dragState.dragging = false;
+          if (wasDragging) {
+            onDragStateChange(false, { card: draggedCard, event: e, moved: false, discarded: droppedOnDiscard });
+          }
         };
 
         card.addEventListener('pointerup', releaseDrag);

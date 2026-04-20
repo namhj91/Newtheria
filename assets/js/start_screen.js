@@ -289,7 +289,12 @@ const updateDiscardHotState = (isHot) => {
 const isPointerInDiscardZone = (pointerEvent) => {
   if (!discardZone) return false;
   const zoneRect = discardZone.getBoundingClientRect();
-  return pointerEvent.clientY >= zoneRect.top;
+  return (
+    pointerEvent.clientX >= zoneRect.left
+    && pointerEvent.clientX <= zoneRect.right
+    && pointerEvent.clientY >= zoneRect.top
+    && pointerEvent.clientY <= zoneRect.bottom
+  );
 };
 
 const restoreCardsForStartScreen = () => {

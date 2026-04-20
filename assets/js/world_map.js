@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.96(260420-카드롱프레스글로우동기화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.98(260420-시작별속도광량개별점멸)';
 
 const MAP_SIZE = 200;
 

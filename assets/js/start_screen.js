@@ -119,6 +119,8 @@ const layout = {
 };
 
 const effects = {
+  twinkleLayer: document.querySelector('.twinkle'),
+
   createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) {
     const gradients = [];
 
@@ -137,59 +139,61 @@ const effects = {
 
   applyStarField() {
     rootStyle.setProperty('--stars-a', this.createStarLayer({
-      count: 340,
-      minRadius: 0.28,
-      maxRadius: 1.2,
-      alphaMin: 0.4,
-      alphaMax: 0.92,
+      count: 220,
+      minRadius: 0.24,
+      maxRadius: 0.88,
+      alphaMin: 0.35,
+      alphaMax: 0.82,
       palette: ['233, 242, 255', '214, 229, 255', '190, 214, 255']
     }));
 
     rootStyle.setProperty('--stars-b', this.createStarLayer({
-      count: 220,
-      minRadius: 0.45,
-      maxRadius: 1.62,
-      alphaMin: 0.36,
-      alphaMax: 0.88,
+      count: 120,
+      minRadius: 0.38,
+      maxRadius: 1.24,
+      alphaMin: 0.32,
+      alphaMax: 0.78,
       palette: ['178, 205, 255', '154, 187, 255', '133, 168, 245']
     }));
 
     rootStyle.setProperty('--stars-c', this.createStarLayer({
-      count: 66,
-      minRadius: 1.05,
-      maxRadius: 2.7,
-      alphaMin: 0.42,
-      alphaMax: 0.84,
+      count: 24,
+      minRadius: 0.8,
+      maxRadius: 1.9,
+      alphaMin: 0.34,
+      alphaMax: 0.72,
       palette: ['122, 238, 255', '107, 224, 255', '184, 208, 255']
     }));
+    this.applyTwinkleStars();
+  },
 
-    rootStyle.setProperty('--twinkle-a', this.createStarLayer({
-      count: 112,
-      minRadius: 0.62,
-      maxRadius: 2.1,
-      alphaMin: 0.52,
-      alphaMax: 0.98,
-      palette: ['255, 255, 255', '238, 246, 255']
-    }));
+  applyTwinkleStars() {
+    if (!this.twinkleLayer) return;
 
-    rootStyle.setProperty('--twinkle-b', this.createStarLayer({
-      count: 90,
-      minRadius: 0.68,
-      maxRadius: 2.4,
-      alphaMin: 0.42,
-      alphaMax: 0.86,
-      palette: ['184, 208, 255', '163, 190, 252', '146, 177, 248']
-    }));
+    this.twinkleLayer.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    const twinkleCount = 84;
+    const twinkleColors = [
+      '255, 255, 255',
+      '232, 242, 255',
+      '184, 208, 255',
+      '138, 242, 255'
+    ];
 
-    rootStyle.setProperty('--twinkle-c', this.createStarLayer({
-      count: 42,
-      minRadius: 1.2,
-      maxRadius: 3.2,
-      alphaMin: 0.35,
-      alphaMax: 0.8,
-      palette: ['138, 242, 255', '117, 230, 255']
-    }));
+    for (let i = 0; i < twinkleCount; i += 1) {
+      const star = document.createElement('span');
+      star.className = 'twinkle-star';
+      star.style.setProperty('--twinkle-x', `${randomBetween(0, 100).toFixed(2)}%`);
+      star.style.setProperty('--twinkle-y', `${randomBetween(0, 100).toFixed(2)}%`);
+      star.style.setProperty('--twinkle-size', `${randomBetween(1.1, 3).toFixed(2)}px`);
+      star.style.setProperty('--twinkle-max', randomBetween(0.45, 0.96).toFixed(2));
+      star.style.setProperty('--twinkle-duration', `${randomBetween(2.2, 8.8).toFixed(2)}s`);
+      star.style.setProperty('--twinkle-delay', `${randomBetween(-8.8, 0).toFixed(2)}s`);
+      star.style.setProperty('--twinkle-color', twinkleColors[Math.floor(Math.random() * twinkleColors.length)]);
+      fragment.appendChild(star);
+    }
 
+    this.twinkleLayer.appendChild(fragment);
   }
 };
 

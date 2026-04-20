@@ -10,6 +10,7 @@ const CARD_MENU_ITEMS = [
 ];
 const overlay = document.querySelector('.overlay');
 const eggButton = document.getElementById('easterEgg');
+const testModeEntryButton = document.getElementById('testModeEntry');
 const discardZone = document.getElementById('discardZone');
 const rootStyle = document.documentElement.style;
 let discardController = null;
@@ -281,6 +282,10 @@ const bindStaticEvents = () => {
   staticEventsBound = true;
 
   eggButton.addEventListener('click', () => reroll.play());
+  // 테스트 허브로 이동: 신규 기능은 우선 Test Mode에서 검증 후 메인 흐름에 반영한다.
+  testModeEntryButton?.addEventListener('click', () => {
+    window.location.href = './test_mode.html';
+  });
   window.addEventListener('resize', () => {
     applyResponsiveUiTuning();
     discardController?.cacheRect();

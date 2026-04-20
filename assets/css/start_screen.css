@@ -249,7 +249,7 @@ body.reduced-effects .twinkle {
 }
 
 .card-fan.selecting .card-fan-card:not(.active) { opacity: .32; filter: saturate(.65); }
-.card-fan.selecting .card-fan-card.active {
+.card-fan .card-fan-card.active {
   transform: var(--base-transform, translate(0px, 0px) rotate(0deg)) translateY(-18px) scale(1.07);
   box-shadow: 0 0 30px rgba(145,183,255,.52), 0 16px 30px rgba(0,0,0,.35);
   z-index: 11;

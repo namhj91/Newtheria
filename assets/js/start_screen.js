@@ -345,7 +345,6 @@ const bindCardInteractions = () => {
       }
     },
     onCardSelected: (card, renderedCards) => {
-      menu.classList.add('selecting');
       renderedCards.forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
     }

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.91(260420-DISCARD근접슬라이드노출)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.92(260420-카드선택딤해제복구)';
 
 const MAP_SIZE = 200;
 

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.95(260420-모바일탭포커스프록시추가)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.96(260420-카드롱프레스글로우동기화)';
 
 const MAP_SIZE = 200;
 

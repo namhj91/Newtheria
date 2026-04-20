@@ -188,6 +188,30 @@ const effects = {
   }
 };
 
+const performanceMode = {
+  shouldReduceMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  },
+
+  detectLowSpec() {
+    const cpuCores = navigator.hardwareConcurrency ?? 8;
+    const deviceMemory = navigator.deviceMemory ?? 8;
+    return cpuCores <= 4 || deviceMemory <= 4;
+  },
+
+  shouldDisableStarAnimation() {
+    return this.shouldReduceMotion() || this.detectLowSpec();
+  },
+
+  applyStarAnimationMode() {
+    const disableStarAnimation = this.shouldDisableStarAnimation();
+    document.body.classList.toggle('reduced-effects', disableStarAnimation);
+    if (!disableStarAnimation) {
+      effects.applyStarField();
+    }
+  }
+};
+
 const reroll = {
   async play() {
     if (menu.classList.contains('rerolling')) return;
@@ -365,7 +389,7 @@ const bindEvents = () => {
 
 const bootstrap = () => {
   bindEvents();
-  effects.applyStarField();
+  performanceMode.applyStarAnimationMode();
   layout.layoutCards();
 };
 

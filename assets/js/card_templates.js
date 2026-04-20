@@ -98,10 +98,20 @@
       const rootComputedStyle = getComputedStyle(document.documentElement);
       const fanGap = parseFloat(rootComputedStyle.getPropertyValue('--fan-gap'));
       const fanTilt = parseFloat(rootComputedStyle.getPropertyValue('--fan-tilt'));
+      const cardFanWidth = menu.clientWidth || menu.getBoundingClientRect().width || 0;
+      const firstCardWidth = cards[0]?.getBoundingClientRect().width || 0;
+
+      let responsiveFanGap = fanGap;
+      if (mid > 0 && cardFanWidth > 0 && firstCardWidth > 0) {
+        const safePadding = 8;
+        const availableHalfWidth = Math.max(0, (cardFanWidth - firstCardWidth) / 2 - safePadding);
+        const maxGap = availableHalfWidth / mid;
+        responsiveFanGap = Math.max(12, Math.min(fanGap, maxGap));
+      }
 
       cards.forEach((card, i) => {
         const offset = i - mid;
-        const tx = offset * fanGap;
+        const tx = offset * responsiveFanGap;
         const ty = Math.abs(offset) * config.cardVerticalStep;
         const rot = offset * fanTilt;
 

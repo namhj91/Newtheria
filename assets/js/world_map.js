@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.79(260415-월드정보팝업디자인개선)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.87(260420-카드클릭오버레이제외)';
 
 const MAP_SIZE = 200;
 

@@ -66,6 +66,8 @@ body.reduced-effects .twinkle {
   position: absolute;
   width: var(--card-w);
   aspect-ratio: var(--card-ratio);
+  padding: 0;
+  box-sizing: border-box;
   border-radius: 16px;
   border: 0;
   background: transparent;
@@ -77,6 +79,7 @@ body.reduced-effects .twinkle {
   transform-style: preserve-3d;
   touch-action: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
   transform: var(--base-transform, translate(0px, 0px) rotate(0deg));
   overflow: visible;
 }

@@ -104,8 +104,6 @@ const layout = {
   }
 };
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const effects = {
   createStarLayer({ count, minRadius, maxRadius, alphaMin, alphaMax, palette }) {
     const gradients = [];
@@ -213,11 +211,8 @@ const reroll = {
     layout.applyCardTransforms();
     cards.forEach((c) => c.classList.remove('active'));
     menu.classList.add('rerolling');
-    menu.dataset.cardFanLocked = 'true';
-    menu.dataset.shuffling = 'true';
 
     // 1) Flip cards to the back before shuffling
-    menu.classList.add('is-deck-flip');
     cards.forEach((card) => card.classList.add('is-flipped'));
     await Promise.all(cards.map((card) => {
       const inner = card.querySelector('.card-fan-card-inner');
@@ -233,37 +228,18 @@ const reroll = {
       const tx = Math.round((Math.random() * UI.stack.txRange + UI.stack.txMin) * direction);
       const ty = Math.round(Math.random() * UI.stack.tyRange - UI.stack.tyCenterOffset);
       const rot = ((Math.random() * UI.stack.rotRange) - UI.stack.rotCenterOffset).toFixed(2);
-      const releaseX = Math.round(tx * 1.35);
-      const releaseY = Math.round(ty * 0.65);
-      return { tx, ty, rot, releaseX, releaseY };
+      return `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
     });
 
-    cards.forEach((card, i) => {
-      const stack = stackTransforms[i];
-      card.style.setProperty('--stack-x', `${stack.tx}px`);
-      card.style.setProperty('--stack-y', `${stack.ty}px`);
-      card.style.setProperty('--stack-rot', `${stack.rot}deg`);
-      card.style.setProperty('--stack-scale', '0.92');
-      card.style.setProperty('--release-x', `${stack.releaseX}px`);
-      card.style.setProperty('--release-y', `${stack.releaseY}px`);
-      card.style.setProperty('--shuffle-delay', `${i * 34}ms`);
-      card.style.setProperty('--shuffle-dir', i % 2 === 0 ? '1' : '-1');
-      card.style.setProperty('--shuffle-turns', String(UI.stack.spinCycles));
-      card.style.setProperty('--shuffle-turn-ms', `${Math.round(UI.reroll.spinMs / UI.stack.spinCycles)}ms`);
-    });
-
-    menu.classList.add('is-gathering');
     await Promise.all(cards.map((card, i) => card.animate([
       { transform: card.dataset.baseTransform },
-      { transform: `translate(-50%, -50%) translate(${stackTransforms[i].tx}px, ${stackTransforms[i].ty}px) rotate(${stackTransforms[i].rot}deg) scale(0.92)` }
+      { transform: stackTransforms[i] }
     ], { duration: UI.reroll.collectMs, easing: 'cubic-bezier(0.16, 0.84, 0.44, 1)' }).finished));
-    menu.classList.remove('is-gathering');
     cards.forEach((card, i) => {
-      card.style.transform = `translate(-50%, -50%) translate(${stackTransforms[i].tx}px, ${stackTransforms[i].ty}px) rotate(${stackTransforms[i].rot}deg) scale(0.92)`;
+      card.style.transform = stackTransforms[i];
     });
 
     // 3) Rotate each card 3 times, reversing direction every turn
-    menu.classList.add('is-rotating');
     await Promise.all(cards.map((card, i) => {
       const spinLayer = card.querySelector('.card-fan-card-spin');
       const direction = i % 2 === 0 ? 1 : -1;
@@ -275,21 +251,17 @@ const reroll = {
         { transform: `rotate(${turn}deg)`, offset: 1 }
       ], { duration: UI.reroll.spinMs, easing: 'ease-in-out' }).finished;
     }));
-    menu.classList.remove('is-rotating');
 
     // 4) Shuffle and spread to fan layout (cards stay back-facing)
     layout.shuffleCardOrder();
     layout.layoutCards();
-    menu.classList.add('is-spreading');
     await Promise.all(cards.map((card, i) => {
       const target = card.dataset.baseTransform;
       return card.animate([
-        { transform: `translate(-50%, -50%) translate(${stackTransforms[i].tx}px, ${stackTransforms[i].ty}px) rotate(${stackTransforms[i].rot}deg) scale(0.92)` },
+        { transform: stackTransforms[i] },
         { transform: target }
       ], { duration: UI.reroll.spreadBaseMs + i * UI.reroll.spreadStepMs, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }).finished;
     }));
-    menu.classList.remove('is-spreading');
-    await wait(40);
 
     // 5) Flip back to front one by one after shuffle
     for (const card of cards) {
@@ -303,10 +275,7 @@ const reroll = {
       card.style.transform = card.dataset.baseTransform;
     }
 
-    menu.classList.remove('is-deck-flip');
     menu.classList.remove('rerolling');
-    delete menu.dataset.cardFanLocked;
-    delete menu.dataset.shuffling;
   }
 };
 

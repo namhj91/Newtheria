@@ -272,6 +272,10 @@ const bindCardInteractions = () => {
       if (isMobileViewport) {
         layout.applyCardTransforms(card);
       }
+
+      if (card.dataset.route === 'new') {
+        window.location.href = './prologue.html';
+      }
     }
   });
 };

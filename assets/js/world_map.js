@@ -1,11 +1,11 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.79(260415-월드정보팝업디자인개선)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.80(260419-월드맵생성화면추가)';
 
-const MAP_SIZE = 200;
+const DEFAULT_MAP_SIZE = 200;
 
 const HEX_CONFIG = {
-  cols: MAP_SIZE,
-  rows: MAP_SIZE,
+  cols: DEFAULT_MAP_SIZE,
+  rows: DEFAULT_MAP_SIZE,
   z: 0,
   size: 4,
   seaLevelRatio: 0.58,
@@ -84,6 +84,7 @@ const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
 const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
 const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
 const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+const pageParams = new URLSearchParams(window.location.search);
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -95,11 +96,68 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let fixedSeed = null;
+let mapWidth = DEFAULT_MAP_SIZE;
+let mapHeight = DEFAULT_MAP_SIZE;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
+const parseNumberInRange = (rawValue, { min, max, fallback, round = false }) => {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return fallback;
+  const clamped = Math.min(max, Math.max(min, parsed));
+  return round ? Math.round(clamped) : clamped;
+};
+
+const applyGenerationQueryParams = () => {
+  mapWidth = parseNumberInRange(pageParams.get('width'), { min: 80, max: 320, fallback: DEFAULT_MAP_SIZE, round: true });
+  mapHeight = parseNumberInRange(pageParams.get('height'), { min: 80, max: 320, fallback: DEFAULT_MAP_SIZE, round: true });
+
+  fixedSeed = null;
+  const seedParam = pageParams.get('seed');
+  if (seedParam) {
+    const parsedSeed = Number(seedParam);
+    if (Number.isFinite(parsedSeed)) {
+      const normalized = Math.abs(Math.floor(parsedSeed)) >>> 0;
+      fixedSeed = normalized;
+    }
+  }
+
+  HEX_CONFIG.seaLevelRatio = parseNumberInRange(pageParams.get('seaLevelRatio'), {
+    min: 0.35,
+    max: 0.8,
+    fallback: HEX_CONFIG.seaLevelRatio
+  });
+  HEX_CONFIG.elevationScale = parseNumberInRange(pageParams.get('elevationScale'), {
+    min: 0.75,
+    max: 1.35,
+    fallback: HEX_CONFIG.elevationScale
+  });
+  HEX_CONFIG.warpStrength = parseNumberInRange(pageParams.get('warpStrength'), {
+    min: 6,
+    max: 32,
+    fallback: HEX_CONFIG.warpStrength,
+    round: true
+  });
+  HEX_CONFIG.ridgeStrength = parseNumberInRange(pageParams.get('ridgeStrength'), {
+    min: 0.08,
+    max: 0.42,
+    fallback: HEX_CONFIG.ridgeStrength
+  });
+  HEX_CONFIG.riverBudgetScale = parseNumberInRange(pageParams.get('riverBudgetScale'), {
+    min: 0.4,
+    max: 2,
+    fallback: HEX_CONFIG.riverBudgetScale
+  });
+
+  if (seaLevelRatioInput) seaLevelRatioInput.value = HEX_CONFIG.seaLevelRatio.toFixed(2);
+  if (elevationScaleInput) elevationScaleInput.value = HEX_CONFIG.elevationScale.toFixed(2);
+  if (warpStrengthInput) warpStrengthInput.value = String(Math.round(HEX_CONFIG.warpStrength));
+  if (ridgeStrengthInput) ridgeStrengthInput.value = HEX_CONFIG.ridgeStrength.toFixed(2);
+  if (riverBudgetScaleInput) riverBudgetScaleInput.value = HEX_CONFIG.riverBudgetScale.toFixed(2);
+};
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const quintic = (t) => t * t * t * (t * (t * 6 - 15) + 10);
@@ -878,10 +936,10 @@ const buildTiles = (width, height, fields, levels, waterDist, random) => {
   return tiles;
 };
 
-function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
+function generateWorldMap(width = DEFAULT_MAP_SIZE, height = DEFAULT_MAP_SIZE, presetSeed = null) {
   setMapDimensions(width, height);
 
-  const seed = createSeed();
+  const seed = Number.isFinite(presetSeed) ? presetSeed : createSeed();
   const random = mulberry32(seed);
   const noiseContext = createNoiseContext(seed);
   const rawFields = buildScalarFields(width, height, noiseContext);
@@ -1020,7 +1078,7 @@ const renderWorld = (world) => {
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
-  const world = generateWorldMap(MAP_SIZE, MAP_SIZE);
+  const world = generateWorldMap(mapWidth, mapHeight, fixedSeed);
   currentWorld = world;
   tilePopup.hidden = true;
   renderWorld(world);
@@ -1154,6 +1212,7 @@ riverBudgetScaleInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();
 });
+applyGenerationQueryParams();
 applyRerollSettings();
 updateRerollLabels();
 updateVersionTag();

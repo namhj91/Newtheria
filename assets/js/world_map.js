@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.89(260420-시작화면카드전부버림시기본복원)';
+const WORLD_VERSION_FALLBACK = 'ver.0.0.91(260420-DISCARD근접슬라이드노출)';
 
 const MAP_SIZE = 200;
 

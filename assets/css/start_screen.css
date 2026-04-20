@@ -69,11 +69,11 @@ body {
   border-color: rgba(255, 132, 132, .9);
   background: linear-gradient(180deg, rgba(95, 31, 41, 0.52), rgba(44, 11, 18, 0.92));
 }
-body.drag-discard-active .drag-discard-overlay,
-body.drag-discard-active .discard-dropzone {
+body.drag-discard-active.drag-discard-visible .drag-discard-overlay,
+body.drag-discard-active.drag-discard-visible .discard-dropzone {
   opacity: 1;
 }
-body.drag-discard-active .discard-dropzone {
+body.drag-discard-active.drag-discard-visible .discard-dropzone {
   transform: translate(-50%, 0);
 }
 .stars::before, .stars::after, .twinkle::before, .twinkle::after {

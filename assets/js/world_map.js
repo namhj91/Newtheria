@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.45(260421-대화변수재정규화수정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.46(260421-대화css공용템플릿분리)';
 
 const MAP_SIZE = 200;
 

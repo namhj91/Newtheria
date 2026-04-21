@@ -152,10 +152,12 @@
 
     const layoutCards = () => {
       const mid = (cards.length - 1) / 2;
+      // 화면별로 오버라이드된 팬 변수(menu scope)를 우선 사용하고, 없으면 전역값으로 폴백한다.
+      const scopedComputedStyle = getComputedStyle(menu);
       const rootComputedStyle = getComputedStyle(document.documentElement);
-      const fanGap = parseFloat(rootComputedStyle.getPropertyValue('--fan-gap'));
-      const fanTilt = parseFloat(rootComputedStyle.getPropertyValue('--fan-tilt'));
-      const cardFanWidth = menu.clientWidth || menu.getBoundingClientRect().width || 0;
+      const fanGap = parseFloat(scopedComputedStyle.getPropertyValue('--fan-gap')) || parseFloat(rootComputedStyle.getPropertyValue('--fan-gap')) || 92;
+      const fanTilt = parseFloat(scopedComputedStyle.getPropertyValue('--fan-tilt')) || parseFloat(rootComputedStyle.getPropertyValue('--fan-tilt')) || 13;
+      const cardFanWidth = menu.clientWidth || menu.getBoundingClientRect().width || menu.parentElement?.clientWidth || 0;
       const firstCardWidth = cards[0]?.getBoundingClientRect().width || 0;
 
       let responsiveFanGap = fanGap;

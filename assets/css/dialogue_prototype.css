@@ -128,7 +128,8 @@
   width: min(840px, calc(100vw - 28px));
   height: min(52vh, 420px);
   perspective: 1600px;
-  pointer-events: none;
+  /* 선택지 카드 드래그/클릭 이벤트를 컨테이너에서 정상 수신하도록 유지한다. */
+  pointer-events: auto;
 }
 
 .dialogue-prototype__drag-overlay,

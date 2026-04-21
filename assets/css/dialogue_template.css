@@ -103,8 +103,57 @@
   transition: opacity 180ms ease;
 }
 
-.dialogue-prototype__cg[style*="url("] {
+.dialogue-prototype__cg[style*="url("],
+.dialogue-prototype__cg.has-standing {
   opacity: 1;
+}
+
+.dialogue-prototype__standing {
+  position: absolute;
+  bottom: 0;
+  width: min(44vw, 620px);
+  height: min(86vh, 980px);
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0;
+  filter: brightness(.46) saturate(.82);
+  transform: translate(var(--standing-offset-x, 0px), var(--standing-offset-y, 0px));
+  transition: opacity .2s ease, filter .2s ease, transform .28s ease;
+}
+
+.dialogue-prototype__standing[data-visible="true"] {
+  opacity: .92;
+}
+
+.dialogue-prototype__standing.is-dimmed {
+  opacity: .58;
+  filter: brightness(.42) saturate(.72);
+}
+
+.dialogue-prototype__standing.is-speaking {
+  opacity: 1;
+  filter: brightness(1) saturate(1.02) drop-shadow(0 10px 20px rgba(0, 0, 0, .38));
+}
+
+.dialogue-prototype__standing[data-flip="true"] {
+  transform: translate(var(--standing-offset-x, 0px), var(--standing-offset-y, 0px)) scaleX(-1);
+}
+
+.dialogue-prototype__standing--left {
+  left: clamp(0px, 1.8vw, 28px);
+}
+
+.dialogue-prototype__standing--right {
+  right: clamp(0px, 1.8vw, 28px);
+}
+
+.dialogue-prototype__standing[data-motion="float"] {
+  animation: dialogue-cg-float 2.4s ease-in-out infinite;
+}
+
+.dialogue-prototype__standing[data-motion="shake"] {
+  animation: dialogue-cg-shake 360ms ease-out;
 }
 
 .dialogue-prototype__cg[data-animation="fade"] {

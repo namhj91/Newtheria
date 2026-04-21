@@ -387,73 +387,61 @@
       choiceDiscardController = null;
     };
 
+    const createChoiceCardItem = (choice) => {
+      // 카드 템플릿 팩토리 입력 규격으로 선택지 정보를 변환한다.
+      // renderCardFanCards를 활용해 DOM 생성 경로를 단일화하면
+      // 수동 마크업 조합에서 발생하던 실행 불일치를 줄일 수 있다.
+      const targetScene = choice.scene || currentFilters.sceneTag || '-';
+      const targetAnchor = choice.anchor || 'start';
+      return {
+        route: `${targetScene}#${targetAnchor}`,
+        icon: '✦',
+        label: choice.label,
+        desc: `${targetScene} · ${targetAnchor}`,
+        brand: 'NEWTHERIA',
+        sigil: '✦'
+      };
+    };
+
     const renderChoices = (choices, context = {}) => {
       const { restoreChoices = choices, hiddenChoices = [], isHiddenMode = false } = context;
-      // 현재 줄에 선택지가 있으면 버튼을 생성하고,
-      // 클릭 시 지정된 scene/anchor로 즉시 점프한다.
+      // 기존 선택지 DOM/상태를 전부 폐기한 뒤 템플릿 API로 재생성한다.
       if (!choicesElement) return;
       teardownChoiceInteractions();
       choicesElement.replaceChildren();
       if (choices.length === 0) return;
 
-      const fragment = document.createDocumentFragment();
-      const middleIndex = (choices.length - 1) / 2;
-      choices.forEach((choice, choiceIndex) => {
-        const button = document.createElement('button');
-        const fanOffset = choiceIndex - middleIndex;
-        // 시작 화면 카드 템플릿과 같은 부채꼴 배치값을 사용해 톤을 통일한다.
-        button.style.setProperty('--fan-rotate', `${fanOffset * 8}deg`);
-        button.style.setProperty('--fan-lift', `${Math.abs(fanOffset) * 10}px`);
-        button.type = 'button';
-        button.className = 'dialogue-prototype__choice card-fan-card';
-        button.dataset.choiceScene = choice.scene || currentFilters.sceneTag || '';
-        button.dataset.choiceAnchor = choice.anchor || '';
-        // 순차 등장 딜레이를 줘서 선택지가 한 번에 딱딱 나타나지 않도록 연출한다.
-        button.style.setProperty('--choice-delay', `${choiceIndex * 48}ms`);
-        // 시작 화면의 카드 템플릿 구조(card-fan-card-inner/face)를 그대로 재사용한다.
-        const spin = document.createElement('span');
-        spin.className = 'card-fan-card-spin';
-        const inner = document.createElement('span');
-        inner.className = 'card-fan-card-inner';
-        const face = document.createElement('span');
-        face.className = 'card-fan-card-face card-fan-front';
-        const back = document.createElement('span');
-        back.className = 'card-fan-card-face card-fan-back';
-        const icon = document.createElement('span');
-        icon.className = 'icon';
-        icon.setAttribute('aria-hidden', 'true');
-        icon.textContent = '✦';
-        const label = document.createElement('span');
-        label.className = 'label';
-        label.textContent = choice.label;
-        const desc = document.createElement('span');
-        desc.className = 'desc';
-        // 시작 화면 카드와 동일한 desc 슬롯을 유지하되, 선택지 이동 목적지를 보조 텍스트로 표시한다.
-        const targetScene = choice.scene || currentFilters.sceneTag || '-';
-        const targetAnchor = choice.anchor || 'start';
-        desc.textContent = `${targetScene} · ${targetAnchor}`;
-        face.append(icon, label, desc);
-        // 롱프레스 뒤집기 시 빈 뒷면이 보이지 않도록 back face를 함께 구성한다.
-        const backSigil = document.createElement('span');
-        backSigil.className = 'sigil';
-        backSigil.setAttribute('aria-hidden', 'true');
-        backSigil.textContent = '✦';
-        const backBrand = document.createElement('span');
-        backBrand.className = 'brand';
-        backBrand.textContent = 'NEWTHERIA';
-        back.append(backSigil, backBrand);
-        inner.append(face, back);
-        spin.appendChild(inner);
-        button.appendChild(spin);
-        fragment.appendChild(button);
-      });
-      choicesElement.appendChild(fragment);
-
       const cardTemplateApi = global.NewtheriaCardTemplates;
-      const renderedCards = [...choicesElement.querySelectorAll('.dialogue-prototype__choice')];
-      if (!cardTemplateApi?.createCardFanBehavior || renderedCards.length === 0) {
-        // 카드 템플릿 스크립트가 없는 환경에서도 선택지 클릭 분기는 동작하도록 안전 장치를 둔다.
-        renderedCards.forEach((button) => {
+      const choiceItems = choices.map((choice) => createChoiceCardItem(choice));
+      const renderedCards = cardTemplateApi?.renderCardFanCards
+        ? cardTemplateApi.renderCardFanCards(choicesElement, choiceItems)
+        : [];
+
+      const cards = renderedCards.length > 0
+        ? renderedCards
+        : (() => {
+          // 템플릿 스크립트가 없는 환경에서는 최소 버튼 UI로 폴백한다.
+          return choices.map((choice) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'dialogue-prototype__choice dialogue-prototype__choice--fallback';
+            button.textContent = choice.label;
+            choicesElement.appendChild(button);
+            return button;
+          });
+        })();
+
+      cards.forEach((card, choiceIndex) => {
+        const choice = choices[choiceIndex];
+        if (!choice) return;
+        card.classList.add('dialogue-prototype__choice');
+        card.dataset.choiceScene = choice.scene || currentFilters.sceneTag || '';
+        card.dataset.choiceAnchor = choice.anchor || '';
+        card.style.setProperty('--choice-delay', `${choiceIndex * 48}ms`);
+      });
+
+      if (!cardTemplateApi?.createCardFanBehavior || !cardTemplateApi?.createDiscardZoneController || renderedCards.length === 0) {
+        cards.forEach((button) => {
           button.addEventListener('click', () => {
             applySelection({
               sceneTag: button.dataset.choiceScene || currentFilters.sceneTag,
@@ -484,9 +472,9 @@
         onDragMove: ({ event, moved }) => {
           choiceDiscardController?.onDragMove({ event, moved });
         },
-        onCardDiscarded: (_, cards) => {
-          if (cards.length !== 0) return;
-          // 선택지를 전부 버린 경우 히든 선택지가 있으면 히든 세트를 우선 노출한다.
+        onCardDiscarded: (_, remainingCards) => {
+          if (remainingCards.length !== 0) return;
+          // 모든 카드를 버리면 히든 선택지 우선, 없으면 기본 선택지로 복구한다.
           if (!isHiddenMode && hiddenChoices.length > 0) {
             renderChoices(hiddenChoices, {
               restoreChoices,
@@ -495,15 +483,14 @@
             });
             return;
           }
-          // 히든 선택지가 없거나(또는 히든까지 모두 버린 경우) 기본 선택지를 복원한다.
           renderChoices(restoreChoices, {
             restoreChoices,
             hiddenChoices,
             isHiddenMode: false
           });
         },
-        onCardSelected: (card, cards) => {
-          cardTemplateApi.setActiveCard(cards, card);
+        onCardSelected: (card, allCards) => {
+          cardTemplateApi.setActiveCard(allCards, card);
           applySelection({
             sceneTag: card.dataset.choiceScene || currentFilters.sceneTag,
             anchorId: card.dataset.choiceAnchor || ''

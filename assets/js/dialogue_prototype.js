@@ -211,6 +211,7 @@
     sceneTag = '',
     anchorId = '',
     backgroundUrl = '',
+    showMeta = false,
     onSkip,
     onError
   } = {}) => {
@@ -241,8 +242,14 @@
 
     const bg = root.querySelector('.dialogue-prototype__bg');
     const loading = root.querySelector('.dialogue-prototype__loading');
+    const panelElement = root.querySelector('.dialogue-prototype__panel');
     const metaElement = root.querySelector('.dialogue-prototype__meta');
     const nameElement = root.querySelector('.dialogue-prototype__name');
+
+    // scene/anchor 메타([intro] #start)는 디버그용 정보라 기본값은 숨김 처리한다.
+    if (metaElement) {
+      metaElement.hidden = !showMeta;
+    }
     const lineElement = root.querySelector('.dialogue-prototype__line');
     const choicesElement = root.querySelector('#dialogueChoices');
     const nextButton = root.querySelector('.dialogue-prototype__next');
@@ -252,6 +259,7 @@
     let queue = [];
     let index = 0;
     let currentFilters = { sceneTag, anchorId };
+    let isChoiceStep = false;
 
     const setBackground = (url) => {
       // 줄 단위 배경 -> 기본 배경 순으로 적용.
@@ -293,6 +301,22 @@
       render();
     };
 
+    const playDialogueMotion = () => {
+      // 대사 전환 시 패널/텍스트에 짧은 진입 애니메이션을 주어
+      // 클릭 피드백이 더 역동적으로 느껴지도록 처리한다.
+      if (panelElement) {
+        panelElement.classList.remove('is-advancing');
+        void panelElement.offsetWidth;
+        panelElement.classList.add('is-advancing');
+      }
+      [metaElement, nameElement, lineElement].forEach((element) => {
+        if (!element || element.hidden) return;
+        element.classList.remove('is-entering');
+        void element.offsetWidth;
+        element.classList.add('is-entering');
+      });
+    };
+
     const renderChoices = (choices) => {
       // 현재 줄에 선택지가 있으면 버튼을 생성하고,
       // 클릭 시 지정된 scene/anchor로 즉시 점프한다.
@@ -301,10 +325,17 @@
       if (choices.length === 0) return;
 
       const fragment = document.createDocumentFragment();
-      choices.forEach((choice) => {
+      const middleIndex = (choices.length - 1) / 2;
+      choices.forEach((choice, choiceIndex) => {
         const button = document.createElement('button');
+        const fanOffset = choiceIndex - middleIndex;
+        // 카드 팬 배치처럼 가운데를 기준으로 회전/높이를 분배해 부채꼴 느낌을 만든다.
+        button.style.setProperty('--fan-rotate', `${fanOffset * 8}deg`);
+        button.style.setProperty('--fan-lift', `${Math.abs(fanOffset) * 10}px`);
         button.type = 'button';
         button.className = 'dialogue-prototype__choice';
+        // 순차 등장 딜레이를 줘서 선택지가 한 번에 딱딱 나타나지 않도록 연출한다.
+        button.style.setProperty('--choice-delay', `${choiceIndex * 48}ms`);
         button.textContent = choice.label;
         button.addEventListener('click', () => {
           applySelection({
@@ -321,17 +352,21 @@
       // UI의 단일 렌더 진입점.
       // 메타(scene/anchor), 화자, 대사, 배경, 선택지를 한 번에 갱신한다.
       const current = queue[index];
-      if (!current || !nameElement || !lineElement || !metaElement) return;
-      const sceneLabel = current.scene ? `[${current.scene}]` : '';
-      const anchorLabel = current.anchor ? `#${current.anchor}` : '';
-      metaElement.textContent = `${sceneLabel}${sceneLabel && anchorLabel ? ' ' : ''}${anchorLabel}`;
+      if (!current || !nameElement || !lineElement) return;
+      if (showMeta && metaElement) {
+        const sceneLabel = current.scene ? `[${current.scene}]` : '';
+        const anchorLabel = current.anchor ? `#${current.anchor}` : '';
+        metaElement.textContent = `${sceneLabel}${sceneLabel && anchorLabel ? ' ' : ''}${anchorLabel}`;
+      }
       nameElement.textContent = current.speaker || '???';
       lineElement.textContent = current.line || '';
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current);
+      isChoiceStep = choices.length > 0;
       renderChoices(choices);
+      playDialogueMotion();
       if (nextButton) {
-        nextButton.style.opacity = choices.length > 0 ? '0.58' : '1';
+        nextButton.style.opacity = isChoiceStep ? '0.58' : '1';
       }
     };
 
@@ -360,13 +395,30 @@
       }
     };
 
-    nextButton?.addEventListener('click', () => {
-      if (queue.length === 0) return;
+    const goNext = () => {
+      // 선택지가 열려 있는 구간에서는 임의 진행을 막고,
+      // 버튼 선택으로만 분기하도록 보호한다.
+      if (queue.length === 0 || isChoiceStep) return;
       index = (index + 1) % queue.length;
       render();
+    };
+
+    // 대화 패널 아무 곳이나 눌러도 다음 대사로 진행되도록 처리한다.
+    // 단, 선택지 버튼/스킵 버튼 클릭은 개별 동작을 우선시하기 위해 제외한다.
+    root.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.dialogue-prototype__choice') || target.closest('.dialogue-prototype__skip')) return;
+      goNext();
     });
 
-    skipButton?.addEventListener('click', () => {
+    nextButton?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      goNext();
+    });
+
+    skipButton?.addEventListener('click', (event) => {
+      event.stopPropagation();
       if (typeof onSkip === 'function') {
         onSkip({ root, mount });
         return;

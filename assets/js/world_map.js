@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.9(260420-대화프로토타입주석보강)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.14(260421-대화전환연출강화)';
 
 const MAP_SIZE = 200;
 

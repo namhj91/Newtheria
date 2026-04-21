@@ -1,6 +1,7 @@
-scene,anchor,speaker,line,backgroundUrl,choice1Label,choice1Scene,choice1Anchor,choice2Label,choice2Scene,choice2Anchor
-intro,start,??? ,"별빛이 잦아드는 밤, 당신의 선택이 새로운 길을 엽니다.",https://picsum.photos/id/1015/1920/1080,,,,,,
-intro,choice,여사제,"당신은 운명을 믿나요? 아니면 스스로 길을 개척하나요?",https://picsum.photos/id/1025/1920/1080,"1장으로 이동",chapter1,start,"인트로 마무리",intro,end
-intro,end,여사제,"CSV 파일에서 불러온 대사 프로토타입입니다.",https://picsum.photos/id/1043/1920/1080,,,,,,
-chapter1,start,기록관,"이제 1장 대사를 시작합니다.",https://picsum.photos/id/1039/1920/1080,,,,,,
-chapter1,end,기록관,"1장 대사는 여기까지입니다.",https://picsum.photos/id/1041/1920/1080,,,,,,
+scene,anchor,speaker,line,backgroundUrl,choice1Label,choice1Scene,choice1Anchor,choice2Label,choice2Scene,choice2Anchor,choice3Label,choice3Scene,choice3Anchor,choice4Label,choice4Scene,choice4Anchor,hiddenChoice1Label,hiddenChoice1Scene,hiddenChoice1Anchor
+intro,start,??? ,"별빛이 잦아드는 밤, 당신의 선택이 새로운 길을 엽니다.",https://picsum.photos/id/1015/1920/1080,,,,,,,,,,,,,,
+intro,choice,여사제,"당신은 운명을 믿나요? 아니면 스스로 길을 개척하나요?",https://picsum.photos/id/1025/1920/1080,"1장으로 이동",chapter1,start,"인트로 마무리",intro,end,"기록 보관소",chapter1,end,"테스트 루프",intro,start,"숨겨진 제단으로",chapter1,secret
+intro,end,여사제,"CSV 파일에서 불러온 대사 프로토타입입니다.",https://picsum.photos/id/1043/1920/1080,,,,,,,,,,,,,,
+chapter1,start,기록관,"이제 1장 대사를 시작합니다.",https://picsum.photos/id/1039/1920/1080,,,,,,,,,,,,,,
+chapter1,secret,기록관,"모든 선택지를 버려야만 보이는 히든 선택지로 왔습니다.",https://picsum.photos/id/1060/1920/1080,"1장 마무리",chapter1,end,,,,,,,,,,,,
+chapter1,end,기록관,"1장 대사는 여기까지입니다.",https://picsum.photos/id/1041/1920/1080,,,,,,,,,,,,,,

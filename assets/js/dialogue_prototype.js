@@ -53,6 +53,50 @@
     return fallback;
   };
 
+  const detectChoiceMaxIndex = (row) => {
+    // CSV 헤더에서 choice 번호를 자동 감지해 선택지 개수를 유동적으로 처리한다.
+    const keys = Object.keys(row || {});
+    const regex = /(?:^|_)(?:choice|hiddenChoice|hidden_choice|선택지|히든선택지|분기|히든분기)\s*(\d+)/i;
+    let maxIndex = 0;
+    keys.forEach((key) => {
+      const matched = key.match(regex);
+      if (!matched) return;
+      const parsed = Number.parseInt(matched[1], 10);
+      if (Number.isNaN(parsed)) return;
+      maxIndex = Math.max(maxIndex, parsed);
+    });
+    return maxIndex;
+  };
+
+  const getChoiceSlot = (row, index, type = 'normal') => {
+    const isHidden = type === 'hidden';
+    const label = isHidden
+      ? pick(row, [`hiddenChoice${index}Label`, `hidden_choice_${index}_label`, `히든선택지${index}`, `히든분기${index}라벨`])
+      : pick(row, [`choice${index}Label`, `choice_${index}_label`, `선택지${index}`, `분기${index}라벨`]);
+    if (!label) return null;
+
+    const scene = isHidden
+      ? pick(row, [`hiddenChoice${index}Scene`, `hidden_choice_${index}_scene`, `히든선택지${index}씬`, `히든분기${index}씬`], '')
+      : pick(row, [`choice${index}Scene`, `choice_${index}_scene`, `선택지${index}씬`, `분기${index}씬`], '');
+
+    const anchor = isHidden
+      ? pick(row, [`hiddenChoice${index}Anchor`, `hidden_choice_${index}_anchor`, `히든선택지${index}앵커`, `히든분기${index}앵커`], '')
+      : pick(row, [`choice${index}Anchor`, `choice_${index}_anchor`, `선택지${index}앵커`, `분기${index}앵커`], '');
+
+    return { label, scene, anchor };
+  };
+
+  const collectChoices = (row, type = 'normal') => {
+    const choices = [];
+    const maxIndex = detectChoiceMaxIndex(row);
+    for (let i = 1; i <= Math.max(maxIndex, 1); i += 1) {
+      const slot = getChoiceSlot(row, i, type);
+      if (!slot) continue;
+      choices.push(slot);
+    }
+    return choices;
+  };
+
   const normalizeDialogueRow = (row) => ({
     // scene: 대사 묶음(챕터/상황) 식별자
     scene: pick(row, ['scene', 'tag', 'group', '태그', '장면', '씬']),
@@ -61,29 +105,21 @@
     speaker: pick(row, ['speaker', 'name', '인물명', '화자'], '???'),
     line: pick(row, ['line', 'script', 'dialogue', '대사']),
     backgroundUrl: pick(row, ['backgroundUrl', 'background_url', 'bg', '배경']),
-    choice1Label: pick(row, ['choice1Label', 'choice_1_label', '선택지1', '분기1라벨']),
-    choice1Scene: pick(row, ['choice1Scene', 'choice_1_scene', '선택지1씬', '분기1씬']),
-    choice1Anchor: pick(row, ['choice1Anchor', 'choice_1_anchor', '선택지1앵커', '분기1앵커']),
-    choice2Label: pick(row, ['choice2Label', 'choice_2_label', '선택지2', '분기2라벨']),
-    choice2Scene: pick(row, ['choice2Scene', 'choice_2_scene', '선택지2씬', '분기2씬']),
-    choice2Anchor: pick(row, ['choice2Anchor', 'choice_2_anchor', '선택지2앵커', '분기2앵커']),
-    choice3Label: pick(row, ['choice3Label', 'choice_3_label', '선택지3', '분기3라벨']),
-    choice3Scene: pick(row, ['choice3Scene', 'choice_3_scene', '선택지3씬', '분기3씬']),
-    choice3Anchor: pick(row, ['choice3Anchor', 'choice_3_anchor', '선택지3앵커', '분기3앵커'])
+    // 일반 선택지/히든 선택지를 row 단위 배열로 보관해 개수 제한 없이 사용한다.
+    choices: collectChoices(row, 'normal'),
+    hiddenChoices: collectChoices(row, 'hidden')
   });
 
-  const extractChoices = (row) => {
-    // 한 줄(row)에서 최대 3개의 선택지를 추출한다.
+  const extractChoices = (row, { hidden = false } = {}) => {
     // scene 미기입 시 현재 scene을 기본값으로 사용해 같은 묶음 내 점프를 쉽게 만든다.
-    const choices = [];
-    for (let i = 1; i <= 3; i += 1) {
-      const label = row[`choice${i}Label`];
-      const scene = row[`choice${i}Scene`] || row.scene;
-      const anchor = row[`choice${i}Anchor`];
-      if (!label) continue;
-      choices.push({ label, scene, anchor });
-    }
-    return choices;
+    const source = hidden ? (row.hiddenChoices || []) : (row.choices || []);
+    return source
+      .filter((choice) => choice?.label)
+      .map((choice) => ({
+        label: choice.label,
+        scene: choice.scene || row.scene,
+        anchor: choice.anchor || ''
+      }));
   };
 
   const selectDialogueSegment = (records, { sceneTag, anchorId } = {}) => {
@@ -228,11 +264,16 @@
       <div class="dialogue-prototype__bg" aria-hidden="true">
         <span class="dialogue-prototype__loading">데이터를 로딩 중...</span>
       </div>
+      <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
+      <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
+      <div class="dialogue-prototype__discard-zone" id="dialogueDiscardZone" aria-hidden="true">
+        <span class="discard-icon" aria-hidden="true">🗑</span>
+        <span>DISCARD</span>
+      </div>
       <section class="dialogue-prototype__panel" aria-label="대화창">
         <p class="dialogue-prototype__meta"></p>
         <p class="dialogue-prototype__name"></p>
         <p class="dialogue-prototype__line"></p>
-        <div class="dialogue-prototype__choices" id="dialogueChoices"></div>
         <button class="dialogue-prototype__next" type="button" aria-label="다음 대사">▼</button>
       </section>
       <button class="dialogue-prototype__skip" type="button">SKIP</button>
@@ -252,6 +293,7 @@
     }
     const lineElement = root.querySelector('.dialogue-prototype__line');
     const choicesElement = root.querySelector('#dialogueChoices');
+    const discardZoneElement = root.querySelector('#dialogueDiscardZone');
     const nextButton = root.querySelector('.dialogue-prototype__next');
     const skipButton = root.querySelector('.dialogue-prototype__skip');
 
@@ -260,6 +302,8 @@
     let index = 0;
     let currentFilters = { sceneTag, anchorId };
     let isChoiceStep = false;
+    let choiceFanBehavior = null;
+    let choiceDiscardController = null;
 
     const setBackground = (url) => {
       // 줄 단위 배경 -> 기본 배경 순으로 적용.
@@ -317,10 +361,21 @@
       });
     };
 
-    const renderChoices = (choices) => {
+    const teardownChoiceInteractions = () => {
+      // 선택지 갱신/소멸 시 기존 드래그 상태를 정리해 discard 오버레이 잔상을 방지한다.
+      choiceFanBehavior = null;
+      if (choiceDiscardController) {
+        choiceDiscardController.reset();
+      }
+      choiceDiscardController = null;
+    };
+
+    const renderChoices = (choices, context = {}) => {
+      const { restoreChoices = choices, hiddenChoices = [], isHiddenMode = false } = context;
       // 현재 줄에 선택지가 있으면 버튼을 생성하고,
       // 클릭 시 지정된 scene/anchor로 즉시 점프한다.
       if (!choicesElement) return;
+      teardownChoiceInteractions();
       choicesElement.replaceChildren();
       if (choices.length === 0) return;
 
@@ -329,23 +384,105 @@
       choices.forEach((choice, choiceIndex) => {
         const button = document.createElement('button');
         const fanOffset = choiceIndex - middleIndex;
-        // 카드 팬 배치처럼 가운데를 기준으로 회전/높이를 분배해 부채꼴 느낌을 만든다.
+        // 시작 화면 카드 템플릿과 같은 부채꼴 배치값을 사용해 톤을 통일한다.
         button.style.setProperty('--fan-rotate', `${fanOffset * 8}deg`);
         button.style.setProperty('--fan-lift', `${Math.abs(fanOffset) * 10}px`);
         button.type = 'button';
-        button.className = 'dialogue-prototype__choice';
+        button.className = 'dialogue-prototype__choice card-fan-card';
+        button.dataset.choiceScene = choice.scene || currentFilters.sceneTag || '';
+        button.dataset.choiceAnchor = choice.anchor || '';
         // 순차 등장 딜레이를 줘서 선택지가 한 번에 딱딱 나타나지 않도록 연출한다.
         button.style.setProperty('--choice-delay', `${choiceIndex * 48}ms`);
-        button.textContent = choice.label;
-        button.addEventListener('click', () => {
-          applySelection({
-            sceneTag: choice.scene || currentFilters.sceneTag,
-            anchorId: choice.anchor || ''
-          });
-        });
+        // 시작 화면의 카드 템플릿 구조(card-fan-card-inner/face)를 그대로 재사용한다.
+        const spin = document.createElement('span');
+        spin.className = 'card-fan-card-spin';
+        const inner = document.createElement('span');
+        inner.className = 'card-fan-card-inner';
+        const face = document.createElement('span');
+        face.className = 'card-fan-card-face card-fan-front';
+        const icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '✦';
+        const label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = choice.label;
+        const desc = document.createElement('span');
+        desc.className = 'desc';
+        // 시작 화면 카드와 동일한 desc 슬롯을 유지하되, 선택지 이동 목적지를 보조 텍스트로 표시한다.
+        const targetScene = choice.scene || currentFilters.sceneTag || '-';
+        const targetAnchor = choice.anchor || 'start';
+        desc.textContent = `${targetScene} · ${targetAnchor}`;
+        face.append(icon, label, desc);
+        inner.appendChild(face);
+        spin.appendChild(inner);
+        button.appendChild(spin);
         fragment.appendChild(button);
       });
       choicesElement.appendChild(fragment);
+
+      const cardTemplateApi = global.NewtheriaCardTemplates;
+      const renderedCards = [...choicesElement.querySelectorAll('.dialogue-prototype__choice')];
+      if (!cardTemplateApi?.createCardFanBehavior || renderedCards.length === 0) {
+        // 카드 템플릿 스크립트가 없는 환경에서도 선택지 클릭 분기는 동작하도록 안전 장치를 둔다.
+        renderedCards.forEach((button) => {
+          button.addEventListener('click', () => {
+            applySelection({
+              sceneTag: button.dataset.choiceScene || currentFilters.sceneTag,
+              anchorId: button.dataset.choiceAnchor || ''
+            });
+          });
+        });
+        return;
+      }
+
+      choiceFanBehavior = cardTemplateApi.createCardFanBehavior({
+        menu: choicesElement,
+        cards: renderedCards
+      });
+      choiceDiscardController = cardTemplateApi.createDiscardZoneController({
+        zone: discardZoneElement,
+        documentBody: root,
+        revealDistancePx: 120,
+        activeClassName: 'is-drag-discard-active',
+        visibleClassName: 'is-drag-discard-visible'
+      });
+
+      choiceFanBehavior.bindInteractions({
+        shouldDiscardDrop: ({ event }) => choiceDiscardController?.shouldDiscardDrop({ event }) || false,
+        onDragStateChange: (isDragging) => {
+          choiceDiscardController?.onDragStateChange(isDragging);
+        },
+        onDragMove: ({ event, moved }) => {
+          choiceDiscardController?.onDragMove({ event, moved });
+        },
+        onCardDiscarded: (_, cards) => {
+          if (cards.length !== 0) return;
+          // 선택지를 전부 버린 경우 히든 선택지가 있으면 히든 세트를 우선 노출한다.
+          if (!isHiddenMode && hiddenChoices.length > 0) {
+            renderChoices(hiddenChoices, {
+              restoreChoices,
+              hiddenChoices,
+              isHiddenMode: true
+            });
+            return;
+          }
+          // 히든 선택지가 없거나(또는 히든까지 모두 버린 경우) 기본 선택지를 복원한다.
+          renderChoices(restoreChoices, {
+            restoreChoices,
+            hiddenChoices,
+            isHiddenMode: false
+          });
+        },
+        onCardSelected: (card, cards) => {
+          cardTemplateApi.setActiveCard(cards, card);
+          applySelection({
+            sceneTag: card.dataset.choiceScene || currentFilters.sceneTag,
+            anchorId: card.dataset.choiceAnchor || ''
+          });
+        }
+      });
+      choiceFanBehavior.layoutCards();
     };
 
     const render = () => {
@@ -362,8 +499,13 @@
       lineElement.textContent = current.line || '';
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current);
+      const hiddenChoices = extractChoices(current, { hidden: true });
       isChoiceStep = choices.length > 0;
-      renderChoices(choices);
+      renderChoices(choices, {
+        restoreChoices: choices,
+        hiddenChoices,
+        isHiddenMode: false
+      });
       playDialogueMotion();
       if (nextButton) {
         nextButton.style.opacity = isChoiceStep ? '0.58' : '1';

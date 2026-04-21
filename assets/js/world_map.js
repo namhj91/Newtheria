@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.44(260421-샘플연속대화확장)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.45(260421-대화변수재정규화수정)';
 
 const MAP_SIZE = 200;
 

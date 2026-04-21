@@ -284,6 +284,37 @@
     .map((entry) => parseChoiceDescriptor(entry))
     .filter((choice) => choice?.label);
 
+  const normalizeVariableRecord = (value) => {
+    // 이미 객체 형태({ playerName: '순례자' })인 변수값은 재파싱하지 않고 그대로 유지한다.
+    // CSV 문자열만 parseInlineVariables로 보내 [object Object] 키가 생기는 재정규화 오류를 방지한다.
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.entries(value).reduce((acc, [rawKey, rawValue]) => {
+        const key = cleanText(rawKey);
+        if (!key) return acc;
+        acc[key] = parseScalarValue(rawValue);
+        return acc;
+      }, {});
+    }
+    return parseInlineVariables(value);
+  };
+
+  const normalizeEffectRecord = (value) => {
+    // 이미 파싱된 효과 배열([{key, operator, value}])은 그대로 재사용한다.
+    if (Array.isArray(value)) {
+      return value
+        .map((effect) => {
+          if (!effect || typeof effect !== 'object') return null;
+          return {
+            key: cleanText(effect.key),
+            operator: cleanText(effect.operator) || '=',
+            value: effect.value
+          };
+        })
+        .filter((effect) => effect?.key);
+    }
+    return parseEffectList(value);
+  };
+
   const normalizeDialogueRow = (row) => ({
     // scene: 대사 묶음(챕터/상황) 식별자
     scene: pick(row, ['태그', 'scene']),
@@ -293,10 +324,10 @@
     line: pick(row, ['대사', 'line']),
     backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
     // 변수 컬럼(vars/variables/변수)에 key=value 목록을 넣으면 줄 단위 템플릿 치환에 사용된다.
-    variables: parseInlineVariables(pick(row, ['variables', 'vars', '변수'], '')),
+    variables: normalizeVariableRecord(row.variables ?? row.vars ?? row.변수 ?? ''),
     // 조건/효과/종료는 "비전공자 친화 문법"을 위한 흐름 제어 확장 칼럼.
     condition: pick(row, ['조건', 'condition']),
-    effects: parseEffectList(pick(row, ['효과', 'effect', 'effects'], '')),
+    effects: normalizeEffectRecord(row.effects ?? row.effect ?? row.효과 ?? ''),
     endDialogue: parseBooleanLike(pick(row, ['종료', 'end', 'stop'], '')),
     // 단일 문법 컬럼:
     // - 선택지: "라벨 => scene#anchor || 라벨2 => scene2#anchor2"

@@ -943,15 +943,11 @@
         }
       });
       const durationMs = commands.at(-1)?.durationMs ?? 320;
-      // 배경은 transform으로 이동/확대하고,
-      // 인물(CG)은 애니메이션(transform)과 충돌하지 않도록 background-size/position으로 카메라 효과를 합성한다.
-      bg.style.transition = `transform ${durationMs}ms ease`;
-      bg.style.transform = `translate(${cameraState.x}px, ${cameraState.y}px) scale(${cameraState.scale})`;
-      if (cg) {
-        cg.style.transition = `background-size ${durationMs}ms ease, background-position ${durationMs}ms ease`;
-        cg.style.backgroundSize = `${cameraState.scale * 100}%`;
-        cg.style.backgroundPosition = `calc(50% + ${cameraState.x * 0.7}px) calc(100% + ${cameraState.y}px)`;
-      }
+      [bg, cg].forEach((layer) => {
+        if (!layer) return;
+        layer.style.transition = `transform ${durationMs}ms ease`;
+        layer.style.transform = `translate(${cameraState.x}px, ${cameraState.y}px) scale(${cameraState.scale})`;
+      });
     };
 
     const applyUiFx = (uiFx = {}) => {

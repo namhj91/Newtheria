@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.0.105(260421-카드css템플릿공용화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.31(260421-대화카드스타일동일화)';
 
 const MAP_SIZE = 200;
 

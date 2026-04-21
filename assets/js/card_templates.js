@@ -85,6 +85,10 @@
       longPressTriggered: false
     };
 
+    // 카드 팬 컨테이너 폭이 늦게 확정되는 환경(테스트 패널 토글/뷰포트 회전)에서도
+    // 카드 간격이 다시 계산되도록 resize 옵저버를 유지한다.
+    let resizeObserver = null;
+
     const clearLongPressTimer = () => {
       if (dragState.longPressTimer === null) return;
       window.clearTimeout(dragState.longPressTimer);
@@ -204,6 +208,15 @@
       }, config.settleMs);
     };
 
+    const attachAutoLayoutSync = () => {
+      window.addEventListener('resize', layoutCards);
+      if (typeof ResizeObserver !== 'function') return;
+      resizeObserver = new ResizeObserver(() => {
+        layoutCards();
+      });
+      resizeObserver.observe(menu);
+    };
+
     const bindInteractions = ({
       isLocked = () => false,
       onCardSelected = () => {},
@@ -212,6 +225,8 @@
       onDragStateChange = () => {},
       onDragMove = () => {}
     } = {}) => {
+      attachAutoLayoutSync();
+
       menu.addEventListener('click', (e) => {
         const card = e.target.closest('.card-fan-card');
         if (!card || isLocked()) return;
@@ -303,15 +318,22 @@
         card.addEventListener('pointerup', releaseDrag);
         card.addEventListener('pointercancel', releaseDrag);
 
-        card.addEventListener('mouseenter', () => {
+        const handleHoverEnter = () => {
           if (isLocked()) return;
           applyCardTransforms(card);
-        });
+        };
 
-        card.addEventListener('mouseleave', () => {
+        const handleHoverLeave = () => {
           if (isLocked()) return;
           applyCardTransforms();
-        });
+        };
+
+        // 포인터 기반 디바이스(펜/터치패드 포함)에서도 hover 반응이 일관되게 동작하도록
+        // mouseenter/leave + pointerenter/leave를 함께 바인딩한다.
+        card.addEventListener('mouseenter', handleHoverEnter);
+        card.addEventListener('mouseleave', handleHoverLeave);
+        card.addEventListener('pointerenter', handleHoverEnter);
+        card.addEventListener('pointerleave', handleHoverLeave);
 
         card.addEventListener('focus', () => {
           if (isLocked()) return;
@@ -344,7 +366,12 @@
       layoutCards,
       shuffleCardOrder,
       resetDraggedCard,
-      getCards: () => cards
+      getCards: () => cards,
+      destroy() {
+        window.removeEventListener('resize', layoutCards);
+        resizeObserver?.disconnect();
+        resizeObserver = null;
+      }
     };
   };
 

@@ -379,6 +379,7 @@
 
     const teardownChoiceInteractions = () => {
       // 선택지 갱신/소멸 시 기존 드래그 상태를 정리해 discard 오버레이 잔상을 방지한다.
+      choiceFanBehavior?.destroy?.();
       choiceFanBehavior = null;
       if (choiceDiscardController) {
         choiceDiscardController.reset();

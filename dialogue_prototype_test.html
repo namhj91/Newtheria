@@ -44,33 +44,69 @@
     }
     .test-controls .group { display: grid; gap: 8px; }
     .test-controls .hint { font-size: 0.78rem; opacity: 0.72; line-height: 1.35; }
+    .test-controls__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .test-controls__title {
+      margin: 0;
+      font-size: 0.9rem;
+      letter-spacing: 0.01em;
+    }
+    .test-controls__toggle {
+      width: auto;
+      min-width: 98px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+    }
+    .test-controls__content {
+      display: grid;
+      gap: 8px;
+    }
+    .test-controls.is-minimized {
+      width: auto;
+      min-width: 180px;
+      max-width: calc(100vw - 24px);
+    }
+    .test-controls.is-minimized .test-controls__content {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <section class="test-controls">
-    <label for="csvUrl">CSV URL</label>
-    <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.csv" />
+  <section class="test-controls is-minimized" id="testControlsPanel">
+    <div class="test-controls__header">
+      <h2 class="test-controls__title">대화 테스트 설정</h2>
+      <button id="toggleControls" class="test-controls__toggle" type="button" aria-expanded="false">열기</button>
+    </div>
 
-    <details open>
-      <summary>대화 앵커/태그 설정 접기</summary>
-      <div class="group">
-        <label for="sceneTag">scene/tag (예: intro, chapter1)</label>
-        <input id="sceneTag" type="text" value="intro" />
+    <div class="test-controls__content">
+      <label for="csvUrl">CSV URL</label>
+      <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.csv" />
 
-        <label for="anchorId">anchor (예: start, choice)</label>
-        <input id="anchorId" type="text" value="start" />
+      <details open>
+        <summary>대화 앵커/태그 설정 접기</summary>
+        <div class="group">
+          <label for="sceneTag">scene/tag (예: intro, chapter1)</label>
+          <input id="sceneTag" type="text" value="intro" />
 
-        <button id="reloadFromUrl" type="button">조건으로 다시 불러오기</button>
-      </div>
-    </details>
+          <label for="anchorId">anchor (예: start, choice)</label>
+          <input id="anchorId" type="text" value="start" />
 
-    <label for="backgroundUrl">기본 배경 URL(비우면 CSV 열 우선)</label>
-    <input id="backgroundUrl" type="text" value="https://picsum.photos/id/1015/1920/1080" />
+          <button id="reloadFromUrl" type="button">조건으로 다시 불러오기</button>
+        </div>
+      </details>
 
-    <label for="csvFile">CSV 파일 직접 선택(.csv)</label>
-    <input id="csvFile" type="file" accept=".csv,text/csv" />
+      <label for="backgroundUrl">기본 배경 URL(비우면 CSV 열 우선)</label>
+      <input id="backgroundUrl" type="text" value="https://picsum.photos/id/1015/1920/1080" />
 
-    <p class="hint">CSV 헤더 예시: <code>scene</code>, <code>anchor</code>, <code>speaker</code>, <code>line</code>, <code>backgroundUrl</code>, <code>choice1Label</code>, <code>choice4Label</code>, <code>hiddenChoice1Label</code><br/>선택지 개수는 <code>choiceNLabel/choiceNScene/choiceNAnchor</code> 형태로 유동 추가 가능, 히든 선택지는 <code>hiddenChoiceNLabel/hiddenChoiceNScene/hiddenChoiceNAnchor</code> 사용<br/>한글 헤더도 지원: <code>태그/장면/씬</code>, <code>앵커/포인트</code>, <code>인물명</code>, <code>대사</code>, <code>배경</code>, <code>선택지N/분기N라벨</code>, <code>히든선택지N/히든분기N라벨</code> 등</p>
+      <label for="csvFile">CSV 파일 직접 선택(.csv)</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+
+      <p class="hint">CSV 단일 문법(권장): <code>태그</code>, <code>앵커</code>, <code>화자</code>, <code>대사</code>, <code>배경</code>, <code>변수</code>, <code>선택지</code>, <code>히든선택지</code><br/>선택지 문법: <code>라벨 =&gt; scene#anchor</code>를 기본으로 쓰고, 여러 개는 <code>||</code>로 연결<br/>변수 문법: <code>변수 = playerName=여행자;title=별의방문자</code>, 대사/선택지에서 <code>{{playerName}}</code>, <code>{{상대이름}}</code> 사용</p>
+    </div>
   </section>
 
   <div id="prototypeMount"></div>
@@ -85,6 +121,8 @@
     const backgroundInput = document.getElementById('backgroundUrl');
     const csvFileInput = document.getElementById('csvFile');
     const reloadButton = document.getElementById('reloadFromUrl');
+    const controlsPanel = document.getElementById('testControlsPanel');
+    const toggleControlsButton = document.getElementById('toggleControls');
 
     const getFilters = () => ({
       sceneTag: sceneTagInput.value.trim(),
@@ -106,6 +144,15 @@
 
     reloadButton.addEventListener('click', async () => {
       await prototype.loadFromCsvUrl(csvUrlInput.value, getFilters());
+    });
+
+    // 대화 테스트 패널 전체를 최소화/복원한다.
+    // 요청사항대로 "앵커/태그 영역만"이 아니라 CSV URL/파일/헤더 힌트까지 전체를 접는다.
+    toggleControlsButton.addEventListener('click', () => {
+      const nextMinimized = !controlsPanel.classList.contains('is-minimized');
+      controlsPanel.classList.toggle('is-minimized', nextMinimized);
+      toggleControlsButton.textContent = nextMinimized ? '열기' : '최소화';
+      toggleControlsButton.setAttribute('aria-expanded', String(!nextMinimized));
     });
 
     csvFileInput.addEventListener('change', async (event) => {

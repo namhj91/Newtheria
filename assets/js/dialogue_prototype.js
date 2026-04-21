@@ -416,6 +416,8 @@
         inner.className = 'card-fan-card-inner';
         const face = document.createElement('span');
         face.className = 'card-fan-card-face card-fan-front';
+        const back = document.createElement('span');
+        back.className = 'card-fan-card-face card-fan-back';
         const icon = document.createElement('span');
         icon.className = 'icon';
         icon.setAttribute('aria-hidden', 'true');
@@ -430,7 +432,16 @@
         const targetAnchor = choice.anchor || 'start';
         desc.textContent = `${targetScene} · ${targetAnchor}`;
         face.append(icon, label, desc);
-        inner.appendChild(face);
+        // 롱프레스 뒤집기 시 빈 뒷면이 보이지 않도록 back face를 함께 구성한다.
+        const backSigil = document.createElement('span');
+        backSigil.className = 'sigil';
+        backSigil.setAttribute('aria-hidden', 'true');
+        backSigil.textContent = '✦';
+        const backBrand = document.createElement('span');
+        backBrand.className = 'brand';
+        backBrand.textContent = 'NEWTHERIA';
+        back.append(backSigil, backBrand);
+        inner.append(face, back);
         spin.appendChild(inner);
         button.appendChild(spin);
         fragment.appendChild(button);

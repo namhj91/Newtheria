@@ -53,61 +53,75 @@
     return fallback;
   };
 
-  const detectChoiceMaxIndex = (row) => {
-    // CSV 헤더에서 choice 번호를 자동 감지해 선택지 개수를 유동적으로 처리한다.
-    const keys = Object.keys(row || {});
-    const regex = /(?:^|_)(?:choice|hiddenChoice|hidden_choice|선택지|히든선택지|분기|히든분기)\s*(\d+)/i;
-    let maxIndex = 0;
-    keys.forEach((key) => {
-      const matched = key.match(regex);
-      if (!matched) return;
-      const parsed = Number.parseInt(matched[1], 10);
-      if (Number.isNaN(parsed)) return;
-      maxIndex = Math.max(maxIndex, parsed);
+  const parseChoiceDescriptor = (value) => {
+    const raw = cleanText(value);
+    if (!raw) return null;
+
+    // 단일 권장 문법:
+    // 라벨 => scene#anchor
+    // (anchor가 비어 있으면 scene 시작점으로 점프)
+    const [labelPart = '', targetPart = ''] = raw.split('=>').map((part) => cleanText(part));
+    if (!labelPart) return null;
+    if (!targetPart) return { label: labelPart, scene: '', anchor: '' };
+    const [scene = '', anchor = ''] = targetPart.split('#').map((part) => cleanText(part));
+    return { label: labelPart, scene, anchor };
+  };
+
+  const parseInlineVariables = (rawValue) => {
+    // CSV의 변수 컬럼 예시:
+    // playerName=아린; title=별의 방문자
+    // 신뢰도:12, faction=은하수
+    const raw = cleanText(rawValue);
+    if (!raw) return {};
+
+    return raw
+      .split(/[;\n,]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .reduce((acc, entry) => {
+        const [rawKey = '', ...rawRest] = entry.split(/[:=]/);
+        const key = cleanText(rawKey);
+        const value = cleanText(rawRest.join('='));
+        if (!key) return acc;
+        acc[key] = value;
+        return acc;
+      }, {});
+  };
+
+  const applyTemplateVariables = (templateText, variables = {}) => {
+    const source = cleanText(templateText, '');
+    if (!source) return '';
+    // {{key}} 형식 치환: 변수 미존재 시 원문 토큰을 유지해 디버깅 가능하게 한다.
+    return source.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (matched, key) => {
+      const variableKey = cleanText(key);
+      if (!variableKey) return matched;
+      if (Object.prototype.hasOwnProperty.call(variables, variableKey)) {
+        return cleanText(variables[variableKey], '');
+      }
+      return matched;
     });
-    return maxIndex;
   };
 
-  const getChoiceSlot = (row, index, type = 'normal') => {
-    const isHidden = type === 'hidden';
-    const label = isHidden
-      ? pick(row, [`hiddenChoice${index}Label`, `hidden_choice_${index}_label`, `히든선택지${index}`, `히든분기${index}라벨`])
-      : pick(row, [`choice${index}Label`, `choice_${index}_label`, `선택지${index}`, `분기${index}라벨`]);
-    if (!label) return null;
-
-    const scene = isHidden
-      ? pick(row, [`hiddenChoice${index}Scene`, `hidden_choice_${index}_scene`, `히든선택지${index}씬`, `히든분기${index}씬`], '')
-      : pick(row, [`choice${index}Scene`, `choice_${index}_scene`, `선택지${index}씬`, `분기${index}씬`], '');
-
-    const anchor = isHidden
-      ? pick(row, [`hiddenChoice${index}Anchor`, `hidden_choice_${index}_anchor`, `히든선택지${index}앵커`, `히든분기${index}앵커`], '')
-      : pick(row, [`choice${index}Anchor`, `choice_${index}_anchor`, `선택지${index}앵커`, `분기${index}앵커`], '');
-
-    return { label, scene, anchor };
-  };
-
-  const collectChoices = (row, type = 'normal') => {
-    const choices = [];
-    const maxIndex = detectChoiceMaxIndex(row);
-    for (let i = 1; i <= Math.max(maxIndex, 1); i += 1) {
-      const slot = getChoiceSlot(row, i, type);
-      if (!slot) continue;
-      choices.push(slot);
-    }
-    return choices;
-  };
+  const parseChoiceList = (rawValue = '') => cleanText(rawValue)
+    .split('||')
+    .map((entry) => parseChoiceDescriptor(entry))
+    .filter((choice) => choice?.label);
 
   const normalizeDialogueRow = (row) => ({
     // scene: 대사 묶음(챕터/상황) 식별자
-    scene: pick(row, ['scene', 'tag', 'group', '태그', '장면', '씬']),
+    scene: pick(row, ['태그', 'scene']),
     // anchor: scene 내부의 시작 지점 식별자(재진입/분기 점프 기준)
-    anchor: pick(row, ['anchor', 'id', 'key', '앵커', '포인트']),
-    speaker: pick(row, ['speaker', 'name', '인물명', '화자'], '???'),
-    line: pick(row, ['line', 'script', 'dialogue', '대사']),
-    backgroundUrl: pick(row, ['backgroundUrl', 'background_url', 'bg', '배경']),
-    // 일반 선택지/히든 선택지를 row 단위 배열로 보관해 개수 제한 없이 사용한다.
-    choices: collectChoices(row, 'normal'),
-    hiddenChoices: collectChoices(row, 'hidden')
+    anchor: pick(row, ['앵커', 'anchor']),
+    speaker: pick(row, ['화자', '인물명', 'speaker'], '???'),
+    line: pick(row, ['대사', 'line']),
+    backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
+    // 변수 컬럼(vars/variables/변수)에 key=value 목록을 넣으면 줄 단위 템플릿 치환에 사용된다.
+    variables: parseInlineVariables(pick(row, ['variables', 'vars', '변수'], '')),
+    // 단일 문법 컬럼:
+    // - 선택지: "라벨 => scene#anchor || 라벨2 => scene2#anchor2"
+    // - 히든선택지: 동일 문법
+    choices: Array.isArray(row.choices) ? row.choices : parseChoiceList(pick(row, ['선택지'], '')),
+    hiddenChoices: Array.isArray(row.hiddenChoices) ? row.hiddenChoices : parseChoiceList(pick(row, ['히든선택지'], ''))
   });
 
   const extractChoices = (row, { hidden = false } = {}) => {
@@ -247,6 +261,7 @@
     sceneTag = '',
     anchorId = '',
     backgroundUrl = '',
+    variables = {},
     showMeta = false,
     onSkip,
     onError
@@ -301,6 +316,7 @@
     let queue = [];
     let index = 0;
     let currentFilters = { sceneTag, anchorId };
+    let sharedVariables = { ...variables };
     let isChoiceStep = false;
     let choiceFanBehavior = null;
     let choiceDiscardController = null;
@@ -495,11 +511,29 @@
         const anchorLabel = current.anchor ? `#${current.anchor}` : '';
         metaElement.textContent = `${sceneLabel}${sceneLabel && anchorLabel ? ' ' : ''}${anchorLabel}`;
       }
-      nameElement.textContent = current.speaker || '???';
-      lineElement.textContent = current.line || '';
+      // 기본 변수 + 줄 단위 변수 + 시스템 변수(화자/씬/앵커)를 병합해 템플릿 치환에 사용한다.
+      const templateVariables = {
+        ...sharedVariables,
+        ...(current.variables || {}),
+        speaker: current.speaker || '???',
+        currentSpeaker: current.speaker || '???',
+        상대이름: current.speaker || '???',
+        scene: current.scene || '',
+        anchor: current.anchor || ''
+      };
+      nameElement.textContent = applyTemplateVariables(current.speaker || '???', templateVariables);
+      lineElement.textContent = applyTemplateVariables(current.line || '', templateVariables);
       setBackground(current.backgroundUrl);
-      const choices = extractChoices(current);
-      const hiddenChoices = extractChoices(current, { hidden: true });
+      const choices = extractChoices(current)
+        .map((choice) => ({
+          ...choice,
+          label: applyTemplateVariables(choice.label, templateVariables)
+        }));
+      const hiddenChoices = extractChoices(current, { hidden: true })
+        .map((choice) => ({
+          ...choice,
+          label: applyTemplateVariables(choice.label, templateVariables)
+        }));
       isChoiceStep = choices.length > 0;
       renderChoices(choices, {
         restoreChoices: choices,
@@ -620,6 +654,11 @@
       jumpTo({ sceneTag: nextSceneTag, anchorId: nextAnchorId } = {}) {
         // 외부에서 강제 점프(예: 이벤트/퀘스트 연동)를 수행할 때 사용.
         applySelection({ sceneTag: nextSceneTag, anchorId: nextAnchorId });
+      },
+      setVariables(nextVariables = {}) {
+        // 런타임에서 템플릿 변수(예: playerName, faction)를 갱신할 때 사용.
+        sharedVariables = { ...sharedVariables, ...nextVariables };
+        render();
       },
       destroy() {
         root.remove();

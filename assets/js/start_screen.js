@@ -1,6 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
+const START_VERSION_FALLBACK = 'ver.0.1.27(260421-샘플배경경로고정)';
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },
@@ -300,6 +301,27 @@ const bindStaticEvents = () => {
   });
 };
 
+const updateStartVersionTag = async () => {
+  // 시작 화면 버전 정보는 하드코딩 대신 변경이력 최신 헤더를 기준으로 동기화한다.
+  if (!eggButton) return;
+  let version = START_VERSION_FALLBACK;
+
+  try {
+    const response = await fetch('./docs/99_변경이력.md', { cache: 'no-store' });
+    if (response.ok) {
+      const changelogText = await response.text();
+      const matched = changelogText.match(/^##\s+(ver\.[^\n]+)/m);
+      if (matched?.[1]) {
+        version = matched[1].trim();
+      }
+    }
+  } catch (error) {
+    console.warn('시작 화면 버전 정보를 변경 이력에서 불러오지 못했습니다.', error);
+  }
+
+  eggButton.textContent = version;
+};
+
 const bootstrap = () => {
   const cardTemplateApi = window.NewtheriaCardTemplates;
   applyResponsiveUiTuning();
@@ -330,6 +352,7 @@ const bootstrap = () => {
     : null;
   bindStaticEvents();
   performanceMode.applyStarAnimationMode();
+  updateStartVersionTag();
   layout.layoutCards();
 };
 

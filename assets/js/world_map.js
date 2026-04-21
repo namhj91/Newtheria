@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.14(260421-대화전환연출강화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.27(260421-샘플배경경로고정)';
 
 const MAP_SIZE = 200;
 

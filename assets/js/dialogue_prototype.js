@@ -446,6 +446,7 @@
     backgroundUrl = '',
     variables = {},
     showMeta = false,
+    onDebugStateChange,
     onSkip,
     onError
   } = {}) => {
@@ -505,6 +506,41 @@
     let choiceDiscardController = null;
     let lastRenderedKey = '';
     let isDialogueEnded = false;
+    const debugListeners = new Set();
+    const traceEntries = [];
+
+    const snapshotDebugState = () => ({
+      filters: { ...currentFilters },
+      index,
+      queueLength: queue.length,
+      isChoiceStep,
+      isDialogueEnded,
+      variables: { ...sharedVariables },
+      trace: [...traceEntries]
+    });
+
+    const emitDebugState = () => {
+      const snapshot = snapshotDebugState();
+      if (typeof onDebugStateChange === 'function') {
+        onDebugStateChange(snapshot);
+      }
+      debugListeners.forEach((listener) => {
+        if (typeof listener === 'function') listener(snapshot);
+      });
+    };
+
+    const pushTrace = (type, payload = {}) => {
+      traceEntries.push({
+        type,
+        payload,
+        at: new Date().toISOString()
+      });
+      // 추적 로그가 무한 증가해 느려지는 것을 막기 위해 최신 120개만 보관한다.
+      if (traceEntries.length > 120) {
+        traceEntries.splice(0, traceEntries.length - 120);
+      }
+      emitDebugState();
+    };
 
     const setBackground = (url) => {
       // 줄 단위 배경 -> 기본 배경 순으로 적용.
@@ -553,6 +589,11 @@
       if (queue.length === 0) {
         throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
       }
+      pushTrace('apply-selection', {
+        sceneTag: currentFilters.sceneTag || '',
+        anchorId: currentFilters.anchorId || '',
+        queueLength: queue.length
+      });
       render();
     };
 
@@ -580,6 +621,10 @@
       }
       index = 0;
       lastRenderedKey = '';
+      pushTrace('refresh-queue', {
+        queueLength: queue.length,
+        preserveCursor
+      });
       render();
     };
 
@@ -668,6 +713,11 @@
           button.addEventListener('click', () => {
             const choiceEffects = JSON.parse(button.dataset.choiceEffects || '[]');
             sharedVariables = applyEffects(sharedVariables, choiceEffects);
+            pushTrace('choice-selected', {
+              sceneTag: button.dataset.choiceScene || currentFilters.sceneTag || '',
+              anchorId: button.dataset.choiceAnchor || '',
+              effects: choiceEffects
+            });
             applySelection({
               sceneTag: button.dataset.choiceScene || currentFilters.sceneTag,
               anchorId: button.dataset.choiceAnchor || ''
@@ -718,6 +768,11 @@
           cardTemplateApi.setActiveCard(allCards, card);
           const choiceEffects = JSON.parse(card.dataset.choiceEffects || '[]');
           sharedVariables = applyEffects(sharedVariables, choiceEffects);
+          pushTrace('choice-selected', {
+            sceneTag: card.dataset.choiceScene || currentFilters.sceneTag || '',
+            anchorId: card.dataset.choiceAnchor || '',
+            effects: choiceEffects
+          });
           applySelection({
             sceneTag: card.dataset.choiceScene || currentFilters.sceneTag,
             anchorId: card.dataset.choiceAnchor || ''
@@ -777,6 +832,7 @@
         isHiddenMode: false
       });
       playDialogueMotion();
+      emitDebugState();
       if (nextButton) {
         nextButton.style.opacity = isChoiceStep ? '0.58' : '1';
       }
@@ -802,6 +858,9 @@
         loading.hidden = false;
         loading.textContent = error.message || '대사 데이터를 불러오지 못했습니다.';
       }
+      pushTrace('error', {
+        message: error?.message || 'unknown error'
+      });
       if (typeof onError === 'function') {
         onError(error);
       }
@@ -894,11 +953,31 @@
       setVariables(nextVariables = {}) {
         // 런타임에서 템플릿 변수(예: playerName, faction)를 갱신할 때 사용.
         sharedVariables = { ...sharedVariables, ...nextVariables };
+        pushTrace('set-variables', { changed: { ...nextVariables } });
         // 변수 변경으로 조건 분기가 달라질 수 있으므로 현재 큐를 재평가한다.
         // 단, 가능한 경우 현재 줄을 유지해 "임의 첫 줄 점프" 체감을 줄인다.
         refreshQueueByCurrentFilters({ preserveCursor: true });
       },
+      getDebugState() {
+        // 외부(테스트 UI)에서 현재 변수/큐/최근 이벤트를 조회할 수 있도록 제공한다.
+        return snapshotDebugState();
+      },
+      subscribeDebug(listener) {
+        if (typeof listener !== 'function') {
+          return () => {};
+        }
+        debugListeners.add(listener);
+        listener(snapshotDebugState());
+        return () => {
+          debugListeners.delete(listener);
+        };
+      },
+      clearDebugTrace() {
+        traceEntries.length = 0;
+        emitDebugState();
+      },
       destroy() {
+        debugListeners.clear();
         root.remove();
       }
     };

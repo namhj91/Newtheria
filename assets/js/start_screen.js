@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.1.31(260421-대화카드스타일동일화)';
+const START_VERSION_FALLBACK = 'ver.0.1.32(260421-대화선택지카드재구현)';
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },

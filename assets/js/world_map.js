@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.32(260421-대화선택지카드재구현)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.36(260421-샘플대사설명중심간소화)';
 
 const MAP_SIZE = 200;
 

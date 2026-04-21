@@ -1,7 +1,9 @@
-태그,앵커,화자,대사,배경,변수,선택지,히든선택지
-intro,start,{{상대이름}},"별빛이 잦아드는 밤, {{playerName}}님의 선택이 새로운 길을 엽니다.",assets/img/goddess.png,playerName=여행자,,
-intro,choice,여사제,"{{playerName}}님, 지금 대화 중인 상대는 {{상대이름}}입니다. 어떤 길을 택하실래요?",assets/img/goddess.png,playerName=여행자,"{{playerName}}의 1장으로 이동 => chapter1#start || {{상대이름}}에게 인트로 마무리 요청 => intro#end || 기록 보관소 => chapter1#end || 테스트 루프 => intro#start","숨겨진 제단으로 => chapter1#secret"
-intro,end,여사제,"{{playerName}}님, CSV 변수 치환 테스트가 완료되었습니다.",assets/img/goddess.png,playerName=여행자,,
-chapter1,start,기록관,"{{playerName}}님, 이제 1장 대사를 시작합니다.",assets/img/goddess.png,playerName=여행자,,
-chapter1,secret,기록관,"모든 선택지를 버려야만 보이는 히든 선택지로 왔습니다. 현재 대화 상대: {{상대이름}}",assets/img/goddess.png,playerName=여행자,"1장 마무리 => chapter1#end",
-chapter1,end,기록관,"1장 대사는 여기까지입니다. 수고하셨습니다, {{playerName}}님.",assets/img/goddess.png,playerName=여행자,,
+태그,앵커,화자,대사,배경,변수,조건,효과,종료,선택지,히든선택지
+intro,start,아스테리아,"{{playerName}} 님, 저는 아스테리아예요. 이 화면은 대사 CSV 문법을 쉽게 확인하는 샘플이에요.",assets/img/goddess.png,playerName=순례자;신뢰도=2;별조각=0,,,,,"기본 설명을 듣는다 => intro#briefing [효과:신뢰도+1] || 바로 예시를 본다 => intro#example",
+intro,briefing,아스테리아,"한 줄은 한 대사예요. `태그`와 `앵커`로 위치를 정하고, `선택지`로 다음 줄을 고를 수 있어요. (신뢰도: {{신뢰도}})",assets/img/goddess.png,,신뢰도>=1,,"","변수 문법을 듣는다 => intro#variables || 조건 문법을 듣는다 => intro#condition","숨은 설명을 본다 => intro#secret [조건:신뢰도>=4]"
+intro,variables,아스테리아,"`변수` 칸에 `playerName=순례자;신뢰도=2`처럼 적으면 되고, 대사에서는 `{{playerName}}`처럼 불러와요.",assets/img/goddess.png,,,신뢰도+1,,"효과 문법을 듣는다 => intro#effect || 종료 예시를 본다 => intro#end",
+intro,condition,아스테리아,"`조건` 칸에는 `신뢰도>=2`, `A 그리고 B`, `NOT(...)` 같은 식을 쓸 수 있어요. 조건이 맞아야 줄이 보여요.",assets/img/goddess.png,,,,"","효과 문법을 듣는다 => intro#effect || 종료 예시를 본다 => intro#end",
+intro,effect,아스테리아,"`효과` 칸은 값을 바꿔요. 예를 들어 `신뢰도+1`, `별조각-1`, `직업=기록관`처럼 쓰면 돼요.",assets/img/goddess.png,,,신뢰도+1,,"선택지 메타를 본다 => intro#example || 종료 예시를 본다 => intro#end",
+intro,example,아스테리아,"선택지에도 메타를 붙일 수 있어요. `[조건:신뢰도>=4]`, `[효과:신뢰도+1]` 같은 형태예요.",assets/img/goddess.png,,,,"","숨은 설명을 연다 => intro#secret [조건:신뢰도>=4] || 안내를 마친다 => intro#end",
+intro,secret,아스테리아,"여기까지 왔다면 조건식이 잘 작동한 거예요. 작은 기능부터 천천히 조합하면 충분해요.",assets/img/goddess.png,,신뢰도>=4,신뢰도+1,,"안내를 마친다 => intro#end",
+intro,end,아스테리아,"좋아요, 오늘 설명은 여기까지예요. 필요하면 `docs/03_대사작성문법.md` 문서를 같이 보시면 더 쉬워요.",assets/img/goddess.png,,,,예,,

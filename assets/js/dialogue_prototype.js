@@ -57,14 +57,29 @@
     const raw = cleanText(value);
     if (!raw) return null;
 
+    // 선택지 한 칸 안에서 부가 메타를 읽는다.
+    // 예: "돕는다 => intro#help [조건:신뢰도>=10] [효과:신뢰도+2;평판+1]"
+    const metadata = {};
+    const normalized = raw.replace(/\[([^\]:]+)\s*:\s*([^\]]+)\]/g, (_, key, body) => {
+      const metaKey = cleanText(key).toLowerCase();
+      const metaValue = cleanText(body);
+      if (metaKey && metaValue) metadata[metaKey] = metaValue;
+      return '';
+    }).trim();
+
     // 단일 권장 문법:
     // 라벨 => scene#anchor
     // (anchor가 비어 있으면 scene 시작점으로 점프)
-    const [labelPart = '', targetPart = ''] = raw.split('=>').map((part) => cleanText(part));
+    const [labelPart = '', targetPart = ''] = normalized.split('=>').map((part) => cleanText(part));
     if (!labelPart) return null;
-    if (!targetPart) return { label: labelPart, scene: '', anchor: '' };
+    const condition = metadata['조건'] || metadata.condition || '';
+    const effect = metadata['효과'] || metadata.effect || metadata.effects || '';
+    const parsedEffects = parseEffectList(effect);
+    if (!targetPart) {
+      return { label: labelPart, scene: '', anchor: '', condition, effects: parsedEffects };
+    }
     const [scene = '', anchor = ''] = targetPart.split('#').map((part) => cleanText(part));
-    return { label: labelPart, scene, anchor };
+    return { label: labelPart, scene, anchor, condition, effects: parsedEffects };
   };
 
   const parseInlineVariables = (rawValue) => {
@@ -87,6 +102,168 @@
         return acc;
       }, {});
   };
+
+  const parseScalarValue = (rawValue) => {
+    const value = cleanText(rawValue);
+    if (!value) return '';
+    const lower = value.toLowerCase();
+    if (['true', '예', 'yes', 'y', 'on'].includes(lower)) return true;
+    if (['false', '아니오', 'no', 'n', 'off'].includes(lower)) return false;
+    if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
+    return value;
+  };
+
+  const parseBooleanLike = (rawValue) => {
+    const value = cleanText(rawValue).toLowerCase();
+    if (!value) return false;
+    return ['1', 'true', '예', 'yes', 'y', 'on', 'end', 'stop', '종료'].includes(value);
+  };
+
+  const splitByTopLevelToken = (source, tokens) => {
+    const fragments = [];
+    let current = '';
+    let depth = 0;
+    let cursor = 0;
+    while (cursor < source.length) {
+      const char = source[cursor];
+      if (char === '(') depth += 1;
+      if (char === ')') depth = Math.max(0, depth - 1);
+      if (depth === 0) {
+        const matched = tokens.find((token) => source.startsWith(token, cursor));
+        if (matched) {
+          fragments.push(cleanText(current));
+          current = '';
+          cursor += matched.length;
+          continue;
+        }
+      }
+      current += char;
+      cursor += 1;
+    }
+    fragments.push(cleanText(current));
+    return fragments.filter(Boolean);
+  };
+
+  const evaluateComparison = (expression, variables = {}) => {
+    const source = cleanText(expression);
+    if (!source) return true;
+    const match = source.match(/^(.*?)\s*(>=|<=|==|!=|>|<)\s*(.*?)$/);
+    if (!match) {
+      if (Object.prototype.hasOwnProperty.call(variables, source)) {
+        return Boolean(variables[source]);
+      }
+      return parseBooleanLike(source);
+    }
+    const [, rawLeft = '', operator = '', rawRight = ''] = match;
+    const leftKey = cleanText(rawLeft);
+    const left = Object.prototype.hasOwnProperty.call(variables, leftKey) ? variables[leftKey] : parseScalarValue(leftKey);
+    const rightKey = cleanText(rawRight);
+    const right = Object.prototype.hasOwnProperty.call(variables, rightKey) ? variables[rightKey] : parseScalarValue(rightKey);
+
+    switch (operator) {
+      case '>=': return Number(left) >= Number(right);
+      case '<=': return Number(left) <= Number(right);
+      case '>': return Number(left) > Number(right);
+      case '<': return Number(left) < Number(right);
+      case '==': return String(left) === String(right);
+      case '!=': return String(left) !== String(right);
+      default: return false;
+    }
+  };
+
+  const evaluateConditionExpression = (condition, variables = {}) => {
+    const source = cleanText(condition);
+    if (!source) return true;
+    const normalized = source
+      .replace(/\s+그리고\s+/g, '&&')
+      .replace(/\s+또는\s+/g, '||')
+      .replace(/\s+AND\s+/gi, '&&')
+      .replace(/\s+OR\s+/gi, '||')
+      .trim();
+
+    const orParts = splitByTopLevelToken(normalized, ['||']);
+    if (orParts.length > 1) {
+      return orParts.some((part) => evaluateConditionExpression(part, variables));
+    }
+
+    const andParts = splitByTopLevelToken(normalized, ['&&']);
+    if (andParts.length > 1) {
+      return andParts.every((part) => evaluateConditionExpression(part, variables));
+    }
+
+    const notMatch = normalized.match(/^NOT\((.*)\)$/i);
+    if (notMatch) {
+      return !evaluateConditionExpression(notMatch[1], variables);
+    }
+
+    if (normalized.startsWith('(') && normalized.endsWith(')')) {
+      return evaluateConditionExpression(normalized.slice(1, -1), variables);
+    }
+
+    return evaluateComparison(normalized, variables);
+  };
+
+  const parseEffectList = (rawValue = '') => {
+    const source = cleanText(rawValue);
+    if (!source) return [];
+    return source
+      .split(/[;\n,]/)
+      .map((entry) => cleanText(entry))
+      .filter(Boolean)
+      .map((entry) => {
+        const assignMatch = entry.match(/^([^+\-!=:]+?)\s*(\+=|-=|=)\s*(.+)$/);
+        if (assignMatch) {
+          return {
+            key: cleanText(assignMatch[1]),
+            operator: assignMatch[2],
+            value: parseScalarValue(assignMatch[3])
+          };
+        }
+        const deltaMatch = entry.match(/^([^+\-!=:]+?)\s*([+-])\s*(\d+(?:\.\d+)?)$/);
+        if (deltaMatch) {
+          return {
+            key: cleanText(deltaMatch[1]),
+            operator: deltaMatch[2] === '+' ? '+=' : '-=',
+            value: Number(deltaMatch[3])
+          };
+        }
+        const toggleMatch = entry.match(/^([^+\-!=:]+?)\s*=\s*!(.+)?$/);
+        if (toggleMatch) {
+          return {
+            key: cleanText(toggleMatch[1]),
+            operator: 'toggle'
+          };
+        }
+        return {
+          key: cleanText(entry),
+          operator: '=',
+          value: true
+        };
+      })
+      .filter((effect) => effect.key);
+  };
+
+  const applyEffects = (baseVariables = {}, effects = []) => effects.reduce((acc, effect) => {
+    const key = effect.key;
+    if (!key) return acc;
+    const current = acc[key];
+    switch (effect.operator) {
+      case '+=':
+        acc[key] = Number(current || 0) + Number(effect.value || 0);
+        break;
+      case '-=':
+        acc[key] = Number(current || 0) - Number(effect.value || 0);
+        break;
+      case 'toggle':
+        acc[key] = !Boolean(current);
+        break;
+      case '=':
+      default:
+        acc[key] = effect.value;
+        break;
+    }
+    return acc;
+  }, { ...baseVariables });
 
   const applyTemplateVariables = (templateText, variables = {}) => {
     const source = cleanText(templateText, '');
@@ -117,6 +294,10 @@
     backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
     // 변수 컬럼(vars/variables/변수)에 key=value 목록을 넣으면 줄 단위 템플릿 치환에 사용된다.
     variables: parseInlineVariables(pick(row, ['variables', 'vars', '변수'], '')),
+    // 조건/효과/종료는 "비전공자 친화 문법"을 위한 흐름 제어 확장 칼럼.
+    condition: pick(row, ['조건', 'condition']),
+    effects: parseEffectList(pick(row, ['효과', 'effect', 'effects'], '')),
+    endDialogue: parseBooleanLike(pick(row, ['종료', 'end', 'stop'], '')),
     // 단일 문법 컬럼:
     // - 선택지: "라벨 => scene#anchor || 라벨2 => scene2#anchor2"
     // - 히든선택지: 동일 문법
@@ -132,7 +313,9 @@
       .map((choice) => ({
         label: choice.label,
         scene: choice.scene || row.scene,
-        anchor: choice.anchor || ''
+        anchor: choice.anchor || '',
+        condition: choice.condition || '',
+        effects: Array.isArray(choice.effects) ? choice.effects : []
       }));
   };
 
@@ -320,6 +503,8 @@
     let isChoiceStep = false;
     let choiceFanBehavior = null;
     let choiceDiscardController = null;
+    let lastRenderedKey = '';
+    let isDialogueEnded = false;
 
     const setBackground = (url) => {
       // 줄 단위 배경 -> 기본 배경 순으로 적용.
@@ -356,8 +541,18 @@
         sceneTag: filters.sceneTag ?? currentFilters.sceneTag,
         anchorId: filters.anchorId ?? currentFilters.anchorId
       };
-      queue = selectDialogueSegment(allRecords, currentFilters);
+      const baseVariables = { ...sharedVariables };
+      queue = selectDialogueSegment(allRecords, currentFilters)
+        .filter((row) => evaluateConditionExpression(row.condition, {
+          ...baseVariables,
+          ...(row.variables || {})
+        }));
       index = 0;
+      isDialogueEnded = false;
+      lastRenderedKey = '';
+      if (queue.length === 0) {
+        throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
+      }
       render();
     };
 
@@ -437,12 +632,15 @@
         card.classList.add('dialogue-prototype__choice');
         card.dataset.choiceScene = choice.scene || currentFilters.sceneTag || '';
         card.dataset.choiceAnchor = choice.anchor || '';
+        card.dataset.choiceEffects = JSON.stringify(choice.effects || []);
         card.style.setProperty('--choice-delay', `${choiceIndex * 48}ms`);
       });
 
       if (!cardTemplateApi?.createCardFanBehavior || !cardTemplateApi?.createDiscardZoneController || renderedCards.length === 0) {
         cards.forEach((button) => {
           button.addEventListener('click', () => {
+            const choiceEffects = JSON.parse(button.dataset.choiceEffects || '[]');
+            sharedVariables = applyEffects(sharedVariables, choiceEffects);
             applySelection({
               sceneTag: button.dataset.choiceScene || currentFilters.sceneTag,
               anchorId: button.dataset.choiceAnchor || ''
@@ -491,6 +689,8 @@
         },
         onCardSelected: (card, allCards) => {
           cardTemplateApi.setActiveCard(allCards, card);
+          const choiceEffects = JSON.parse(card.dataset.choiceEffects || '[]');
+          sharedVariables = applyEffects(sharedVariables, choiceEffects);
           applySelection({
             sceneTag: card.dataset.choiceScene || currentFilters.sceneTag,
             anchorId: card.dataset.choiceAnchor || ''
@@ -505,6 +705,11 @@
       // 메타(scene/anchor), 화자, 대사, 배경, 선택지를 한 번에 갱신한다.
       const current = queue[index];
       if (!current || !nameElement || !lineElement) return;
+      const currentRenderKey = `${current.scene}::${current.anchor}::${index}`;
+      if (currentRenderKey !== lastRenderedKey) {
+        sharedVariables = applyEffects(sharedVariables, current.effects || []);
+        lastRenderedKey = currentRenderKey;
+      }
       if (showMeta && metaElement) {
         const sceneLabel = current.scene ? `[${current.scene}]` : '';
         const anchorLabel = current.anchor ? `#${current.anchor}` : '';
@@ -524,6 +729,7 @@
       lineElement.textContent = applyTemplateVariables(current.line || '', templateVariables);
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current)
+        .filter((choice) => evaluateConditionExpression(choice.condition, templateVariables))
         .map((choice) => ({
           ...choice,
           label: applyTemplateVariables(choice.label, templateVariables)
@@ -534,6 +740,7 @@
           label: applyTemplateVariables(choice.label, templateVariables)
         }));
       isChoiceStep = choices.length > 0;
+      isDialogueEnded = Boolean(current.endDialogue);
       renderChoices(choices, {
         restoreChoices: choices,
         hiddenChoices,
@@ -573,7 +780,7 @@
     const goNext = () => {
       // 선택지가 열려 있는 구간에서는 임의 진행을 막고,
       // 버튼 선택으로만 분기하도록 보호한다.
-      if (queue.length === 0 || isChoiceStep) return;
+      if (queue.length === 0 || isChoiceStep || isDialogueEnded) return;
       index = (index + 1) % queue.length;
       render();
     };

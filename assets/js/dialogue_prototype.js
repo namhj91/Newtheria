@@ -556,6 +556,33 @@
       render();
     };
 
+    const refreshQueueByCurrentFilters = ({ preserveCursor = true } = {}) => {
+      // 변수 재평가 시 현재 scene/anchor 필터를 유지한 채 조건식을 다시 계산한다.
+      // preserveCursor=true면 가능한 경우 현재 줄 위치를 유지한다.
+      const currentRow = preserveCursor ? queue[index] : null;
+      const baseVariables = { ...sharedVariables };
+      const nextQueue = selectDialogueSegment(allRecords, currentFilters)
+        .filter((row) => evaluateConditionExpression(row.condition, {
+          ...baseVariables,
+          ...(row.variables || {})
+        }));
+      if (nextQueue.length === 0) {
+        throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
+      }
+      queue = nextQueue;
+      if (currentRow) {
+        const nextIndex = nextQueue.indexOf(currentRow);
+        if (nextIndex >= 0) {
+          index = nextIndex;
+          render();
+          return;
+        }
+      }
+      index = 0;
+      lastRenderedKey = '';
+      render();
+    };
+
     const playDialogueMotion = () => {
       // 대사 전환 시 패널/텍스트에 짧은 진입 애니메이션을 주어
       // 클릭 피드백이 더 역동적으로 느껴지도록 처리한다.
@@ -707,6 +734,9 @@
       if (!current || !nameElement || !lineElement) return;
       const currentRenderKey = `${current.scene}::${current.anchor}::${index}`;
       if (currentRenderKey !== lastRenderedKey) {
+        // `변수` 컬럼은 현재 줄 렌더 시점에 공용 상태로 합쳐 다음 줄에서도 재사용되게 유지한다.
+        // 예: start 줄에서 `playerName=순례자`를 주입하면 이후 줄의 `{{playerName}}`도 정상 치환.
+        sharedVariables = { ...sharedVariables, ...(current.variables || {}) };
         sharedVariables = applyEffects(sharedVariables, current.effects || []);
         lastRenderedKey = currentRenderKey;
       }
@@ -864,7 +894,9 @@
       setVariables(nextVariables = {}) {
         // 런타임에서 템플릿 변수(예: playerName, faction)를 갱신할 때 사용.
         sharedVariables = { ...sharedVariables, ...nextVariables };
-        render();
+        // 변수 변경으로 조건 분기가 달라질 수 있으므로 현재 큐를 재평가한다.
+        // 단, 가능한 경우 현재 줄을 유지해 "임의 첫 줄 점프" 체감을 줄인다.
+        refreshQueueByCurrentFilters({ preserveCursor: true });
       },
       destroy() {
         root.remove();

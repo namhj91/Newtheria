@@ -177,6 +177,12 @@ body.reduced-effects .twinkle {
 }
 
 @media (max-width: 760px) {
+  /* 카드 템플릿 공용화 이후 축소된 모바일 카드를 시작화면 기준 크기로 보정한다. */
+  :root {
+    --card-w: min(46vw, 208px);
+    --fan-gap: 52px;
+  }
+
   body { overflow-x: hidden; overflow-y: auto; }
   .screen { padding: 30px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .logo p { margin-top: 8px; line-height: 1.35; letter-spacing: .09em; }
@@ -191,6 +197,11 @@ body.reduced-effects .twinkle {
 }
 
 @media (max-width: 520px) {
+  :root {
+    --card-w: min(48vw, 196px);
+    --fan-gap: 40px;
+  }
+
   .logo h1 { letter-spacing: .08em; }
   .logo p { font-size: .78rem; }
   .card-fan { height: min(52svh, 340px); }

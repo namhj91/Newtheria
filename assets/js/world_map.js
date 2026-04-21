@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.41(260421-샘플대사확장문법가이드강화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.44(260421-샘플연속대화확장)';
 
 const MAP_SIZE = 200;
 

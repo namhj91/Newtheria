@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.57(260421-순례자스탠딩경로분리)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.58(260421-대사스크립트NDS전환)';
 
 const MAP_SIZE = 200;
 

@@ -1,0 +1,48 @@
+; NEWTHERIA Dialogue Script (NDS) 샘플
+; UTF-8
+
+@intro#start
+화자: 아스테리아
+대사: 순례자여, 이제 CSV 대신 읽기 쉬운 블록 문법으로 대화를 작성해요.
+배경: assets/img/goddess.png
+스탠딩: 좌=assets/img/goddess.png|아스테리아|float|right;우=assets/img/player.png|순례자|move(-8,0,260)|auto
+변수: playerName=순례자;신뢰도=2;별조각=1
+자동넘김: 1200
+
+---
+@intro#fx_only
+화자: 아스테리아
+대사:
+sfx: assets/audio/ui_click.ogg
+화면효과: flash
+카메라: zoom(1.04,220)
+자동넘김: 600
+점프: intro#choice
+
+---
+@intro#choice
+화자: 아스테리아
+대사: 선택지는 그대로 지원돼요. 필요하면 앵커 점프로 즉시 넘어갈 수도 있어요.
+선택지: 문법 설명을 듣는다 => intro#guide || 바로 종료로 이동한다 => intro#end
+히든선택지: 비밀 루트로 이동 => intro#secret [조건:신뢰도>=2] [효과:별조각+1]
+
+---
+@intro#guide
+화자: 순례자
+대사: 칼럼을 외울 필요 없이, 필요한 키만 쓰는 블록이라 훨씬 읽기 쉬워.
+효과: 신뢰도+1
+자동넘김: 1000
+점프: intro#end
+
+---
+@intro#secret
+화자: 아스테리아
+대사: 훌륭해요 {{playerName}}. 숨겨진 선택으로 별조각이 {{별조각}}개가 되었어요.
+자동넘김: 1200
+점프: intro#end
+
+---
+@intro#end
+화자: 아스테리아
+대사: 여기까지가 NDS 샘플이에요. 비전문가도 앵커/효과/연출을 쉽게 읽을 수 있어요.
+종료: 예

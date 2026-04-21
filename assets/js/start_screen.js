@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.1.57(260421-순례자스탠딩경로분리)';
+const START_VERSION_FALLBACK = 'ver.0.1.58(260421-대사스크립트NDS전환)';
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },

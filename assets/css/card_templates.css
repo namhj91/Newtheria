@@ -4,6 +4,18 @@
   --card-ratio: 1 / 1.618;
   --fan-gap: 92px;
   --fan-tilt: 13deg;
+  /* 카드 뒷면 공용 토큰: 시작 화면/대화 선택지 모두 같은 템플릿에서 재사용한다. */
+  --card-back-bg:
+    radial-gradient(circle at 28% 24%, rgba(77, 213, 255, .24), transparent 44%),
+    radial-gradient(circle at 72% 76%, rgba(129, 140, 248, .26), transparent 42%),
+    linear-gradient(160deg, #0a1b34 0%, #091325 48%, #050a17 100%);
+  --card-back-orbit-border: 1px solid rgba(148, 223, 255, .28);
+  --card-back-sigil-size: 2rem;
+  --card-back-sigil-color: #8be9ff;
+  --card-back-sigil-shadow: 0 0 16px rgba(56, 189, 248, .45);
+  --card-back-brand-size: .92rem;
+  --card-back-brand-letter-spacing: .22em;
+  --card-back-brand-color: rgba(226, 241, 255, .94);
 }
 
 .card-fan-card {
@@ -103,10 +115,7 @@
 
 .card-fan-back {
   transform: rotateY(180deg);
-  background:
-    radial-gradient(circle at 28% 24%, rgba(77, 213, 255, .24), transparent 44%),
-    radial-gradient(circle at 72% 76%, rgba(129, 140, 248, .26), transparent 42%),
-    linear-gradient(160deg, #0a1b34 0%, #091325 48%, #050a17 100%);
+  background: var(--card-back-bg);
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -115,19 +124,19 @@
 
 .card-fan-back .sigil {
   display: block;
-  font-size: 2rem;
+  font-size: var(--card-back-sigil-size);
   line-height: 1;
-  color: #8be9ff;
-  text-shadow: 0 0 16px rgba(56, 189, 248, .45);
+  color: var(--card-back-sigil-color);
+  text-shadow: var(--card-back-sigil-shadow);
   margin-bottom: 10px;
 }
 
 .card-fan-back .brand {
   display: block;
-  font-size: .92rem;
-  letter-spacing: .22em;
+  font-size: var(--card-back-brand-size);
+  letter-spacing: var(--card-back-brand-letter-spacing);
   text-transform: uppercase;
-  color: rgba(226, 241, 255, .94);
+  color: var(--card-back-brand-color);
   font-weight: 700;
 }
 
@@ -135,7 +144,7 @@
   position: absolute;
   inset: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 223, 255, .28);
+  border: var(--card-back-orbit-border);
   pointer-events: none;
 }
 

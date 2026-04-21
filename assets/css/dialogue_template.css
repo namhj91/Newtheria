@@ -31,16 +31,6 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 18%, rgba(0, 0, 0, 0.18) 54%, rgba(0, 0, 0, 0.6) 100%);
 }
 
-.dialogue-prototype__loading {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  color: var(--dialogue-text-muted);
-}
 
 .dialogue-prototype__panel {
   position: absolute;
@@ -203,24 +193,22 @@
   box-shadow: 0 14px 26px rgba(0,0,0,.34);
 }
 
-.dialogue-prototype__choice .card-fan-back {
-  align-items: center;
-  justify-content: center;
-  background:
+.dialogue-prototype__choice {
+  /* 대화 선택지용 카드 뒷면 톤은 공용 카드 템플릿 변수만 오버라이드한다. */
+  --card-back-bg:
     radial-gradient(circle at 30% 25%, rgba(122, 155, 255, 0.32), transparent 44%),
     linear-gradient(165deg, rgba(11, 20, 49, 0.98), rgba(22, 35, 75, 0.95));
-  transform: rotateY(180deg);
+  --card-back-sigil-size: 1.6rem;
+  --card-back-brand-size: .76rem;
+  --card-back-brand-letter-spacing: .12em;
 }
 
 .dialogue-prototype__choice .card-fan-back .sigil {
-  font-size: 1.6rem;
   opacity: .92;
 }
 
 .dialogue-prototype__choice .card-fan-back .brand {
   margin-top: 6px;
-  font-size: .76rem;
-  letter-spacing: .12em;
   opacity: .84;
 }
 
@@ -265,6 +253,12 @@
     --fan-tilt: 8deg;
   }
 
+  .dialogue-prototype {
+    /* 모바일에서는 카드 실제 폭과 기준폭(--card-w)을 동일하게 맞춰
+       margin-left 기준 중앙 정렬이 틀어지지 않도록 한다. */
+    --card-w: min(40vw, 184px);
+  }
+
   .dialogue-prototype__panel {
     width: calc(100vw - 20px);
     height: clamp(170px, 25vh, 214px);
@@ -287,9 +281,6 @@
     width: min(360px, calc(100vw - 20px));
   }
 
-  .dialogue-prototype__choice {
-    width: min(40vw, 184px);
-  }
 }
 
 @keyframes dialogue-panel-breath {
@@ -318,12 +309,13 @@
     --fan-tilt: 6deg;
   }
 
-  .dialogue-prototype__choices {
-    height: min(44svh, 320px);
+  .dialogue-prototype {
+    /* 초소형 구간도 --card-w를 카드 실제 폭과 동기화해 우측 쏠림을 방지한다. */
+    --card-w: min(42vw, 168px);
   }
 
-  .dialogue-prototype__choice {
-    width: min(42vw, 168px);
+  .dialogue-prototype__choices {
+    height: min(44svh, 320px);
   }
 
   /* 모바일 카드 타이포/패딩은 공용 템플릿에서 처리한다. */

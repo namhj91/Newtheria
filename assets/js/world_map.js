@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.49(260421-모바일선택지카드중앙정렬보정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.54(260421-샘플대사연속형재구성)';
 
 const MAP_SIZE = 200;
 

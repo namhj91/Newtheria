@@ -346,6 +346,28 @@
     return filtered;
   };
 
+  const buildRunnableQueue = (records, filters = {}, baseVariables = {}) => {
+    // scene/anchor로 자른 구간을 "실제 진행 순서"대로 평가해 실행 가능한 큐를 만든다.
+    // 핵심: 줄 조건을 한 번에 정적 필터링하지 않고, 앞줄에서 반영된 변수/효과를
+    // 다음 줄 조건 계산에 순차적으로 반영한다.
+    const segment = selectDialogueSegment(records, filters);
+    const queue = [];
+    let simulatedVariables = { ...baseVariables };
+
+    segment.forEach((row) => {
+      const mergedVariables = {
+        ...simulatedVariables,
+        ...(row.variables || {})
+      };
+      const canEnterRow = evaluateConditionExpression(row.condition, mergedVariables);
+      if (!canEnterRow) return;
+      queue.push(row);
+      simulatedVariables = applyEffects(mergedVariables, row.effects || []);
+    });
+
+    return queue;
+  };
+
   const parseCsvRows = (csvText) => {
     // 따옴표/콤마/개행을 처리하는 경량 CSV 파서.
     // 외부 라이브러리 의존 없이 테스트 환경에서도 동작하도록 직접 구현.
@@ -578,11 +600,7 @@
         anchorId: filters.anchorId ?? currentFilters.anchorId
       };
       const baseVariables = { ...sharedVariables };
-      queue = selectDialogueSegment(allRecords, currentFilters)
-        .filter((row) => evaluateConditionExpression(row.condition, {
-          ...baseVariables,
-          ...(row.variables || {})
-        }));
+      queue = buildRunnableQueue(allRecords, currentFilters, baseVariables);
       index = 0;
       isDialogueEnded = false;
       lastRenderedKey = '';
@@ -602,11 +620,7 @@
       // preserveCursor=true면 가능한 경우 현재 줄 위치를 유지한다.
       const currentRow = preserveCursor ? queue[index] : null;
       const baseVariables = { ...sharedVariables };
-      const nextQueue = selectDialogueSegment(allRecords, currentFilters)
-        .filter((row) => evaluateConditionExpression(row.condition, {
-          ...baseVariables,
-          ...(row.variables || {})
-        }));
+      const nextQueue = buildRunnableQueue(allRecords, currentFilters, baseVariables);
       if (nextQueue.length === 0) {
         throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
       }

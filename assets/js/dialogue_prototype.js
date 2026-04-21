@@ -514,7 +514,6 @@
 
     root.innerHTML = `
       <div class="dialogue-prototype__bg" aria-hidden="true">
-        <span class="dialogue-prototype__loading">데이터를 로딩 중...</span>
       </div>
       <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
       <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
@@ -534,7 +533,6 @@
     mount.replaceChildren(root);
 
     const bg = root.querySelector('.dialogue-prototype__bg');
-    const loading = root.querySelector('.dialogue-prototype__loading');
     const panelElement = root.querySelector('.dialogue-prototype__panel');
     const metaElement = root.querySelector('.dialogue-prototype__meta');
     const nameElement = root.querySelector('.dialogue-prototype__name');
@@ -559,6 +557,9 @@
     let choiceDiscardController = null;
     let lastRenderedKey = '';
     let isDialogueEnded = false;
+    // 같은 배경 URL을 연속 렌더할 때 불필요한 재로딩을 피하기 위해 상태를 기억한다.
+    let currentBackgroundUrl = '';
+    const backgroundLoadCache = new Map();
     const debugListeners = new Set();
     const traceEntries = [];
 
@@ -595,30 +596,39 @@
       emitDebugState();
     };
 
+    const applyBackgroundStyle = (targetUrl) => {
+      if (!bg) return;
+      bg.style.backgroundImage = `linear-gradient(to top, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.18)), url("${targetUrl}")`;
+      currentBackgroundUrl = targetUrl;
+    };
+
     const setBackground = (url) => {
       // 줄 단위 배경 -> 기본 배경 순으로 적용.
-      const targetUrl = url || backgroundUrl;
+      const targetUrl = cleanText(url || backgroundUrl);
       if (!bg) return;
       if (!targetUrl) {
-        if (loading) loading.hidden = true;
+        currentBackgroundUrl = '';
         return;
       }
 
-      if (loading) {
-        loading.hidden = false;
-        loading.textContent = '배경 이미지 로딩 중...';
+      // 같은 URL이면 이미 보여 주는 배경을 그대로 유지한다.
+      if (targetUrl === currentBackgroundUrl) {
+        return;
+      }
+
+      const cachedStatus = backgroundLoadCache.get(targetUrl);
+      if (cachedStatus === 'loaded') {
+        applyBackgroundStyle(targetUrl);
+        return;
       }
 
       const image = new Image();
       image.onload = () => {
-        bg.style.backgroundImage = `linear-gradient(to top, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.18)), url("${targetUrl}")`;
-        if (loading) loading.hidden = true;
+        backgroundLoadCache.set(targetUrl, 'loaded');
+        applyBackgroundStyle(targetUrl);
       };
       image.onerror = () => {
-        if (loading) {
-          loading.hidden = false;
-          loading.textContent = '배경 이미지를 불러오지 못했습니다.';
-        }
+        backgroundLoadCache.set(targetUrl, 'error');
       };
       image.src = targetUrl;
     };
@@ -898,11 +908,7 @@
     };
 
     const reportError = (error) => {
-      // 사용자 화면(로딩 텍스트)과 개발자 콜백(onError)을 동시에 갱신하는 공통 에러 처리기.
-      if (loading) {
-        loading.hidden = false;
-        loading.textContent = error.message || '대사 데이터를 불러오지 못했습니다.';
-      }
+      // 사용자 노출용 로딩 배지는 제거하고, 에러는 콜백/콘솔 중심으로 전달한다.
       pushTrace('error', {
         message: error?.message || 'unknown error'
       });

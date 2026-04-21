@@ -241,6 +241,57 @@
     return null;
   };
 
+  const parseStandingDirective = (rawValue = '') => {
+    // 스탠딩 문법(세미콜론 구분):
+    // 좌=url|이름|move(18,0,280)|flip
+    // 우=url|이름|move(-12,0,280)|auto
+    // 화자=좌
+    // clear / off
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    const lowered = source.toLowerCase();
+    if (['off', 'clear', 'reset', 'none'].includes(lowered)) {
+      return { clear: true, slots: {}, activeSlot: '' };
+    }
+
+    const standing = { clear: false, slots: {}, activeSlot: '' };
+    source
+      .split(/[;\n]/)
+      .map((entry) => cleanText(entry))
+      .filter(Boolean)
+      .forEach((entry) => {
+        const [rawKey = '', ...rawRest] = entry.split('=');
+        const key = cleanText(rawKey).toLowerCase();
+        const body = cleanText(rawRest.join('='));
+        if (!key || !body) return;
+
+        if (['화자', 'active', 'speaker'].includes(key)) {
+          standing.activeSlot = ['좌', 'left', 'l'].includes(body.toLowerCase())
+            ? 'left'
+            : (['우', 'right', 'r'].includes(body.toLowerCase()) ? 'right' : '');
+          return;
+        }
+
+        const slot = ['좌', 'left', 'l'].includes(key)
+          ? 'left'
+          : (['우', 'right', 'r'].includes(key) ? 'right' : '');
+        if (!slot) return;
+
+        const [urlRaw = '', nameRaw = '', motionRaw = '', facingRaw = ''] = body.split('|').map((part) => cleanText(part));
+        const moveMatch = motionRaw.match(/^move\(([-\d.]+)\s*,\s*([-\d.]+)(?:\s*,\s*(\d+))?\)$/i);
+        standing.slots[slot] = {
+          url: urlRaw,
+          name: nameRaw,
+          motion: moveMatch ? 'move' : motionRaw.toLowerCase(),
+          moveX: moveMatch ? Number(moveMatch[1]) : 0,
+          moveY: moveMatch ? Number(moveMatch[2]) : 0,
+          durationMs: moveMatch ? Number(moveMatch[3] || 280) : 280,
+          facing: facingRaw.toLowerCase()
+        };
+      });
+    return standing;
+  };
+
   const parseTransitionDirective = (rawValue = '') => {
     // 전환 문법: fade-black(500) / fade-white(360)
     const source = cleanText(rawValue);
@@ -479,6 +530,8 @@
     illustrationUrl: pick(row, ['그림', '일러스트', 'cg', 'image', 'imageUrl']),
     // 그림 애니메이션 preset: fade, float, zoom-in, shake
     illustrationAnimation: pick(row, ['그림애니메이션', '이미지애니메이션', 'animation', 'imageAnimation']),
+    // 스탠딩 문법(좌/우 배치 + 화자 하이라이트 + 간단 이동)
+    standing: parseStandingDirective(pick(row, ['스탠딩', 'standing', '스탠딩문법'])),
     // 오디오 레이어 3종:
     // - bgm: 장면 음악(loop 기본 true)
     // - bgs: 환경음(loop 기본 true)
@@ -692,7 +745,10 @@
       </div>
       <div class="dialogue-prototype__light" aria-hidden="true"></div>
       <div class="dialogue-prototype__particles" aria-hidden="true"></div>
-      <div class="dialogue-prototype__cg" aria-hidden="true"></div>
+      <div class="dialogue-prototype__cg" aria-hidden="true">
+        <div class="dialogue-prototype__standing dialogue-prototype__standing--left" data-slot="left"></div>
+        <div class="dialogue-prototype__standing dialogue-prototype__standing--right" data-slot="right"></div>
+      </div>
       <div class="dialogue-prototype__transition" aria-hidden="true"></div>
       <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
       <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
@@ -716,6 +772,8 @@
     const lightLayer = root.querySelector('.dialogue-prototype__light');
     const particleLayer = root.querySelector('.dialogue-prototype__particles');
     const transitionLayer = root.querySelector('.dialogue-prototype__transition');
+    const standingLeftElement = root.querySelector('.dialogue-prototype__standing--left');
+    const standingRightElement = root.querySelector('.dialogue-prototype__standing--right');
     const panelElement = root.querySelector('.dialogue-prototype__panel');
     const metaElement = root.querySelector('.dialogue-prototype__meta');
     const nameElement = root.querySelector('.dialogue-prototype__name');
@@ -743,6 +801,10 @@
     // 같은 배경 URL을 연속 렌더할 때 불필요한 재로딩을 피하기 위해 상태를 기억한다.
     let currentBackgroundUrl = '';
     let currentIllustrationUrl = '';
+    const standingState = {
+      left: { url: '', name: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' },
+      right: { url: '', name: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' }
+    };
     const backgroundLoadCache = new Map();
     const illustrationLoadCache = new Map();
     const debugListeners = new Set();
@@ -834,6 +896,85 @@
         backgroundLoadCache.set(targetUrl, 'error');
       };
       image.src = targetUrl;
+    };
+
+    const getStandingElement = (slot) => (slot === 'left' ? standingLeftElement : standingRightElement);
+    const refreshStandingContainerState = () => {
+      const hasStanding = [standingLeftElement, standingRightElement].some((node) => node?.dataset.visible === 'true');
+      cg?.classList.toggle('has-standing', hasStanding);
+    };
+
+    const applyStandingSlotStyle = (slot, payload = {}) => {
+      const element = getStandingElement(slot);
+      if (!element) return;
+      const state = standingState[slot];
+      const targetUrl = cleanText(payload.url ?? state.url);
+      const targetName = cleanText(payload.name ?? state.name);
+      const targetMotion = cleanText(payload.motion ?? state.motion).toLowerCase();
+      const moveX = Number.isFinite(payload.moveX) ? payload.moveX : Number(state.moveX || 0);
+      const moveY = Number.isFinite(payload.moveY) ? payload.moveY : Number(state.moveY || 0);
+      const durationMs = Number.isFinite(payload.durationMs) ? payload.durationMs : Number(state.durationMs || 280);
+      const facingHint = cleanText(payload.facing ?? state.facing).toLowerCase();
+      // 기본 정책: 일러스트는 오른쪽을 바라보도록 제작하므로,
+      // 우측 슬롯은 좌측 인물과 마주 보이도록 자동 좌우반전(auto)한다.
+      const shouldFlip = facingHint === 'flip'
+        || facingHint === 'left'
+        || (facingHint !== 'unflip' && facingHint !== 'right' && slot === 'right');
+
+      state.url = targetUrl;
+      state.name = targetName;
+      state.motion = targetMotion;
+      state.moveX = moveX;
+      state.moveY = moveY;
+      state.durationMs = durationMs;
+      state.facing = facingHint;
+
+      if (!targetUrl || ['off', 'none', 'clear', '-'].includes(targetUrl.toLowerCase())) {
+        element.style.backgroundImage = 'none';
+        element.dataset.visible = 'false';
+        refreshStandingContainerState();
+        return;
+      }
+      element.dataset.visible = 'true';
+      element.dataset.name = targetName;
+      element.dataset.motion = targetMotion;
+      element.dataset.flip = shouldFlip ? 'true' : 'false';
+      element.style.setProperty('--standing-offset-x', `${moveX}px`);
+      element.style.setProperty('--standing-offset-y', `${moveY}px`);
+      element.style.transitionDuration = `${durationMs}ms`;
+      element.style.backgroundImage = `url("${targetUrl}")`;
+      refreshStandingContainerState();
+    };
+
+    const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '' } = {}) => {
+      if (activeSlot) return activeSlot;
+      const normalizedSpeaker = cleanText(speaker);
+      if (!normalizedSpeaker) return '';
+      if (normalizedSpeaker === cleanText(standingState.left.name)) return 'left';
+      if (normalizedSpeaker === cleanText(standingState.right.name)) return 'right';
+      return '';
+    };
+
+    const applyStandingFocus = ({ speaker = '', activeSlot = '' } = {}) => {
+      const resolvedSlot = resolveActiveStandingSlot({ speaker, activeSlot });
+      [standingLeftElement, standingRightElement].forEach((element) => {
+        if (!element) return;
+        const isVisible = element.dataset.visible === 'true';
+        const isActive = resolvedSlot && element.dataset.slot === resolvedSlot;
+        element.classList.toggle('is-dimmed', isVisible && !isActive);
+        element.classList.toggle('is-speaking', isVisible && isActive);
+      });
+    };
+
+    const applyStandingDirective = (directive = null, { speaker = '' } = {}) => {
+      if (!standingLeftElement || !standingRightElement) return;
+      if (directive?.clear) {
+        applyStandingSlotStyle('left', { url: '' });
+        applyStandingSlotStyle('right', { url: '' });
+      }
+      if (directive?.slots?.left) applyStandingSlotStyle('left', directive.slots.left);
+      if (directive?.slots?.right) applyStandingSlotStyle('right', directive.slots.right);
+      applyStandingFocus({ speaker, activeSlot: directive?.activeSlot || '' });
     };
 
     const setIllustration = ({ url = '', animation = '' } = {}) => {
@@ -1255,6 +1396,7 @@
           url: current.illustrationUrl,
           animation: current.illustrationAnimation
         });
+        applyStandingDirective(current.standing, { speaker: current.speaker || '' });
         applyAudioDirective('bgm', current.bgm);
         applyAudioDirective('bgs', current.bgs);
         applyAudioDirective('voice', current.voice, { restartOnSameUrl: true });
@@ -1285,6 +1427,8 @@
       };
       nameElement.textContent = applyTemplateVariables(current.speaker || '???', templateVariables);
       lineElement.textContent = applyTemplateVariables(current.line || '', templateVariables);
+      // 줄마다 화자 기준 하이라이트를 다시 계산해 "누가 말하는지"를 즉시 드러낸다.
+      applyStandingFocus({ speaker: current.speaker || '', activeSlot: current.standing?.activeSlot || '' });
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current)
         .filter((choice) => evaluateConditionExpression(choice.condition, templateVariables))

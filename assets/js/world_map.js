@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.54(260421-샘플대사연속형재구성)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.57(260421-순례자스탠딩경로분리)';
 
 const MAP_SIZE = 200;
 

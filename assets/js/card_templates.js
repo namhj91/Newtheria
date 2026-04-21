@@ -69,6 +69,10 @@
 
   const createCardFanBehavior = ({ menu, cards, ui = {} }) => {
     const config = { ...DEFAULT_BEHAVIOR, ...ui };
+    // 선택지 카드가 자주 재생성되는 화면(대화 테스트 등)에서 이벤트 누적을 막기 위해
+    // AbortController로 이번 인스턴스의 모든 리스너를 묶어 해제한다.
+    const listenersController = typeof AbortController === 'function' ? new AbortController() : null;
+    const listenerOptions = listenersController ? { signal: listenersController.signal } : undefined;
     const dragState = {
       pointerId: null,
       card: null,
@@ -209,7 +213,7 @@
     };
 
     const attachAutoLayoutSync = () => {
-      window.addEventListener('resize', layoutCards);
+      window.addEventListener('resize', layoutCards, listenerOptions);
       if (typeof ResizeObserver !== 'function') return;
       resizeObserver = new ResizeObserver(() => {
         layoutCards();
@@ -231,7 +235,7 @@
         const card = e.target.closest('.card-fan-card');
         if (!card || isLocked()) return;
         onCardSelected(card, cards);
-      });
+      }, listenerOptions);
 
       cards.forEach((card) => {
         card.addEventListener('pointerdown', (e) => {
@@ -251,7 +255,7 @@
 
           card.setPointerCapture(e.pointerId);
           startLongPressTimer(card);
-        });
+        }, listenerOptions);
 
         card.addEventListener('pointermove', (e) => {
           if (!dragState.card || dragState.pointerId !== e.pointerId) return;
@@ -277,7 +281,7 @@
           dragState.pendingDy = dy;
           scheduleDragRender();
           onDragMove({ card: dragState.card, event: e, moved: dragState.moved });
-        });
+        }, listenerOptions);
 
         const releaseDrag = (e) => {
           if (!dragState.card || dragState.pointerId !== e.pointerId) return;
@@ -315,8 +319,8 @@
           }
         };
 
-        card.addEventListener('pointerup', releaseDrag);
-        card.addEventListener('pointercancel', releaseDrag);
+        card.addEventListener('pointerup', releaseDrag, listenerOptions);
+        card.addEventListener('pointercancel', releaseDrag, listenerOptions);
 
         const handleHoverEnter = () => {
           if (isLocked()) return;
@@ -330,20 +334,20 @@
 
         // 포인터 기반 디바이스(펜/터치패드 포함)에서도 hover 반응이 일관되게 동작하도록
         // mouseenter/leave + pointerenter/leave를 함께 바인딩한다.
-        card.addEventListener('mouseenter', handleHoverEnter);
-        card.addEventListener('mouseleave', handleHoverLeave);
-        card.addEventListener('pointerenter', handleHoverEnter);
-        card.addEventListener('pointerleave', handleHoverLeave);
+        card.addEventListener('mouseenter', handleHoverEnter, listenerOptions);
+        card.addEventListener('mouseleave', handleHoverLeave, listenerOptions);
+        card.addEventListener('pointerenter', handleHoverEnter, listenerOptions);
+        card.addEventListener('pointerleave', handleHoverLeave, listenerOptions);
 
         card.addEventListener('focus', () => {
           if (isLocked()) return;
           applyCardTransforms(card);
-        });
+        }, listenerOptions);
 
         card.addEventListener('blur', () => {
           if (isLocked()) return;
           applyCardTransforms();
-        });
+        }, listenerOptions);
 
         card.addEventListener('click', (e) => {
           if (card.dataset.consumeClick === 'true') {
@@ -356,7 +360,7 @@
           e.preventDefault();
           e.stopPropagation();
           dragState.moved = false;
-        });
+        }, listenerOptions);
       });
     };
 
@@ -368,7 +372,7 @@
       resetDraggedCard,
       getCards: () => cards,
       destroy() {
-        window.removeEventListener('resize', layoutCards);
+        listenersController?.abort();
         resizeObserver?.disconnect();
         resizeObserver = null;
       }

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.39(260421-대화선택지초기플리커보정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.41(260421-샘플대사확장문법가이드강화)';
 
 const MAP_SIZE = 200;
 

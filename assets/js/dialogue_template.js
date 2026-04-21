@@ -1,4 +1,4 @@
-(function attachDialoguePrototype(global) {
+(function attachDialogueTemplate(global) {
   // 모듈 단독 실행/테스트 시 사용하는 기본 대사 세트.
   // CSV가 없거나 파싱에 실패했을 때 최소 동작 보장을 위해 유지한다.
   const DEFAULT_DIALOGUES = [
@@ -117,6 +117,158 @@
     const value = cleanText(rawValue).toLowerCase();
     if (!value) return false;
     return ['1', 'true', '예', 'yes', 'y', 'on', 'end', 'stop', '종료'].includes(value);
+  };
+
+  const parseAudioDirective = (rawValue = '', { defaultLoop = false } = {}) => {
+    // 오디오 문법:
+    // 1) "stop" / "off" / "정지"
+    // 2) "play|url|0.7|loop" (action|url|volume|loop)
+    // 3) "url" (재생으로 간주)
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    const lowered = source.toLowerCase();
+    if (['stop', 'off', '정지', '중지'].includes(lowered)) {
+      return { action: 'stop' };
+    }
+
+    const parts = source.split('|').map((part) => cleanText(part));
+    if (parts.length > 1) {
+      const [actionRaw = 'play', urlRaw = '', volumeRaw = '', loopRaw = ''] = parts;
+      const action = cleanText(actionRaw).toLowerCase() || 'play';
+      if (action === 'stop') return { action: 'stop' };
+      return {
+        action: 'play',
+        url: urlRaw,
+        volume: volumeRaw ? Math.max(0, Math.min(1, Number(volumeRaw))) : undefined,
+        loop: loopRaw ? parseBooleanLike(loopRaw) : defaultLoop
+      };
+    }
+
+    return {
+      action: 'play',
+      url: source,
+      loop: defaultLoop
+    };
+  };
+
+  const parseNumberLike = (rawValue, fallback = 0) => {
+    const value = Number(cleanText(rawValue));
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  const parseUiDirective = (rawValue = '') => {
+    // UI 문법(세미콜론 구분):
+    // hud=off;name=off;choices=lock;skip=off
+    const source = cleanText(rawValue);
+    if (!source) return {};
+    return source
+      .split(/[;\n,]/)
+      .map((entry) => cleanText(entry))
+      .filter(Boolean)
+      .reduce((acc, entry) => {
+        const [keyRaw = '', valueRaw = ''] = entry.split('=');
+        const key = cleanText(keyRaw).toLowerCase();
+        const value = cleanText(valueRaw).toLowerCase();
+        if (!key) return acc;
+        acc[key] = value || 'on';
+        return acc;
+      }, {});
+  };
+
+  const parseCameraDirective = (rawValue = '') => {
+    // 카메라 문법:
+    // pan(12,-8,400);zoom(1.08,320) / reset
+    const source = cleanText(rawValue);
+    if (!source) return [];
+    if (source.toLowerCase() === 'reset') {
+      return [{ action: 'reset' }];
+    }
+    return source
+      .split(/[;\n]/)
+      .map((entry) => cleanText(entry))
+      .filter(Boolean)
+      .map((entry) => {
+        const panMatch = entry.match(/^pan\(([-\d.]+)\s*,\s*([-\d.]+)(?:\s*,\s*(\d+))?\)$/i);
+        if (panMatch) {
+          return {
+            action: 'pan',
+            x: Number(panMatch[1]),
+            y: Number(panMatch[2]),
+            durationMs: Number(panMatch[3] || 360)
+          };
+        }
+        const zoomMatch = entry.match(/^zoom\(([-\d.]+)(?:\s*,\s*(\d+))?\)$/i);
+        if (zoomMatch) {
+          return {
+            action: 'zoom',
+            scale: Number(zoomMatch[1]),
+            durationMs: Number(zoomMatch[2] || 320)
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  const parseParticleDirective = (rawValue = '') => {
+    // 파티클 문법: snow:on / ember:on / off
+    const source = cleanText(rawValue);
+    if (!source) return { mode: '' };
+    if (source.toLowerCase() === 'off') {
+      return { mode: 'off' };
+    }
+    const match = source.match(/^([a-zA-Z가-힣_-]+)\s*[:=]\s*(on|off)$/);
+    if (match) {
+      return { mode: match[1].toLowerCase(), enabled: match[2].toLowerCase() === 'on' };
+    }
+    return { mode: source.toLowerCase(), enabled: true };
+  };
+
+  const parseLightDirective = (rawValue = '') => {
+    // 조명 문법: tint(#88aaff,0.24,400) / off
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    if (source.toLowerCase() === 'off') return { action: 'off' };
+    const tintMatch = source.match(/^tint\(\s*([^,]+)\s*,\s*([-\d.]+)(?:\s*,\s*(\d+))?\s*\)$/i);
+    if (tintMatch) {
+      return {
+        action: 'tint',
+        color: cleanText(tintMatch[1]),
+        alpha: Math.max(0, Math.min(1, Number(tintMatch[2]))),
+        durationMs: Number(tintMatch[3] || 360)
+      };
+    }
+    return null;
+  };
+
+  const parseTransitionDirective = (rawValue = '') => {
+    // 전환 문법: fade-black(500) / fade-white(360)
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    const match = source.match(/^(fade-black|fade-white)\((\d+)\)$/i);
+    if (!match) return null;
+    return {
+      action: cleanText(match[1]).toLowerCase(),
+      durationMs: Number(match[2])
+    };
+  };
+
+  const parseHapticDirective = (rawValue = '') => {
+    // 진동 문법: light / medium / heavy / custom(40,80,40)
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    const lower = source.toLowerCase();
+    if (['light', 'medium', 'heavy'].includes(lower)) return { pattern: lower };
+    const customMatch = source.match(/^custom\(([\d,\s]+)\)$/i);
+    if (customMatch) {
+      return {
+        pattern: customMatch[1]
+          .split(',')
+          .map((v) => Number(cleanText(v)))
+          .filter((v) => Number.isFinite(v) && v >= 0)
+      };
+    }
+    return null;
   };
 
   const splitByTopLevelToken = (source, tokens) => {
@@ -323,6 +475,29 @@
     speaker: pick(row, ['화자', '인물명', 'speaker'], '???'),
     line: pick(row, ['대사', 'line']),
     backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
+    // 그림(캐릭터 스탠딩/컷인) 레이어. 배경 위, 대화창 아래에서 표시한다.
+    illustrationUrl: pick(row, ['그림', '일러스트', 'cg', 'image', 'imageUrl']),
+    // 그림 애니메이션 preset: fade, float, zoom-in, shake
+    illustrationAnimation: pick(row, ['그림애니메이션', '이미지애니메이션', 'animation', 'imageAnimation']),
+    // 오디오 레이어 3종:
+    // - bgm: 장면 음악(loop 기본 true)
+    // - bgs: 환경음(loop 기본 true)
+    // - voice: 대사 보이스(loop 기본 false)
+    bgm: parseAudioDirective(pick(row, ['bgm', 'BGM', '배경음악']), { defaultLoop: true }),
+    bgs: parseAudioDirective(pick(row, ['bgs', 'BGS', '배경환경음']), { defaultLoop: true }),
+    voice: parseAudioDirective(pick(row, ['voice', 'VOICE', '보이스']), { defaultLoop: false }),
+    // sfx: 원샷 효과음(기본 loop=false)
+    sfx: parseAudioDirective(pick(row, ['sfx', 'SFX', '효과음']), { defaultLoop: false }),
+    // 자동넘김: 선택지 없는 줄에서 지정 ms 후 자동으로 다음 줄로 진행.
+    autoNextMs: parseNumberLike(pick(row, ['자동넘김', 'autoNextMs', 'delayMs']), 0),
+    // 화면효과: flash, shake, dim 중 하나. 줄 진입 시 짧게 적용.
+    screenFx: pick(row, ['화면효과', 'screenFx']),
+    cameraFx: parseCameraDirective(pick(row, ['카메라', 'cameraFx', 'camera'])),
+    uiFx: parseUiDirective(pick(row, ['ui', 'UI', 'uiFx'])),
+    hapticFx: parseHapticDirective(pick(row, ['진동', 'haptic', 'hapticFx'])),
+    particleFx: parseParticleDirective(pick(row, ['파티클', 'particle', 'particleFx'])),
+    lightFx: parseLightDirective(pick(row, ['조명', 'light', 'lightFx'])),
+    transitionFx: parseTransitionDirective(pick(row, ['씬전환', 'transition', 'transitionFx'])),
     // 변수 컬럼(vars/variables/변수)에 key=value 목록을 넣으면 줄 단위 템플릿 치환에 사용된다.
     variables: normalizeVariableRecord(row.variables ?? row.vars ?? row.변수 ?? ''),
     // 조건/효과/종료는 "비전공자 친화 문법"을 위한 흐름 제어 확장 칼럼.
@@ -490,7 +665,7 @@
     return parseDialoguesFromCsvText(text, options);
   };
 
-  const createDialoguePrototype = ({
+  const createDialogueTemplate = ({
     mount,
     dialogues,
     csvUrl,
@@ -505,7 +680,7 @@
   } = {}) => {
     // 외부 공개 API: mount 요소 내부에 대화 프로토타입 UI를 생성한다.
     if (!mount) {
-      throw new Error('dialogue prototype mount 요소가 필요합니다.');
+      throw new Error('dialogue template mount 요소가 필요합니다.');
     }
 
     const root = document.createElement('section');
@@ -515,6 +690,10 @@
     root.innerHTML = `
       <div class="dialogue-prototype__bg" aria-hidden="true">
       </div>
+      <div class="dialogue-prototype__light" aria-hidden="true"></div>
+      <div class="dialogue-prototype__particles" aria-hidden="true"></div>
+      <div class="dialogue-prototype__cg" aria-hidden="true"></div>
+      <div class="dialogue-prototype__transition" aria-hidden="true"></div>
       <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
       <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
       <div class="dialogue-prototype__discard-zone" id="dialogueDiscardZone" aria-hidden="true">
@@ -533,6 +712,10 @@
     mount.replaceChildren(root);
 
     const bg = root.querySelector('.dialogue-prototype__bg');
+    const cg = root.querySelector('.dialogue-prototype__cg');
+    const lightLayer = root.querySelector('.dialogue-prototype__light');
+    const particleLayer = root.querySelector('.dialogue-prototype__particles');
+    const transitionLayer = root.querySelector('.dialogue-prototype__transition');
     const panelElement = root.querySelector('.dialogue-prototype__panel');
     const metaElement = root.querySelector('.dialogue-prototype__meta');
     const nameElement = root.querySelector('.dialogue-prototype__name');
@@ -559,9 +742,29 @@
     let isDialogueEnded = false;
     // 같은 배경 URL을 연속 렌더할 때 불필요한 재로딩을 피하기 위해 상태를 기억한다.
     let currentBackgroundUrl = '';
+    let currentIllustrationUrl = '';
     const backgroundLoadCache = new Map();
+    const illustrationLoadCache = new Map();
     const debugListeners = new Set();
     const traceEntries = [];
+    const audioChannels = {
+      bgm: new Audio(),
+      bgs: new Audio(),
+      voice: new Audio(),
+      sfx: new Audio()
+    };
+    audioChannels.bgm.preload = 'auto';
+    audioChannels.bgs.preload = 'auto';
+    audioChannels.voice.preload = 'auto';
+    audioChannels.sfx.preload = 'auto';
+    let autoAdvanceTimer = null;
+    const cameraState = { x: 0, y: 0, scale: 1 };
+    const uiState = {
+      hudVisible: true,
+      nameVisible: true,
+      choicesLocked: false,
+      skipVisible: true
+    };
 
     const snapshotDebugState = () => ({
       filters: { ...currentFilters },
@@ -631,6 +834,210 @@
         backgroundLoadCache.set(targetUrl, 'error');
       };
       image.src = targetUrl;
+    };
+
+    const setIllustration = ({ url = '', animation = '' } = {}) => {
+      const targetUrl = cleanText(url);
+      const animationName = cleanText(animation).toLowerCase();
+      if (!cg) return;
+
+      if (!targetUrl) {
+        cg.style.backgroundImage = 'none';
+        cg.dataset.animation = '';
+        currentIllustrationUrl = '';
+        return;
+      }
+
+      const applyIllustrationStyle = () => {
+        cg.style.backgroundImage = `url("${targetUrl}")`;
+        cg.dataset.animation = animationName;
+        currentIllustrationUrl = targetUrl;
+      };
+
+      if (targetUrl === currentIllustrationUrl) {
+        cg.dataset.animation = animationName;
+        return;
+      }
+
+      const cachedStatus = illustrationLoadCache.get(targetUrl);
+      if (cachedStatus === 'loaded') {
+        applyIllustrationStyle();
+        return;
+      }
+
+      const image = new Image();
+      image.onload = () => {
+        illustrationLoadCache.set(targetUrl, 'loaded');
+        applyIllustrationStyle();
+      };
+      image.onerror = () => {
+        illustrationLoadCache.set(targetUrl, 'error');
+      };
+      image.src = targetUrl;
+    };
+
+    const applyAudioDirective = (channelName, directive, { restartOnSameUrl = false } = {}) => {
+      if (!directive) return;
+      const audio = audioChannels[channelName];
+      if (!audio) return;
+      if (directive.action === 'stop') {
+        audio.pause();
+        audio.currentTime = 0;
+        return;
+      }
+      const url = cleanText(directive.url);
+      if (!url) return;
+      const shouldReload = audio.src !== new URL(url, window.location.href).href;
+      if (shouldReload) {
+        audio.src = url;
+      } else if (restartOnSameUrl) {
+        audio.currentTime = 0;
+      }
+      if (typeof directive.loop === 'boolean') {
+        audio.loop = directive.loop;
+      }
+      if (Number.isFinite(directive.volume)) {
+        audio.volume = Math.max(0, Math.min(1, directive.volume));
+      }
+      audio.play().catch(() => {
+        // 자동재생 제한(브라우저 정책)으로 실패할 수 있으므로 콘솔 경고만 남긴다.
+      });
+    };
+
+    const clearAutoAdvanceTimer = () => {
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+        autoAdvanceTimer = null;
+      }
+    };
+
+    const applyScreenFx = (effectName = '') => {
+      const normalized = cleanText(effectName).toLowerCase();
+      root.classList.remove('is-fx-flash', 'is-fx-shake', 'is-fx-dim');
+      if (!normalized) return;
+      if (normalized === 'flash') root.classList.add('is-fx-flash');
+      if (normalized === 'shake') root.classList.add('is-fx-shake');
+      if (normalized === 'dim') root.classList.add('is-fx-dim');
+      // 일회성 연출은 짧게 적용 후 자동 해제한다.
+      window.setTimeout(() => {
+        root.classList.remove('is-fx-flash', 'is-fx-shake', 'is-fx-dim');
+      }, 420);
+    };
+
+    const applyCameraFx = (commands = []) => {
+      if (!bg || commands.length === 0) return;
+      commands.forEach((command) => {
+        if (!command) return;
+        if (command.action === 'reset') {
+          cameraState.x = 0;
+          cameraState.y = 0;
+          cameraState.scale = 1;
+          return;
+        }
+        if (command.action === 'pan') {
+          cameraState.x = command.x;
+          cameraState.y = command.y;
+        }
+        if (command.action === 'zoom') {
+          cameraState.scale = command.scale;
+        }
+      });
+      const durationMs = commands.at(-1)?.durationMs ?? 320;
+      // 배경은 transform으로 이동/확대하고,
+      // 인물(CG)은 애니메이션(transform)과 충돌하지 않도록 background-size/position으로 카메라 효과를 합성한다.
+      bg.style.transition = `transform ${durationMs}ms ease`;
+      bg.style.transform = `translate(${cameraState.x}px, ${cameraState.y}px) scale(${cameraState.scale})`;
+      if (cg) {
+        cg.style.transition = `background-size ${durationMs}ms ease, background-position ${durationMs}ms ease`;
+        cg.style.backgroundSize = `${cameraState.scale * 100}%`;
+        cg.style.backgroundPosition = `calc(50% + ${cameraState.x * 0.7}px) calc(100% + ${cameraState.y}px)`;
+      }
+    };
+
+    const applyUiFx = (uiFx = {}) => {
+      const normalized = uiFx || {};
+      const toToggle = (value, defaultValue = true) => {
+        if (!value) return defaultValue;
+        return !['off', 'hide', 'false', '0'].includes(String(value).toLowerCase());
+      };
+      if (Object.prototype.hasOwnProperty.call(normalized, 'hud')) {
+        uiState.hudVisible = toToggle(normalized.hud, uiState.hudVisible);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalized, 'name')) {
+        uiState.nameVisible = toToggle(normalized.name, uiState.nameVisible);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalized, 'skip')) {
+        uiState.skipVisible = toToggle(normalized.skip, uiState.skipVisible);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalized, 'choices')) {
+        uiState.choicesLocked = ['lock', 'locked', 'off', 'false', '0'].includes(String(normalized.choices).toLowerCase());
+      }
+      if (panelElement) panelElement.hidden = !uiState.hudVisible;
+      if (nameElement) nameElement.hidden = !uiState.nameVisible;
+      if (skipButton) skipButton.hidden = !uiState.skipVisible;
+      if (choicesElement) {
+        choicesElement.classList.toggle('is-choice-locked', uiState.choicesLocked);
+      }
+    };
+
+    const applyHapticFx = (hapticFx) => {
+      if (!hapticFx || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+      const map = {
+        light: [24],
+        medium: [48],
+        heavy: [90]
+      };
+      const pattern = Array.isArray(hapticFx.pattern) ? hapticFx.pattern : (map[hapticFx.pattern] || []);
+      if (pattern.length > 0) navigator.vibrate(pattern);
+    };
+
+    const applyParticleFx = (particleFx = {}) => {
+      if (!particleLayer) return;
+      const shouldEnable = particleFx.enabled !== false && particleFx.mode && particleFx.mode !== 'off';
+      particleLayer.dataset.mode = shouldEnable ? particleFx.mode : '';
+      if (!shouldEnable) {
+        particleLayer.replaceChildren();
+        return;
+      }
+      if (particleLayer.childElementCount > 0 && particleLayer.dataset.mode === particleFx.mode) {
+        return;
+      }
+      particleLayer.replaceChildren();
+      const count = particleFx.mode === 'ember' ? 16 : 26;
+      for (let i = 0; i < count; i += 1) {
+        const dot = document.createElement('span');
+        dot.className = 'dialogue-prototype__particle';
+        dot.style.left = `${Math.random() * 100}%`;
+        dot.style.setProperty('--particle-delay', `${Math.round(Math.random() * 1000)}ms`);
+        dot.style.setProperty('--particle-duration', `${2400 + Math.round(Math.random() * 2200)}ms`);
+        particleLayer.appendChild(dot);
+      }
+    };
+
+    const applyLightFx = (lightFx) => {
+      if (!lightLayer || !lightFx) return;
+      if (lightFx.action === 'off') {
+        lightLayer.style.background = 'transparent';
+        return;
+      }
+      if (lightFx.action === 'tint') {
+        lightLayer.style.transition = `background ${lightFx.durationMs || 320}ms ease`;
+        lightLayer.style.background = `${lightFx.color}${Math.round((lightFx.alpha || 0) * 255).toString(16).padStart(2, '0')}`;
+      }
+    };
+
+    const applyTransitionFx = (transitionFx) => {
+      if (!transitionLayer || !transitionFx) return;
+      const isBlack = transitionFx.action === 'fade-black';
+      transitionLayer.style.background = isBlack ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.9)';
+      transitionLayer.style.transition = 'none';
+      transitionLayer.style.opacity = '0';
+      void transitionLayer.offsetWidth;
+      transitionLayer.style.transition = `opacity ${transitionFx.durationMs}ms ease`;
+      transitionLayer.style.opacity = '1';
+      window.setTimeout(() => {
+        transitionLayer.style.opacity = '0';
+      }, transitionFx.durationMs);
     };
 
     const applySelection = (filters = {}) => {
@@ -848,6 +1255,21 @@
         // 예: start 줄에서 `playerName=순례자`를 주입하면 이후 줄의 `{{playerName}}`도 정상 치환.
         sharedVariables = { ...sharedVariables, ...(current.variables || {}) };
         sharedVariables = applyEffects(sharedVariables, current.effects || []);
+        setIllustration({
+          url: current.illustrationUrl,
+          animation: current.illustrationAnimation
+        });
+        applyAudioDirective('bgm', current.bgm);
+        applyAudioDirective('bgs', current.bgs);
+        applyAudioDirective('voice', current.voice, { restartOnSameUrl: true });
+        applyAudioDirective('sfx', current.sfx, { restartOnSameUrl: true });
+        applyScreenFx(current.screenFx);
+        applyCameraFx(current.cameraFx);
+        applyUiFx(current.uiFx);
+        applyHapticFx(current.hapticFx);
+        applyParticleFx(current.particleFx);
+        applyLightFx(current.lightFx);
+        applyTransitionFx(current.transitionFx);
         lastRenderedKey = currentRenderKey;
       }
       if (showMeta && metaElement) {
@@ -890,6 +1312,14 @@
       emitDebugState();
       if (nextButton) {
         nextButton.style.opacity = isChoiceStep ? '0.58' : '1';
+      }
+
+      // 자동 넘김은 선택지/종료 구간에서는 비활성화한다.
+      clearAutoAdvanceTimer();
+      if (!isChoiceStep && !isDialogueEnded && Number(current.autoNextMs) > 0) {
+        autoAdvanceTimer = window.setTimeout(() => {
+          goNext();
+        }, Number(current.autoNextMs));
       }
     };
 
@@ -1028,14 +1458,27 @@
         emitDebugState();
       },
       destroy() {
+        clearAutoAdvanceTimer();
         debugListeners.clear();
+        Object.values(audioChannels).forEach((audio) => {
+          audio.pause();
+          audio.src = '';
+        });
         root.remove();
       }
     };
   };
 
+  // 신규 네임스페이스: 템플릿 명칭에 맞춰 공개한다.
+  global.NewtheriaDialogueTemplate = {
+    createDialogueTemplate,
+    loadDialoguesFromCsvUrl,
+    parseDialoguesFromCsvText,
+    selectDialogueSegment
+  };
+  // 하위 호환: 기존 호출부(window.NewtheriaDialoguePrototype)도 유지한다.
   global.NewtheriaDialoguePrototype = {
-    createDialoguePrototype,
+    createDialoguePrototype: createDialogueTemplate,
     loadDialoguesFromCsvUrl,
     parseDialoguesFromCsvText,
     selectDialogueSegment

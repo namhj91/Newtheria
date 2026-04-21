@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.49(260421-모바일선택지카드중앙정렬보정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.55(260421-샘플선택지보강자동넘김축소카메라줌보정)';
 
 const MAP_SIZE = 200;
 

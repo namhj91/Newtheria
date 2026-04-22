@@ -34,7 +34,6 @@ sfx = assets/audio/soft_chime.ogg
 변수 = playerName=순례자;goddessName=아스테리아;신뢰도=1;별조각=0;환생의지=0;윤회기억=1;서약상태=대기
 
 [흐름제어]
-점프 = rebirth_offer#vision_open
 
 ---
 @rebirth_intro#comfort

@@ -12,7 +12,8 @@
 대사 = 순례자여, 긴 여정을 지나 여기까지 왔군요. 시간도 경계도 없는 별빛의 뜰에서, 이제는 안식해도 괜찮아요.
 
 [그림제어]
-배경 = assets/img/goddess.png
+; 샘플 대화 기본 배경은 요청사항에 맞춰 background.jpg를 사용한다.
+배경 = background.jpg
 그림 = assets/img/goddess.png
 그림애니메이션 = fade
 스탠딩 = 좌=assets/img/goddess.png|아스테리아|float|right|id=asteria_core;우=assets/img/player.png|순례자|move(-10,0,320)|auto|id=pilgrim_core
@@ -316,7 +317,8 @@ voice = play|assets/audio/pilgrim_vow_01.ogg|0.9|off
 대사 = (낯선 공기… 새로운 하늘… 나는 다시 태어났다.)
 
 [그림제어]
-배경 = assets/img/goddess.png
+; 샘플 대화 기본 배경은 요청사항에 맞춰 background.jpg를 사용한다.
+배경 = background.jpg
 그림애니메이션 = fade
 
 [소리제어]

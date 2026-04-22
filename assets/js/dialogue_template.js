@@ -43,6 +43,17 @@
     return String(value).trim();
   };
 
+  const cleanAnchorToken = (value) => {
+    // 앵커/씬 토큰 뒤에 붙은 세미콜론/쉼표/인라인 메모를 정리한다.
+    // 예: "start;", "start ; 임시메모", "start, "
+    const normalized = cleanText(value);
+    if (!normalized) return '';
+    return normalized
+      .replace(/\s*[;,]\s*$/g, '')
+      .replace(/\s+(?:\/\/|;).+$/g, '')
+      .trim();
+  };
+
   const pick = (row, keys, fallback = '') => {
     // 같은 의미의 헤더를 여러 이름(영문/한글)으로 지원하기 위한 우선순위 선택기.
     for (const key of keys) {
@@ -78,7 +89,7 @@
     if (!targetPart) {
       return { label: labelPart, scene: '', anchor: '', condition, effects: parsedEffects };
     }
-    const [scene = '', anchor = ''] = targetPart.split('#').map((part) => cleanText(part));
+    const [scene = '', anchor = ''] = targetPart.split('#').map((part) => cleanAnchorToken(part));
     return { label: labelPart, scene, anchor, condition, effects: parsedEffects };
   };
 
@@ -502,7 +513,7 @@
     // 예: "intro#ending", "#ending", "chapter2"
     const source = cleanText(rawValue);
     if (!source) return null;
-    const [sceneRaw = '', anchorRaw = ''] = source.split('#').map((part) => cleanText(part));
+    const [sceneRaw = '', anchorRaw = ''] = source.split('#').map((part) => cleanAnchorToken(part));
     if (!sceneRaw && !anchorRaw) return null;
     return {
       scene: sceneRaw || fallbackScene,
@@ -656,6 +667,19 @@
     return queue;
   };
 
+  const normalizeScriptLineBreaks = (scriptText) => {
+    const raw = String(scriptText || '');
+    // 일부 입력 경로(메신저/복붙)에서 "\n"이 실제 개행이 아닌 리터럴 문자로 들어올 수 있다.
+    // 이런 경우 주석 배너 한 줄 뒤의 @anchor가 같은 물리 라인에 붙어 파서가 통째로 건너뛸 수 있어,
+    // "개행 문자가 거의 없고 \\n 토큰이 많은" 케이스에 한해 안전하게 실제 개행으로 복원한다.
+    const actualNewlineCount = (raw.match(/\r?\n/g) || []).length;
+    const escapedNewlineCount = (raw.match(/\\n/g) || []).length;
+    if (actualNewlineCount <= 1 && escapedNewlineCount >= 2) {
+      return raw.replace(/\\n/g, '\n');
+    }
+    return raw;
+  };
+
   const parseAllDialoguesFromScriptText = (scriptText) => {
     // NDS v2 문법(섹션 기반):
     // @scene#anchor
@@ -668,7 +692,8 @@
     // [선택지]
     // - 라벨 => intro#next
     // ---
-    const lines = String(scriptText || '').split(/\r?\n/);
+    const normalizedScriptText = normalizeScriptLineBreaks(scriptText);
+    const lines = normalizedScriptText.split(/\r?\n/);
     const records = [];
     let row = {};
     let currentSection = '';
@@ -715,7 +740,7 @@
       if (line.startsWith('@')) {
         flush();
         const target = cleanText(line.slice(1));
-        const [scene = '', anchor = ''] = target.split('#').map((part) => cleanText(part));
+        const [scene = '', anchor = ''] = target.split('#').map((part) => cleanAnchorToken(part));
         row.태그 = scene;
         row.앵커 = anchor;
         return;

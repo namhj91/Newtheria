@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.77(260422-그림유지정책배경동기화)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.79(260422-배경방식스탠딩일러복원)';
 
 const MAP_SIZE = 200;
 

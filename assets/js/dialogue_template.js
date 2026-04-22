@@ -558,15 +558,15 @@
     // anchor: scene 내부의 시작 지점 식별자(재진입/분기 점프 기준)
     anchor: pick(row, ['앵커', 'anchor']),
     speaker: pick(row, ['화자', '인물명', 'speaker'], '???'),
-    // 화자명과 스탠딩 하이라이트 키를 분리해, 추후 멀티 레이어 캐릭터에서도 안정적으로 포커스 제어.
+    // 레거시 호환: 과거 스탠딩 포커스 문법 입력을 파싱만 유지한다(현재 렌더에는 미사용).
     speakerFocus: pick(row, ['화자포커스', '포커스', 'focus', 'speakerFocus']),
     line: pick(row, ['대사', 'line']),
     backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
-    // 그림(캐릭터 스탠딩/컷인) 레이어. 배경 위, 대화창 아래에서 표시한다.
+    // 레거시 호환: 그림 컬럼은 파싱만 유지한다(현재는 배경 레이어만 렌더).
     illustrationUrl: pick(row, ['그림', '일러스트', 'cg', 'image', 'imageUrl']),
-    // 그림 애니메이션 preset: fade, float, zoom-in, shake
+    // 레거시 호환: 그림 애니메이션 컬럼 파싱만 유지한다.
     illustrationAnimation: pick(row, ['그림애니메이션', '이미지애니메이션', 'animation', 'imageAnimation']),
-    // 스탠딩 문법(좌/우 배치 + 화자 하이라이트 + 간단 이동)
+    // 레거시 호환: 스탠딩 문법 파싱만 유지한다.
     standing: parseStandingDirective(pick(row, ['스탠딩', 'standing', '스탠딩문법'])),
     // 오디오 레이어 3종:
     // - bgm: 장면 음악(loop 기본 true)
@@ -835,12 +835,9 @@
     root.innerHTML = `
       <div class="dialogue-prototype__bg" aria-hidden="true">
       </div>
+      <div class="dialogue-prototype__actors" aria-hidden="true"></div>
       <div class="dialogue-prototype__light" aria-hidden="true"></div>
       <div class="dialogue-prototype__particles" aria-hidden="true"></div>
-      <div class="dialogue-prototype__cg" aria-hidden="true">
-        <div class="dialogue-prototype__standing dialogue-prototype__standing--left" data-slot="left"></div>
-        <div class="dialogue-prototype__standing dialogue-prototype__standing--right" data-slot="right"></div>
-      </div>
       <div class="dialogue-prototype__transition" aria-hidden="true"></div>
       <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
       <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
@@ -860,12 +857,10 @@
     mount.replaceChildren(root);
 
     const bg = root.querySelector('.dialogue-prototype__bg');
-    const cg = root.querySelector('.dialogue-prototype__cg');
+    const actorsLayer = root.querySelector('.dialogue-prototype__actors');
     const lightLayer = root.querySelector('.dialogue-prototype__light');
     const particleLayer = root.querySelector('.dialogue-prototype__particles');
     const transitionLayer = root.querySelector('.dialogue-prototype__transition');
-    const standingLeftElement = root.querySelector('.dialogue-prototype__standing--left');
-    const standingRightElement = root.querySelector('.dialogue-prototype__standing--right');
     const panelElement = root.querySelector('.dialogue-prototype__panel');
     const metaElement = root.querySelector('.dialogue-prototype__meta');
     const nameElement = root.querySelector('.dialogue-prototype__name');
@@ -892,14 +887,13 @@
     let isDialogueEnded = false;
     // 같은 배경 URL을 연속 렌더할 때 불필요한 재로딩을 피하기 위해 상태를 기억한다.
     let currentBackgroundUrl = '';
+    // 그림/스탠딩은 전용 DOM 대신 "배경과 동일한 background-image 렌더 방식"으로 누적 상태를 유지한다.
     let currentIllustrationUrl = '';
-    const standingState = {
-      left: { url: '', name: '', id: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' },
-      right: { url: '', name: '', id: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' }
+    const standingRenderState = {
+      left: '',
+      right: ''
     };
     const backgroundLoadCache = new Map();
-    const illustrationLoadCache = new Map();
-    const standingLoadCache = new Map();
     const debugListeners = new Set();
     const traceEntries = [];
     const audioChannels = {
@@ -954,12 +948,7 @@
       emitDebugState();
     };
 
-    const IMAGE_EMPTY_TOKENS = new Set(['off', 'none', 'clear', '-']);
-    const getStandingElement = (slot) => (slot === 'left' ? standingLeftElement : standingRightElement);
-    const refreshStandingContainerState = () => {
-      const hasStanding = [standingLeftElement, standingRightElement].some((node) => node?.dataset.visible === 'true');
-      cg?.classList.toggle('has-standing', hasStanding);
-    };
+
     const preloadImageForDiagnostics = ({
       url,
       cache,
@@ -988,9 +977,7 @@
     };
 
     const setBackground = (url) => {
-      // [그림제어/배경] 재작성 정책:
-      // - 렌더는 즉시 반영한다(화면 멈춤 체감 방지).
-      // - 프리로드는 진단(성공/실패 캐시, trace)만 담당한다.
+      // 배경 렌더는 항상 즉시 반영하고, 프리로드는 실패 진단(trace) 용도로만 사용한다.
       const rowBackgroundUrl = cleanText(url);
       const fallbackBackgroundUrl = cleanText(backgroundUrl);
       const targetUrl = rowBackgroundUrl || currentBackgroundUrl || fallbackBackgroundUrl;
@@ -1011,138 +998,85 @@
       });
     };
 
-    const applyStandingSlotStyle = (slot, payload = {}) => {
-      const element = getStandingElement(slot);
-      if (!element) return;
-      const state = standingState[slot];
-      const targetUrl = cleanText(payload.url ?? state.url);
-      const targetName = cleanText(payload.name ?? state.name);
-      const targetId = cleanText(payload.id ?? state.id);
-      const targetMotion = cleanText(payload.motion ?? state.motion).toLowerCase();
-      const moveX = Number.isFinite(payload.moveX) ? payload.moveX : Number(state.moveX || 0);
-      const moveY = Number.isFinite(payload.moveY) ? payload.moveY : Number(state.moveY || 0);
-      const durationMs = Number.isFinite(payload.durationMs) ? payload.durationMs : Number(state.durationMs || 280);
-      const facingHint = cleanText(payload.facing ?? state.facing).toLowerCase();
-      const shouldFlip = facingHint === 'flip'
-        || facingHint === 'left'
-        || (facingHint !== 'unflip' && facingHint !== 'right' && slot === 'right');
-
-      // 상태를 먼저 동기화해 다음 줄에서 payload 생략 시에도 동일 동작을 유지한다.
-      state.url = targetUrl;
-      state.name = targetName;
-      state.id = targetId;
-      state.motion = targetMotion;
-      state.moveX = moveX;
-      state.moveY = moveY;
-      state.durationMs = durationMs;
-      state.facing = facingHint;
-
-      if (!targetUrl || IMAGE_EMPTY_TOKENS.has(targetUrl.toLowerCase())) {
-        element.style.backgroundImage = 'none';
-        element.dataset.visible = 'false';
-        refreshStandingContainerState();
-        return;
-      }
-
-      element.dataset.visible = 'true';
-      element.dataset.name = targetName;
-      element.dataset.standingId = targetId;
-      element.dataset.motion = targetMotion;
-      element.dataset.flip = shouldFlip ? 'true' : 'false';
-      element.style.setProperty('--standing-offset-x', `${moveX}px`);
-      element.style.setProperty('--standing-offset-y', `${moveY}px`);
-      element.style.transitionDuration = `${durationMs}ms`;
-      element.style.backgroundImage = `url("${targetUrl}")`;
-      refreshStandingContainerState();
-
-      preloadImageForDiagnostics({
-        url: targetUrl,
-        cache: standingLoadCache,
-        traceType: 'standing-load-error',
-        tracePayload: { slot },
-        consoleLabel: `스탠딩 이미지(slot: ${slot})`
-      });
+    const IMAGE_EMPTY_TOKENS = new Set(['off', 'none', 'clear', '-']);
+    const isExplicitClearToken = (value = '') => {
+      const normalized = cleanText(value).toLowerCase();
+      return Boolean(normalized) && IMAGE_EMPTY_TOKENS.has(normalized);
     };
 
-    const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
-      if (activeSlot) return activeSlot;
-
-      const resolveByToken = (token) => {
-        const normalized = cleanText(token);
-        if (!normalized) return '';
-        const lowered = normalized.toLowerCase();
-        if (['좌', 'left', 'l'].includes(lowered)) return 'left';
-        if (['우', 'right', 'r'].includes(lowered)) return 'right';
-        if (normalized === cleanText(standingState.left.id)) return 'left';
-        if (normalized === cleanText(standingState.right.id)) return 'right';
-        if (normalized === cleanText(standingState.left.name)) return 'left';
-        if (normalized === cleanText(standingState.right.name)) return 'right';
-        return '';
-      };
-
-      // 1순위: 별도 포커스 키(화자포커스/포커스)
-      const focusSlot = resolveByToken(focusTarget);
-      if (focusSlot) return focusSlot;
-
-      // 2순위: 화자명
-      return resolveByToken(speaker);
-    };
-
-    const applyStandingFocus = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
-      const resolvedSlot = resolveActiveStandingSlot({ speaker, activeSlot, focusTarget });
-      [standingLeftElement, standingRightElement].forEach((element) => {
-        if (!element) return;
-        const isVisible = element.dataset.visible === 'true';
-        const isActive = resolvedSlot && element.dataset.slot === resolvedSlot;
-        element.classList.toggle('is-dimmed', isVisible && !isActive);
-        element.classList.toggle('is-speaking', isVisible && isActive);
-      });
-    };
-
-    const applyStandingDirective = (directive = null, { speaker = '', focusTarget = '' } = {}) => {
-      if (!standingLeftElement || !standingRightElement) return;
-      if (directive?.clear) {
-        applyStandingSlotStyle('left', { url: '' });
-        applyStandingSlotStyle('right', { url: '' });
-      }
-      if (directive?.slots?.left) applyStandingSlotStyle('left', directive.slots.left);
-      if (directive?.slots?.right) applyStandingSlotStyle('right', directive.slots.right);
-      applyStandingFocus({ speaker, activeSlot: directive?.activeSlot || '', focusTarget });
-    };
-
-    const setIllustration = ({ url = '', animation = '' } = {}) => {
-      // [그림제어/그림] 재작성 정책:
-      // - URL이 있으면 즉시 표시
-      // - URL이 비면 "직전 그림 유지"(배경과 동일 정책)
-      // - clear는 off/none/clear/- 토큰을 명시했을 때만 수행
-      // - 프리로드는 진단 전용
-      if (!cg) return;
-      const rowIllustrationUrl = cleanText(url);
-      const animationName = cleanText(animation).toLowerCase();
-      const isExplicitClear = rowIllustrationUrl && IMAGE_EMPTY_TOKENS.has(rowIllustrationUrl.toLowerCase());
-      if (isExplicitClear) {
-        cg.style.backgroundImage = 'none';
-        cg.dataset.animation = '';
+    const applyIllustrationState = (url = '') => {
+      const normalized = cleanText(url);
+      if (isExplicitClearToken(normalized)) {
         currentIllustrationUrl = '';
         return;
       }
-      const targetUrl = rowIllustrationUrl || currentIllustrationUrl;
-      if (!targetUrl) {
-        // 아직 한 번도 그림이 설정되지 않은 초기 상태.
-        cg.dataset.animation = animationName;
+      if (normalized) {
+        currentIllustrationUrl = normalized;
+      }
+    };
+
+    const applyStandingState = (directive = null) => {
+      if (!directive) return;
+      if (directive.clear) {
+        standingRenderState.left = '';
+        standingRenderState.right = '';
+      }
+      const leftUrl = cleanText(directive?.slots?.left?.url);
+      const rightUrl = cleanText(directive?.slots?.right?.url);
+      if (isExplicitClearToken(leftUrl)) {
+        standingRenderState.left = '';
+      } else if (leftUrl) {
+        standingRenderState.left = leftUrl;
+      }
+      if (isExplicitClearToken(rightUrl)) {
+        standingRenderState.right = '';
+      } else if (rightUrl) {
+        standingRenderState.right = rightUrl;
+      }
+    };
+
+    const renderActorLayer = (animationName = '') => {
+      if (!actorsLayer) return;
+      const renderItems = [];
+      // 우/좌 스탠딩 + 컷인(그림)을 모두 CSS background-image 다중 레이어로 합성한다.
+      if (standingRenderState.right) {
+        renderItems.push({
+          url: standingRenderState.right,
+          size: 'min(44vw, 620px) auto',
+          position: 'right clamp(0px, 1.8vw, 28px) bottom'
+        });
+      }
+      if (standingRenderState.left) {
+        renderItems.push({
+          url: standingRenderState.left,
+          size: 'min(44vw, 620px) auto',
+          position: 'left clamp(0px, 1.8vw, 28px) bottom'
+        });
+      }
+      if (currentIllustrationUrl) {
+        renderItems.push({
+          url: currentIllustrationUrl,
+          size: 'contain',
+          position: 'center bottom'
+        });
+      }
+
+      if (renderItems.length === 0) {
+        actorsLayer.style.backgroundImage = 'none';
+        actorsLayer.style.backgroundSize = '';
+        actorsLayer.style.backgroundPosition = '';
+        actorsLayer.style.backgroundRepeat = '';
+        actorsLayer.dataset.hasActors = 'false';
+        actorsLayer.dataset.animation = '';
         return;
       }
-      if (targetUrl !== currentIllustrationUrl) {
-        cg.style.backgroundImage = `url("${targetUrl}")`;
-        currentIllustrationUrl = targetUrl;
-      }
-      cg.dataset.animation = animationName;
-      preloadImageForDiagnostics({
-        url: targetUrl,
-        cache: illustrationLoadCache,
-        traceType: 'illustration-load-error',
-        consoleLabel: '그림 이미지'
-      });
+
+      actorsLayer.style.backgroundImage = renderItems.map((item) => `url("${item.url}")`).join(', ');
+      actorsLayer.style.backgroundSize = renderItems.map((item) => item.size).join(', ');
+      actorsLayer.style.backgroundPosition = renderItems.map((item) => item.position).join(', ');
+      actorsLayer.style.backgroundRepeat = renderItems.map(() => 'no-repeat').join(', ');
+      actorsLayer.dataset.hasActors = 'true';
+      actorsLayer.dataset.animation = cleanText(animationName).toLowerCase();
     };
 
     const applyAudioDirective = (channelName, directive, { restartOnSameUrl = false } = {}) => {
@@ -1212,7 +1146,7 @@
         }
       });
       const durationMs = commands.at(-1)?.durationMs ?? 320;
-      [bg, cg].forEach((layer) => {
+      [bg, actorsLayer].forEach((layer) => {
         if (!layer) return;
         layer.style.transition = `transform ${durationMs}ms ease`;
         layer.style.transform = `translate(${cameraState.x}px, ${cameraState.y}px) scale(${cameraState.scale})`;
@@ -1319,46 +1253,6 @@
       lastRenderedKey = '';
       if (queue.length === 0) {
         throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
-      }
-
-      const hasStandingPayload = (directive) => {
-        if (!directive) return false;
-        if (directive.clear) return true;
-        return Boolean(directive.slots?.left || directive.slots?.right);
-      };
-
-      const findPreviousStandingDirective = ({ sceneTag: targetSceneTag, anchorId: targetAnchorId } = {}) => {
-        // 원인 정리:
-        // - 스탠딩은 "상태 유지형"이라 현재 줄에 문법이 없으면 직전 상태를 재사용한다.
-        // - 그런데 scene/anchor로 중간 진입하면 "직전 상태" 자체가 없어 스탠딩이 한 번도 안 뜰 수 있다.
-        // - 따라서 같은 scene에서 anchor 이전에 선언된 마지막 스탠딩을 부트스트랩한다.
-        if (!targetSceneTag || !targetAnchorId) return null;
-        const sceneRows = allRecords.filter((row) => row.scene === targetSceneTag);
-        if (sceneRows.length === 0) return null;
-        const anchorIndex = sceneRows.findIndex((row) => row.anchor === targetAnchorId);
-        if (anchorIndex <= 0) return null;
-        for (let cursor = anchorIndex - 1; cursor >= 0; cursor -= 1) {
-          const candidate = sceneRows[cursor]?.standing;
-          if (hasStandingPayload(candidate)) {
-            return candidate;
-          }
-        }
-        return null;
-      };
-
-      const firstRow = queue[0];
-      if (!hasStandingPayload(firstRow?.standing)) {
-        const bootstrappedStanding = findPreviousStandingDirective(currentFilters);
-        if (hasStandingPayload(bootstrappedStanding)) {
-          applyStandingDirective(bootstrappedStanding, {
-            speaker: firstRow?.speaker || '',
-            focusTarget: firstRow?.speakerFocus || ''
-          });
-          pushTrace('standing-bootstrap', {
-            sceneTag: currentFilters.sceneTag || '',
-            anchorId: currentFilters.anchorId || ''
-          });
-        }
       }
 
       pushTrace('apply-selection', {
@@ -1561,14 +1455,9 @@
         // 예: start 줄에서 `playerName=순례자`를 주입하면 이후 줄의 `{{playerName}}`도 정상 치환.
         sharedVariables = { ...sharedVariables, ...(current.variables || {}) };
         sharedVariables = applyEffects(sharedVariables, current.effects || []);
-        setIllustration({
-          url: current.illustrationUrl,
-          animation: current.illustrationAnimation
-        });
-        applyStandingDirective(current.standing, {
-          speaker: current.speaker || '',
-          focusTarget: current.speakerFocus || ''
-        });
+        applyIllustrationState(current.illustrationUrl);
+        applyStandingState(current.standing);
+        renderActorLayer(current.illustrationAnimation);
         applyAudioDirective('bgm', current.bgm);
         applyAudioDirective('bgs', current.bgs);
         applyAudioDirective('voice', current.voice, { restartOnSameUrl: true });
@@ -1599,12 +1488,6 @@
       };
       nameElement.textContent = applyTemplateVariables(current.speaker || '???', templateVariables);
       lineElement.textContent = applyTemplateVariables(current.line || '', templateVariables);
-      // 줄마다 화자 기준 하이라이트를 다시 계산해 "누가 말하는지"를 즉시 드러낸다.
-      applyStandingFocus({
-        speaker: current.speaker || '',
-        activeSlot: current.standing?.activeSlot || '',
-        focusTarget: current.speakerFocus || ''
-      });
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current)
         .filter((choice) => evaluateConditionExpression(choice.condition, templateVariables))

@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.1.77(260422-그림유지정책배경동기화)';
+const START_VERSION_FALLBACK = 'ver.0.1.78(260422-배경기반일러렌더전환)';
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },

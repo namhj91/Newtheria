@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.1.64(260422-환생서사샘플대사개편)';
+const START_VERSION_FALLBACK = 'ver.0.1.69(260422-대화점프디버그보강)';
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },

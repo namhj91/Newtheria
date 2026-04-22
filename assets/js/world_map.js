@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.64(260422-환생서사샘플대사개편)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.69(260422-대화점프디버그보강)';
 
 const MAP_SIZE = 200;
 

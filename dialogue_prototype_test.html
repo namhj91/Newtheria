@@ -165,11 +165,11 @@
           <div class="row">
             <div>
               <label for="sceneTag">scene/tag (예: intro, chapter1)</label>
-              <input id="sceneTag" type="text" value="intro" />
+              <input id="sceneTag" type="text" value="rebirth_intro" />
             </div>
             <div>
               <label for="anchorId">anchor (예: start, choice)</label>
-              <input id="anchorId" type="text" value="start" />
+              <input id="anchorId" type="text" value="awakening" />
             </div>
           </div>
 
@@ -228,10 +228,37 @@
     const controlsPanel = document.getElementById('testControlsPanel');
     const toggleControlsButton = document.getElementById('toggleControls');
 
-    const getFilters = () => ({
-      sceneTag: sceneTagInput.value.trim(),
-      anchorId: anchorIdInput.value.trim()
-    });
+    const normalizeSceneAnchorInput = (sceneRaw = '', anchorRaw = '') => {
+      // 테스트 입력 편의: @scene#anchor 한 줄 입력도 허용하고,
+      // 기존 2칸(scene + anchor) 입력도 그대로 유지한다.
+      const sceneText = String(sceneRaw || '').trim();
+      const anchorText = String(anchorRaw || '').trim();
+
+      // 케이스 1) anchor 칸에 @scene#anchor를 붙여 넣은 경우
+      const mergedAnchorMatch = anchorText.match(/^@?([^#\s]+)#([^#\s]+)$/);
+      if (mergedAnchorMatch) {
+        return {
+          sceneTag: mergedAnchorMatch[1].trim(),
+          anchorId: mergedAnchorMatch[2].trim()
+        };
+      }
+
+      // 케이스 2) scene 칸에 @scene#anchor를 붙여 넣은 경우
+      const mergedSceneMatch = sceneText.match(/^@?([^#\s]+)#([^#\s]+)$/);
+      if (mergedSceneMatch) {
+        return {
+          sceneTag: mergedSceneMatch[1].trim(),
+          anchorId: mergedSceneMatch[2].trim()
+        };
+      }
+
+      return {
+        sceneTag: sceneText.replace(/^@/, ''),
+        anchorId: anchorText.replace(/^#/, '')
+      };
+    };
+
+    const getFilters = () => normalizeSceneAnchorInput(sceneTagInput.value, anchorIdInput.value);
 
     const prototype = window.NewtheriaDialogueTemplate.createDialogueTemplate({
       mount,

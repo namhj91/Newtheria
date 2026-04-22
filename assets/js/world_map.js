@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.74(260422-스탠딩즉시렌더보강)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.76(260422-그림제어전면재작성)';
 
 const MAP_SIZE = 200;
 

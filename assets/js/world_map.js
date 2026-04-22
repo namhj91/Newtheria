@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.76(260422-그림제어전면재작성)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.77(260422-그림유지정책배경동기화)';
 
 const MAP_SIZE = 200;
 

@@ -1113,15 +1113,23 @@
     const setIllustration = ({ url = '', animation = '' } = {}) => {
       // [그림제어/그림] 재작성 정책:
       // - URL이 있으면 즉시 표시
-      // - URL이 비면 clear
+      // - URL이 비면 "직전 그림 유지"(배경과 동일 정책)
+      // - clear는 off/none/clear/- 토큰을 명시했을 때만 수행
       // - 프리로드는 진단 전용
       if (!cg) return;
-      const targetUrl = cleanText(url);
+      const rowIllustrationUrl = cleanText(url);
       const animationName = cleanText(animation).toLowerCase();
-      if (!targetUrl || IMAGE_EMPTY_TOKENS.has(targetUrl.toLowerCase())) {
+      const isExplicitClear = rowIllustrationUrl && IMAGE_EMPTY_TOKENS.has(rowIllustrationUrl.toLowerCase());
+      if (isExplicitClear) {
         cg.style.backgroundImage = 'none';
         cg.dataset.animation = '';
         currentIllustrationUrl = '';
+        return;
+      }
+      const targetUrl = rowIllustrationUrl || currentIllustrationUrl;
+      if (!targetUrl) {
+        // 아직 한 번도 그림이 설정되지 않은 초기 상태.
+        cg.dataset.animation = animationName;
         return;
       }
       if (targetUrl !== currentIllustrationUrl) {

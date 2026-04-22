@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.70(260422-샘플대화자동넘김대폭축소)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.71(260422-샘플그림제어경로복구)';
 
 const MAP_SIZE = 200;
 

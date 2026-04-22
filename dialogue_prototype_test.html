@@ -203,7 +203,7 @@
 
       <details id="sectionGuide">
         <summary>5) 문법 힌트</summary>
-        <p class="hint">NDS 블록 문법: <code>@scene#anchor</code> + <code>키: 값</code> + 블록 구분선 <code>---</code>.<br/>핵심 키: <code>화자</code>, <code>대사</code>, <code>배경</code>, <code>스탠딩</code>, <code>bgm/bgs/voice/sfx</code>, <code>자동넘김</code>, <code>조건</code>, <code>효과</code>, <code>선택지</code>, <code>히든선택지</code>, <code>점프</code>, <code>종료</code>.<br/>점프 예시: <code>점프: intro#end</code> (선택지 없이 앵커 이동)</p>
+        <p class="hint">NDS v2 섹션 문법: <code>@scene#anchor</code> + <code>[흐름제어/대사출력/소리제어/그림제어/변수제어]</code> + <code>키 = 값</code> + <code>---</code>.<br/>선택지는 <code>[선택지]</code> 섹션에서 <code>- 라벨 => scene#anchor</code> 형식으로 작성합니다.<br/>점프 예시: <code>점프 = intro#end</code> (선택지 없이 앵커 이동), 포커스 예시: <code>화자포커스 = asteria_base</code></p>
       </details>
     </div>
   </section>

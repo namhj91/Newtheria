@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.71(260422-샘플그림제어경로복구)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.74(260422-스탠딩즉시렌더보강)';
 
 const MAP_SIZE = 200;
 

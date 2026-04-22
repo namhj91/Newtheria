@@ -899,6 +899,7 @@
     };
     const backgroundLoadCache = new Map();
     const illustrationLoadCache = new Map();
+    const standingLoadCache = new Map();
     const debugListeners = new Set();
     const traceEntries = [];
     const audioChannels = {
@@ -1045,8 +1046,32 @@
       element.style.setProperty('--standing-offset-x', `${moveX}px`);
       element.style.setProperty('--standing-offset-y', `${moveY}px`);
       element.style.transitionDuration = `${durationMs}ms`;
+      // 표시 자체는 CSS background-image에 즉시 반영한다.
+      // (프리로드 완료 콜백에 렌더를 의존하면 환경에 따라 스탠딩이 끝까지 비가시화될 수 있다.)
       element.style.backgroundImage = `url("${targetUrl}")`;
       refreshStandingContainerState();
+
+      const cachedStatus = standingLoadCache.get(targetUrl);
+      if (cachedStatus === 'error') {
+        pushTrace('standing-load-error', { url: targetUrl, slot });
+      }
+      if (cachedStatus === 'loaded' || cachedStatus === 'error') {
+        return;
+      }
+
+      // 사후 진단용 프리로드: 렌더 여부와 분리해 성공/실패 캐시만 기록한다.
+      const image = new Image();
+      image.onload = () => {
+        standingLoadCache.set(targetUrl, 'loaded');
+      };
+      image.onerror = () => {
+        standingLoadCache.set(targetUrl, 'error');
+        // 스탠딩 URL 오탈자가 있으면 배경은 보이는데 캐릭터만 사라져 보인다.
+        // 원인 파악을 빠르게 하기 위해 추적/콘솔에 실패 정보를 남긴다.
+        pushTrace('standing-load-error', { url: targetUrl, slot });
+        console.warn('[DialogueTemplate] 스탠딩 이미지 로딩 실패:', targetUrl, `(slot: ${slot})`);
+      };
+      image.src = targetUrl;
     };
 
     const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
@@ -1313,6 +1338,47 @@
       if (queue.length === 0) {
         throw new Error('조건을 통과한 대사가 없어 진행할 수 없습니다.');
       }
+
+      const hasStandingPayload = (directive) => {
+        if (!directive) return false;
+        if (directive.clear) return true;
+        return Boolean(directive.slots?.left || directive.slots?.right);
+      };
+
+      const findPreviousStandingDirective = ({ sceneTag: targetSceneTag, anchorId: targetAnchorId } = {}) => {
+        // 원인 정리:
+        // - 스탠딩은 "상태 유지형"이라 현재 줄에 문법이 없으면 직전 상태를 재사용한다.
+        // - 그런데 scene/anchor로 중간 진입하면 "직전 상태" 자체가 없어 스탠딩이 한 번도 안 뜰 수 있다.
+        // - 따라서 같은 scene에서 anchor 이전에 선언된 마지막 스탠딩을 부트스트랩한다.
+        if (!targetSceneTag || !targetAnchorId) return null;
+        const sceneRows = allRecords.filter((row) => row.scene === targetSceneTag);
+        if (sceneRows.length === 0) return null;
+        const anchorIndex = sceneRows.findIndex((row) => row.anchor === targetAnchorId);
+        if (anchorIndex <= 0) return null;
+        for (let cursor = anchorIndex - 1; cursor >= 0; cursor -= 1) {
+          const candidate = sceneRows[cursor]?.standing;
+          if (hasStandingPayload(candidate)) {
+            return candidate;
+          }
+        }
+        return null;
+      };
+
+      const firstRow = queue[0];
+      if (!hasStandingPayload(firstRow?.standing)) {
+        const bootstrappedStanding = findPreviousStandingDirective(currentFilters);
+        if (hasStandingPayload(bootstrappedStanding)) {
+          applyStandingDirective(bootstrappedStanding, {
+            speaker: firstRow?.speaker || '',
+            focusTarget: firstRow?.speakerFocus || ''
+          });
+          pushTrace('standing-bootstrap', {
+            sceneTag: currentFilters.sceneTag || '',
+            anchorId: currentFilters.anchorId || ''
+          });
+        }
+      }
+
       pushTrace('apply-selection', {
         sceneTag: currentFilters.sceneTag || '',
         anchorId: currentFilters.anchorId || '',

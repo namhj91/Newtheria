@@ -991,6 +991,9 @@
       };
       image.onerror = () => {
         backgroundLoadCache.set(targetUrl, 'error');
+        // 그림제어 이슈를 테스트 패널에서 바로 확인할 수 있도록 로딩 실패를 추적에 남긴다.
+        pushTrace('background-load-error', { url: targetUrl });
+        console.warn('[DialogueTemplate] 배경 이미지 로딩 실패:', targetUrl);
       };
       image.src = targetUrl;
     };
@@ -1128,6 +1131,9 @@
       };
       image.onerror = () => {
         illustrationLoadCache.set(targetUrl, 'error');
+        // 컷인/그림 레이어 실패도 조용히 묻히지 않도록 디버그 힌트를 제공한다.
+        pushTrace('illustration-load-error', { url: targetUrl });
+        console.warn('[DialogueTemplate] 그림 이미지 로딩 실패:', targetUrl);
       };
       image.src = targetUrl;
     };

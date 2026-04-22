@@ -954,17 +954,43 @@
       emitDebugState();
     };
 
-    const applyBackgroundStyle = (targetUrl) => {
-      if (!bg) return;
-      bg.style.backgroundImage = `linear-gradient(to top, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.18)), url("${targetUrl}")`;
-      currentBackgroundUrl = targetUrl;
+    const IMAGE_EMPTY_TOKENS = new Set(['off', 'none', 'clear', '-']);
+    const getStandingElement = (slot) => (slot === 'left' ? standingLeftElement : standingRightElement);
+    const refreshStandingContainerState = () => {
+      const hasStanding = [standingLeftElement, standingRightElement].some((node) => node?.dataset.visible === 'true');
+      cg?.classList.toggle('has-standing', hasStanding);
+    };
+    const preloadImageForDiagnostics = ({
+      url,
+      cache,
+      traceType,
+      tracePayload = {},
+      consoleLabel = '이미지'
+    } = {}) => {
+      const targetUrl = cleanText(url);
+      if (!targetUrl) return;
+      const cachedStatus = cache.get(targetUrl);
+      if (cachedStatus === 'loaded') return;
+      if (cachedStatus === 'error') {
+        pushTrace(traceType, { url: targetUrl, ...tracePayload });
+        return;
+      }
+      const image = new Image();
+      image.onload = () => {
+        cache.set(targetUrl, 'loaded');
+      };
+      image.onerror = () => {
+        cache.set(targetUrl, 'error');
+        pushTrace(traceType, { url: targetUrl, ...tracePayload });
+        console.warn(`[DialogueTemplate] ${consoleLabel} 로딩 실패:`, targetUrl);
+      };
+      image.src = targetUrl;
     };
 
     const setBackground = (url) => {
-      // 배경 정책:
-      // 1) 현재 줄에 `배경`이 있으면 해당 URL로 교체
-      // 2) 현재 줄에 `배경`이 없으면 "직전 배경 유지" (요청사항)
-      // 3) 단, 아직 한 번도 배경이 없던 초기 상태에서는 기본 backgroundUrl을 사용
+      // [그림제어/배경] 재작성 정책:
+      // - 렌더는 즉시 반영한다(화면 멈춤 체감 방지).
+      // - 프리로드는 진단(성공/실패 캐시, trace)만 담당한다.
       const rowBackgroundUrl = cleanText(url);
       const fallbackBackgroundUrl = cleanText(backgroundUrl);
       const targetUrl = rowBackgroundUrl || currentBackgroundUrl || fallbackBackgroundUrl;
@@ -973,36 +999,16 @@
         currentBackgroundUrl = '';
         return;
       }
-
-      // 같은 URL이면 이미 보여 주는 배경을 그대로 유지한다.
-      if (targetUrl === currentBackgroundUrl) {
-        return;
+      if (targetUrl !== currentBackgroundUrl) {
+        bg.style.backgroundImage = `linear-gradient(to top, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.18)), url("${targetUrl}")`;
+        currentBackgroundUrl = targetUrl;
       }
-
-      const cachedStatus = backgroundLoadCache.get(targetUrl);
-      if (cachedStatus === 'loaded') {
-        applyBackgroundStyle(targetUrl);
-        return;
-      }
-
-      const image = new Image();
-      image.onload = () => {
-        backgroundLoadCache.set(targetUrl, 'loaded');
-        applyBackgroundStyle(targetUrl);
-      };
-      image.onerror = () => {
-        backgroundLoadCache.set(targetUrl, 'error');
-        // 그림제어 이슈를 테스트 패널에서 바로 확인할 수 있도록 로딩 실패를 추적에 남긴다.
-        pushTrace('background-load-error', { url: targetUrl });
-        console.warn('[DialogueTemplate] 배경 이미지 로딩 실패:', targetUrl);
-      };
-      image.src = targetUrl;
-    };
-
-    const getStandingElement = (slot) => (slot === 'left' ? standingLeftElement : standingRightElement);
-    const refreshStandingContainerState = () => {
-      const hasStanding = [standingLeftElement, standingRightElement].some((node) => node?.dataset.visible === 'true');
-      cg?.classList.toggle('has-standing', hasStanding);
+      preloadImageForDiagnostics({
+        url: targetUrl,
+        cache: backgroundLoadCache,
+        traceType: 'background-load-error',
+        consoleLabel: '배경 이미지'
+      });
     };
 
     const applyStandingSlotStyle = (slot, payload = {}) => {
@@ -1017,12 +1023,11 @@
       const moveY = Number.isFinite(payload.moveY) ? payload.moveY : Number(state.moveY || 0);
       const durationMs = Number.isFinite(payload.durationMs) ? payload.durationMs : Number(state.durationMs || 280);
       const facingHint = cleanText(payload.facing ?? state.facing).toLowerCase();
-      // 기본 정책: 일러스트는 오른쪽을 바라보도록 제작하므로,
-      // 우측 슬롯은 좌측 인물과 마주 보이도록 자동 좌우반전(auto)한다.
       const shouldFlip = facingHint === 'flip'
         || facingHint === 'left'
         || (facingHint !== 'unflip' && facingHint !== 'right' && slot === 'right');
 
+      // 상태를 먼저 동기화해 다음 줄에서 payload 생략 시에도 동일 동작을 유지한다.
       state.url = targetUrl;
       state.name = targetName;
       state.id = targetId;
@@ -1032,12 +1037,13 @@
       state.durationMs = durationMs;
       state.facing = facingHint;
 
-      if (!targetUrl || ['off', 'none', 'clear', '-'].includes(targetUrl.toLowerCase())) {
+      if (!targetUrl || IMAGE_EMPTY_TOKENS.has(targetUrl.toLowerCase())) {
         element.style.backgroundImage = 'none';
         element.dataset.visible = 'false';
         refreshStandingContainerState();
         return;
       }
+
       element.dataset.visible = 'true';
       element.dataset.name = targetName;
       element.dataset.standingId = targetId;
@@ -1046,32 +1052,16 @@
       element.style.setProperty('--standing-offset-x', `${moveX}px`);
       element.style.setProperty('--standing-offset-y', `${moveY}px`);
       element.style.transitionDuration = `${durationMs}ms`;
-      // 표시 자체는 CSS background-image에 즉시 반영한다.
-      // (프리로드 완료 콜백에 렌더를 의존하면 환경에 따라 스탠딩이 끝까지 비가시화될 수 있다.)
       element.style.backgroundImage = `url("${targetUrl}")`;
       refreshStandingContainerState();
 
-      const cachedStatus = standingLoadCache.get(targetUrl);
-      if (cachedStatus === 'error') {
-        pushTrace('standing-load-error', { url: targetUrl, slot });
-      }
-      if (cachedStatus === 'loaded' || cachedStatus === 'error') {
-        return;
-      }
-
-      // 사후 진단용 프리로드: 렌더 여부와 분리해 성공/실패 캐시만 기록한다.
-      const image = new Image();
-      image.onload = () => {
-        standingLoadCache.set(targetUrl, 'loaded');
-      };
-      image.onerror = () => {
-        standingLoadCache.set(targetUrl, 'error');
-        // 스탠딩 URL 오탈자가 있으면 배경은 보이는데 캐릭터만 사라져 보인다.
-        // 원인 파악을 빠르게 하기 위해 추적/콘솔에 실패 정보를 남긴다.
-        pushTrace('standing-load-error', { url: targetUrl, slot });
-        console.warn('[DialogueTemplate] 스탠딩 이미지 로딩 실패:', targetUrl, `(slot: ${slot})`);
-      };
-      image.src = targetUrl;
+      preloadImageForDiagnostics({
+        url: targetUrl,
+        cache: standingLoadCache,
+        traceType: 'standing-load-error',
+        tracePayload: { slot },
+        consoleLabel: `스탠딩 이미지(slot: ${slot})`
+      });
     };
 
     const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
@@ -1121,46 +1111,30 @@
     };
 
     const setIllustration = ({ url = '', animation = '' } = {}) => {
+      // [그림제어/그림] 재작성 정책:
+      // - URL이 있으면 즉시 표시
+      // - URL이 비면 clear
+      // - 프리로드는 진단 전용
+      if (!cg) return;
       const targetUrl = cleanText(url);
       const animationName = cleanText(animation).toLowerCase();
-      if (!cg) return;
-
-      if (!targetUrl) {
+      if (!targetUrl || IMAGE_EMPTY_TOKENS.has(targetUrl.toLowerCase())) {
         cg.style.backgroundImage = 'none';
         cg.dataset.animation = '';
         currentIllustrationUrl = '';
         return;
       }
-
-      const applyIllustrationStyle = () => {
+      if (targetUrl !== currentIllustrationUrl) {
         cg.style.backgroundImage = `url("${targetUrl}")`;
-        cg.dataset.animation = animationName;
         currentIllustrationUrl = targetUrl;
-      };
-
-      if (targetUrl === currentIllustrationUrl) {
-        cg.dataset.animation = animationName;
-        return;
       }
-
-      const cachedStatus = illustrationLoadCache.get(targetUrl);
-      if (cachedStatus === 'loaded') {
-        applyIllustrationStyle();
-        return;
-      }
-
-      const image = new Image();
-      image.onload = () => {
-        illustrationLoadCache.set(targetUrl, 'loaded');
-        applyIllustrationStyle();
-      };
-      image.onerror = () => {
-        illustrationLoadCache.set(targetUrl, 'error');
-        // 컷인/그림 레이어 실패도 조용히 묻히지 않도록 디버그 힌트를 제공한다.
-        pushTrace('illustration-load-error', { url: targetUrl });
-        console.warn('[DialogueTemplate] 그림 이미지 로딩 실패:', targetUrl);
-      };
-      image.src = targetUrl;
+      cg.dataset.animation = animationName;
+      preloadImageForDiagnostics({
+        url: targetUrl,
+        cache: illustrationLoadCache,
+        traceType: 'illustration-load-error',
+        consoleLabel: '그림 이미지'
+      });
     };
 
     const applyAudioDirective = (channelName, directive, { restartOnSameUrl = false } = {}) => {

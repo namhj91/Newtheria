@@ -1614,14 +1614,21 @@
       const current = queue[index];
       const jump = current?.jump;
       if (jump?.scene || jump?.anchor) {
-        pushTrace('jump', {
-          sceneTag: jump.scene || currentFilters.sceneTag || '',
-          anchorId: jump.anchor || ''
-        });
-        applySelection({
+        const nextFilters = {
           sceneTag: jump.scene || currentFilters.sceneTag,
           anchorId: jump.anchor || ''
+        };
+        pushTrace('jump', {
+          sceneTag: nextFilters.sceneTag || '',
+          anchorId: nextFilters.anchorId || ''
         });
+        try {
+          applySelection(nextFilters);
+        } catch (error) {
+          // 점프 타겟 오타/누락 시 무반응처럼 보이지 않도록
+          // 디버그 콜백으로 명시적 에러를 전달한다.
+          reportError(error);
+        }
         return;
       }
       index = (index + 1) % queue.length;

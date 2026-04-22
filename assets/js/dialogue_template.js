@@ -487,6 +487,19 @@
     .map((entry) => parseChoiceDescriptor(entry))
     .filter((choice) => choice?.label);
 
+  const parseJumpDescriptor = (rawValue = '', { fallbackScene = '' } = {}) => {
+    // 선택지 없이 다음 앵커로 이동할 때 사용하는 축약 문법.
+    // 예: "intro#ending", "#ending", "chapter2"
+    const source = cleanText(rawValue);
+    if (!source) return null;
+    const [sceneRaw = '', anchorRaw = ''] = source.split('#').map((part) => cleanText(part));
+    if (!sceneRaw && !anchorRaw) return null;
+    return {
+      scene: sceneRaw || fallbackScene,
+      anchor: anchorRaw || ''
+    };
+  };
+
   const normalizeVariableRecord = (value) => {
     // 이미 객체 형태({ playerName: '순례자' })인 변수값은 재파싱하지 않고 그대로 유지한다.
     // CSV 문자열만 parseInlineVariables로 보내 [object Object] 키가 생기는 재정규화 오류를 방지한다.
@@ -557,6 +570,10 @@
     condition: pick(row, ['조건', 'condition']),
     effects: normalizeEffectRecord(row.effects ?? row.effect ?? row.효과 ?? ''),
     endDialogue: parseBooleanLike(pick(row, ['종료', 'end', 'stop'], '')),
+    // 점프: 선택지 없이 다음 앵커(또는 scene 시작점)로 이동.
+    jump: parseJumpDescriptor(pick(row, ['점프', 'jump', '이동'], ''), {
+      fallbackScene: pick(row, ['태그', 'scene'])
+    }),
     // 단일 문법 컬럼:
     // - 선택지: "라벨 => scene#anchor || 라벨2 => scene2#anchor2"
     // - 히든선택지: 동일 문법
@@ -627,92 +644,69 @@
     return queue;
   };
 
-  const parseCsvRows = (csvText) => {
-    // 따옴표/콤마/개행을 처리하는 경량 CSV 파서.
-    // 외부 라이브러리 의존 없이 테스트 환경에서도 동작하도록 직접 구현.
-    const rows = [];
-    let current = '';
-    let row = [];
-    let inQuotes = false;
+  const parseAllDialoguesFromScriptText = (scriptText) => {
+    // 유저친화 스크립트 문법:
+    // @scene#anchor
+    // 화자: 아스테리아
+    // 대사: ...
+    // 점프: intro#ending
+    // ---
+    const lines = String(scriptText || '').split(/\r?\n/);
+    const records = [];
+    let row = {};
 
-    for (let i = 0; i < csvText.length; i += 1) {
-      const char = csvText[i];
-      const next = csvText[i + 1];
+    const flush = () => {
+      if (Object.keys(row).length === 0) return;
+      records.push(normalizeDialogueRow(row));
+      row = {};
+    };
 
-      if (char === '"') {
-        if (inQuotes && next === '"') {
-          current += '"';
-          i += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-        continue;
+    lines.forEach((rawLine) => {
+      const line = cleanText(rawLine);
+      // 빈 줄은 블록 종료로 보지 않는다.
+      // 이유: 비전문가 스크립트에서 가독성을 위해 블록 내부에 공백 줄을 자주 넣기 때문.
+      if (!line) return;
+      if (line === '---') {
+        flush();
+        return;
+      }
+      if (line.startsWith('//') || line.startsWith(';')) return;
+
+      if (line.startsWith('@')) {
+        flush();
+        const target = cleanText(line.slice(1));
+        const [scene = '', anchor = ''] = target.split('#').map((part) => cleanText(part));
+        row.태그 = scene;
+        row.앵커 = anchor;
+        return;
       }
 
-      if (char === ',' && !inQuotes) {
-        row.push(current);
-        current = '';
-        continue;
-      }
+      const separatorIndex = line.indexOf(':');
+      if (separatorIndex < 0) return;
+      const key = cleanText(line.slice(0, separatorIndex));
+      const value = cleanText(line.slice(separatorIndex + 1));
+      if (!key) return;
+      row[key] = value;
+    });
 
-      if ((char === '\n' || char === '\r') && !inQuotes) {
-        if (char === '\r' && next === '\n') i += 1;
-        row.push(current);
-        rows.push(row);
-        row = [];
-        current = '';
-        continue;
-      }
-
-      current += char;
-    }
-
-    if (current.length > 0 || row.length > 0) {
-      row.push(current);
-      rows.push(row);
-    }
-
-    return rows;
-  };
-
-  const parseAllDialoguesFromCsvText = (csvText) => {
-    // CSV 원문을 "정규화된 전체 대사 레코드 배열"로 변환한다.
-    // 분기 점프를 위해 전체 레코드를 보관해야 하므로, 이 함수는 필터링하지 않는다.
-    const rows = parseCsvRows(csvText);
-    if (rows.length < 2) {
-      throw new Error('CSV 파일에서 헤더/대사 데이터를 찾지 못했습니다.');
-    }
-
-    const headers = rows[0].map((header) => cleanText(header));
-    const records = rows.slice(1)
-      .filter((cells) => cells.some((cell) => cleanText(cell).length > 0))
-      .map((cells) => {
-        const row = {};
-        headers.forEach((header, index) => {
-          row[header] = cells[index] ?? '';
-        });
-        return normalizeDialogueRow(row);
-      })
-      .filter((row) => row.line.length > 0);
-
+    flush();
     if (records.length === 0) {
-      throw new Error('CSV 파일에서 유효한 대사를 찾지 못했습니다.');
+      throw new Error('대사 스크립트에서 유효한 블록을 찾지 못했습니다.');
     }
-
     return records;
   };
 
-  const parseDialoguesFromCsvText = (csvText, options = {}) => {
-    // 외부 공개 API: CSV 텍스트 -> (scene/anchor 조건 반영된) 표시용 대사 구간.
-    const records = parseAllDialoguesFromCsvText(csvText);
+  const parseDialoguesFromCsvText = (scriptText, options = {}) => {
+    // 하위 호환 API 이름 유지: 내부 구현은 신규 스크립트 문법을 사용한다.
+    const records = parseAllDialoguesFromScriptText(scriptText);
     return selectDialogueSegment(records, options);
   };
 
   const loadDialoguesFromCsvUrl = async (csvUrl, options = {}) => {
-    // 외부 공개 API: CSV URL에서 바로 로딩 + 필터링.
+    // 외부 공개 API: 스크립트 URL에서 바로 로딩 + 필터링.
     const response = await fetch(csvUrl, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(`CSV 파일을 불러오지 못했습니다: ${response.status}`);
+      throw new Error(`대사 스크립트 파일을 불러오지 못했습니다: ${response.status}`);
     }
     const text = await response.text();
     return parseDialoguesFromCsvText(text, options);
@@ -1465,9 +1459,7 @@
 
     const setAllRecords = (records, filters = {}) => {
       // 외부 데이터 교체 시 전체 레코드를 저장하고, 현재 필터로 즉시 재선택/렌더한다.
-      allRecords = records
-        .map(normalizeDialogueRow)
-        .filter((row) => row.line.length > 0);
+      allRecords = records.map(normalizeDialogueRow);
       if (allRecords.length === 0) {
         allRecords = [...DEFAULT_DIALOGUES];
       }
@@ -1491,6 +1483,19 @@
       // 선택지가 열려 있는 구간에서는 임의 진행을 막고,
       // 버튼 선택으로만 분기하도록 보호한다.
       if (queue.length === 0 || isChoiceStep || isDialogueEnded) return;
+      const current = queue[index];
+      const jump = current?.jump;
+      if (jump?.scene || jump?.anchor) {
+        pushTrace('jump', {
+          sceneTag: jump.scene || currentFilters.sceneTag || '',
+          anchorId: jump.anchor || ''
+        });
+        applySelection({
+          sceneTag: jump.scene || currentFilters.sceneTag,
+          anchorId: jump.anchor || ''
+        });
+        return;
+      }
       index = (index + 1) % queue.length;
       render();
     };
@@ -1524,12 +1529,12 @@
       fetch(csvUrl, { cache: 'no-store' })
         .then((response) => {
           if (!response.ok) {
-            throw new Error(`CSV 파일을 불러오지 못했습니다: ${response.status}`);
+            throw new Error(`대사 스크립트 파일을 불러오지 못했습니다: ${response.status}`);
           }
           return response.text();
         })
         .then((text) => {
-          const records = parseAllDialoguesFromCsvText(text);
+          const records = parseAllDialoguesFromScriptText(text);
           setAllRecords(records);
         })
         .catch(reportError);
@@ -1544,24 +1549,24 @@
         setAllRecords(Array.isArray(nextDialogues) ? nextDialogues : DEFAULT_DIALOGUES, filters);
       },
       async loadFromCsvUrl(nextCsvUrl, filters = {}) {
-        // 런타임에서 URL 기반 CSV를 다시 불러올 때 사용.
+        // 런타임에서 URL 기반 스크립트를 다시 불러올 때 사용.
         try {
           const response = await fetch(nextCsvUrl, { cache: 'no-store' });
           if (!response.ok) {
-            throw new Error(`CSV 파일을 불러오지 못했습니다: ${response.status}`);
+            throw new Error(`대사 스크립트 파일을 불러오지 못했습니다: ${response.status}`);
           }
           const text = await response.text();
-          const records = parseAllDialoguesFromCsvText(text);
+          const records = parseAllDialoguesFromScriptText(text);
           setAllRecords(records, filters);
         } catch (error) {
           reportError(error);
         }
       },
       async loadFromCsvFile(file, filters = {}) {
-        // 런타임에서 로컬 CSV 파일(File API)을 직접 업로드할 때 사용.
+        // 런타임에서 로컬 스크립트 파일(File API)을 직접 업로드할 때 사용.
         try {
           const text = await file.text();
-          const records = parseAllDialoguesFromCsvText(text);
+          const records = parseAllDialoguesFromScriptText(text);
           setAllRecords(records, filters);
         } catch (error) {
           reportError(error);

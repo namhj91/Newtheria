@@ -151,11 +151,11 @@
       <details id="sectionSource" open>
         <summary>1) 데이터 소스</summary>
         <div class="group">
-          <label for="csvUrl">CSV URL</label>
-          <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.csv" />
+          <label for="csvUrl">스크립트 URL</label>
+          <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.nds" />
 
-          <label for="csvFile">CSV 파일 직접 선택(.csv)</label>
-          <input id="csvFile" type="file" accept=".csv,text/csv" />
+          <label for="csvFile">스크립트 파일 직접 선택(.nds/.txt)</label>
+          <input id="csvFile" type="file" accept=".nds,.txt,text/plain" />
         </div>
       </details>
 
@@ -180,7 +180,7 @@
       <details id="sectionBackground">
         <summary>3) 배경 설정</summary>
         <div class="group">
-          <label for="backgroundUrl">기본 배경 URL(비우면 CSV 열 우선)</label>
+          <label for="backgroundUrl">기본 배경 URL(비우면 스크립트 값 우선)</label>
           <input id="backgroundUrl" type="text" value="https://picsum.photos/id/1015/1920/1080" />
         </div>
       </details>
@@ -203,7 +203,7 @@
 
       <details id="sectionGuide">
         <summary>5) 문법 힌트</summary>
-        <p class="hint">CSV 단일 문법(권장): <code>태그</code>, <code>앵커</code>, <code>화자</code>, <code>대사</code>, <code>배경</code>, <code>그림</code>, <code>그림애니메이션</code>, <code>스탠딩</code>, <code>bgm</code>, <code>bgs</code>, <code>voice</code>, <code>sfx</code>, <code>자동넘김</code>, <code>화면효과</code>, <code>카메라</code>, <code>ui</code>, <code>진동</code>, <code>파티클</code>, <code>조명</code>, <code>씬전환</code>, <code>변수</code>, <code>조건</code>, <code>효과</code>, <code>종료</code>, <code>선택지</code>, <code>히든선택지</code><br/>오디오: <code>play|url|0.7|true</code> / <code>stop</code> / <code>url</code><br/>연출: <code>스탠딩=좌=hero.png|아스테리아|move(12,0,280)|right;우=player.png|순례자|move(-12,0,280)|auto;화자=좌</code>, <code>카메라=pan(12,-6,400);zoom(1.06,320)</code>, <code>ui=choices=lock</code>, <code>진동=medium</code>, <code>파티클=snow:on</code>, <code>조명=tint(#88aaff,0.22,360)</code>, <code>씬전환=fade-black(500)</code></p>
+        <p class="hint">NDS 블록 문법: <code>@scene#anchor</code> + <code>키: 값</code> + 블록 구분선 <code>---</code>.<br/>핵심 키: <code>화자</code>, <code>대사</code>, <code>배경</code>, <code>스탠딩</code>, <code>bgm/bgs/voice/sfx</code>, <code>자동넘김</code>, <code>조건</code>, <code>효과</code>, <code>선택지</code>, <code>히든선택지</code>, <code>점프</code>, <code>종료</code>.<br/>점프 예시: <code>점프: intro#end</code> (선택지 없이 앵커 이동)</p>
       </details>
     </div>
   </section>
@@ -278,7 +278,7 @@
     });
 
     // 대화 테스트 패널 전체를 최소화/복원한다.
-    // 요청사항대로 "앵커/태그 영역만"이 아니라 CSV URL/파일/헤더 힌트까지 전체를 접는다.
+    // 요청사항대로 "앵커/태그 영역만"이 아니라 스크립트 URL/파일/문법 힌트까지 전체를 접는다.
     toggleControlsButton.addEventListener('click', () => {
       const nextMinimized = !controlsPanel.classList.contains('is-minimized');
       controlsPanel.classList.toggle('is-minimized', nextMinimized);

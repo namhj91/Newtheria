@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.57(260421-순례자스탠딩경로분리)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.59(260422-대사없는블록진행정지수정)';
 
 const MAP_SIZE = 200;
 

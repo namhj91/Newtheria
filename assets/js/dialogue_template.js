@@ -277,11 +277,15 @@
           : (['우', 'right', 'r'].includes(key) ? 'right' : '');
         if (!slot) return;
 
-        const [urlRaw = '', nameRaw = '', motionRaw = '', facingRaw = ''] = body.split('|').map((part) => cleanText(part));
+        const [urlRaw = '', nameRaw = '', motionRaw = '', facingRaw = '', ...metaParts] = body.split('|').map((part) => cleanText(part));
         const moveMatch = motionRaw.match(/^move\(([-\d.]+)\s*,\s*([-\d.]+)(?:\s*,\s*(\d+))?\)$/i);
+        const standingId = metaParts
+          .map((part) => part.match(/^(?:id|tag|키)\s*[:=]\s*(.+)$/i))
+          .find(Boolean)?.[1]?.trim() || '';
         standing.slots[slot] = {
           url: urlRaw,
           name: nameRaw,
+          id: standingId,
           motion: moveMatch ? 'move' : motionRaw.toLowerCase(),
           moveX: moveMatch ? Number(moveMatch[1]) : 0,
           moveY: moveMatch ? Number(moveMatch[2]) : 0,
@@ -487,6 +491,12 @@
     .map((entry) => parseChoiceDescriptor(entry))
     .filter((choice) => choice?.label);
 
+  const parseChoiceSectionLines = (entries = []) => entries
+    .map((entry) => cleanText(entry).replace(/^-\s*/, ''))
+    .filter(Boolean)
+    .map((entry) => parseChoiceDescriptor(entry))
+    .filter((choice) => choice?.label);
+
   const parseJumpDescriptor = (rawValue = '', { fallbackScene = '' } = {}) => {
     // 선택지 없이 다음 앵커로 이동할 때 사용하는 축약 문법.
     // 예: "intro#ending", "#ending", "chapter2"
@@ -537,6 +547,8 @@
     // anchor: scene 내부의 시작 지점 식별자(재진입/분기 점프 기준)
     anchor: pick(row, ['앵커', 'anchor']),
     speaker: pick(row, ['화자', '인물명', 'speaker'], '???'),
+    // 화자명과 스탠딩 하이라이트 키를 분리해, 추후 멀티 레이어 캐릭터에서도 안정적으로 포커스 제어.
+    speakerFocus: pick(row, ['화자포커스', '포커스', 'focus', 'speakerFocus']),
     line: pick(row, ['대사', 'line']),
     backgroundUrl: pick(row, ['배경', 'backgroundUrl']),
     // 그림(캐릭터 스탠딩/컷인) 레이어. 배경 위, 대화창 아래에서 표시한다.
@@ -645,26 +657,54 @@
   };
 
   const parseAllDialoguesFromScriptText = (scriptText) => {
-    // 유저친화 스크립트 문법:
+    // NDS v2 문법(섹션 기반):
     // @scene#anchor
-    // 화자: 아스테리아
-    // 대사: ...
-    // 점프: intro#ending
+    // [대사출력]
+    // 화자 = 아스테리아
+    // 대사 = ...
+    // [흐름제어]
+    // 자동넘김 = 1200
+    // 점프 = intro#next
+    // [선택지]
+    // - 라벨 => intro#next
     // ---
     const lines = String(scriptText || '').split(/\r?\n/);
     const records = [];
     let row = {};
+    let currentSection = '';
+
+    const SECTION_ALIAS = {
+      '대사출력': 'dialogue',
+      '소리제어': 'audio',
+      '그림제어': 'image',
+      '연출제어': 'fx',
+      '흐름제어': 'flow',
+      '변수제어': 'state',
+      '선택지': 'choices',
+      '히든선택지': 'hiddenChoices'
+    };
+
+
+    const appendChoiceLine = (key, value) => {
+      if (!Array.isArray(row[key])) row[key] = [];
+      row[key].push(value);
+    };
 
     const flush = () => {
       if (Object.keys(row).length === 0) return;
+      if (Array.isArray(row.선택지)) {
+        row.choices = parseChoiceSectionLines(row.선택지);
+      }
+      if (Array.isArray(row.히든선택지)) {
+        row.hiddenChoices = parseChoiceSectionLines(row.히든선택지);
+      }
       records.push(normalizeDialogueRow(row));
       row = {};
+      currentSection = '';
     };
 
     lines.forEach((rawLine) => {
       const line = cleanText(rawLine);
-      // 빈 줄은 블록 종료로 보지 않는다.
-      // 이유: 비전문가 스크립트에서 가독성을 위해 블록 내부에 공백 줄을 자주 넣기 때문.
       if (!line) return;
       if (line === '---') {
         flush();
@@ -681,17 +721,50 @@
         return;
       }
 
-      const separatorIndex = line.indexOf(':');
-      if (separatorIndex < 0) return;
-      const key = cleanText(line.slice(0, separatorIndex));
-      const value = cleanText(line.slice(separatorIndex + 1));
-      if (!key) return;
+      const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+      if (sectionMatch) {
+        const sectionName = cleanText(sectionMatch[1]);
+        currentSection = SECTION_ALIAS[sectionName] || '';
+        return;
+      }
+
+      const listMatch = line.match(/^-\s*(.+)$/);
+      if (listMatch && (currentSection === 'choices' || currentSection === 'hiddenChoices')) {
+        const listValue = cleanText(listMatch[1]);
+        if (!listValue) return;
+        if (currentSection === 'choices') appendChoiceLine('선택지', listValue);
+        if (currentSection === 'hiddenChoices') appendChoiceLine('히든선택지', listValue);
+        return;
+      }
+
+      const kvMatch = line.match(/^([^:=]+?)\s*[:=]\s*(.*)$/);
+      if (!kvMatch) {
+        if (currentSection === 'choices') appendChoiceLine('선택지', line);
+        if (currentSection === 'hiddenChoices') appendChoiceLine('히든선택지', line);
+        return;
+      }
+
+      const explicitKey = cleanText(kvMatch[1]);
+      const value = cleanText(kvMatch[2]);
+      if (!explicitKey) return;
+
+      const key = explicitKey;
+
+      if (key === '선택지') {
+        row.choices = parseChoiceList(value);
+        return;
+      }
+      if (key === '히든선택지') {
+        row.hiddenChoices = parseChoiceList(value);
+        return;
+      }
+
       row[key] = value;
     });
 
     flush();
     if (records.length === 0) {
-      throw new Error('대사 스크립트에서 유효한 블록을 찾지 못했습니다.');
+      throw new Error('대사 스크립트에서 유효한 블록을 찾지 못했습니다. @scene#anchor와 [섹션] 구성을 확인해 주세요.');
     }
     return records;
   };
@@ -796,8 +869,8 @@
     let currentBackgroundUrl = '';
     let currentIllustrationUrl = '';
     const standingState = {
-      left: { url: '', name: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' },
-      right: { url: '', name: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' }
+      left: { url: '', name: '', id: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' },
+      right: { url: '', name: '', id: '', motion: '', moveX: 0, moveY: 0, durationMs: 280, facing: '' }
     };
     const backgroundLoadCache = new Map();
     const illustrationLoadCache = new Map();
@@ -862,8 +935,13 @@
     };
 
     const setBackground = (url) => {
-      // 줄 단위 배경 -> 기본 배경 순으로 적용.
-      const targetUrl = cleanText(url || backgroundUrl);
+      // 배경 정책:
+      // 1) 현재 줄에 `배경`이 있으면 해당 URL로 교체
+      // 2) 현재 줄에 `배경`이 없으면 "직전 배경 유지" (요청사항)
+      // 3) 단, 아직 한 번도 배경이 없던 초기 상태에서는 기본 backgroundUrl을 사용
+      const rowBackgroundUrl = cleanText(url);
+      const fallbackBackgroundUrl = cleanText(backgroundUrl);
+      const targetUrl = rowBackgroundUrl || currentBackgroundUrl || fallbackBackgroundUrl;
       if (!bg) return;
       if (!targetUrl) {
         currentBackgroundUrl = '';
@@ -904,6 +982,7 @@
       const state = standingState[slot];
       const targetUrl = cleanText(payload.url ?? state.url);
       const targetName = cleanText(payload.name ?? state.name);
+      const targetId = cleanText(payload.id ?? state.id);
       const targetMotion = cleanText(payload.motion ?? state.motion).toLowerCase();
       const moveX = Number.isFinite(payload.moveX) ? payload.moveX : Number(state.moveX || 0);
       const moveY = Number.isFinite(payload.moveY) ? payload.moveY : Number(state.moveY || 0);
@@ -917,6 +996,7 @@
 
       state.url = targetUrl;
       state.name = targetName;
+      state.id = targetId;
       state.motion = targetMotion;
       state.moveX = moveX;
       state.moveY = moveY;
@@ -931,6 +1011,7 @@
       }
       element.dataset.visible = 'true';
       element.dataset.name = targetName;
+      element.dataset.standingId = targetId;
       element.dataset.motion = targetMotion;
       element.dataset.flip = shouldFlip ? 'true' : 'false';
       element.style.setProperty('--standing-offset-x', `${moveX}px`);
@@ -940,17 +1021,32 @@
       refreshStandingContainerState();
     };
 
-    const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '' } = {}) => {
+    const resolveActiveStandingSlot = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
       if (activeSlot) return activeSlot;
-      const normalizedSpeaker = cleanText(speaker);
-      if (!normalizedSpeaker) return '';
-      if (normalizedSpeaker === cleanText(standingState.left.name)) return 'left';
-      if (normalizedSpeaker === cleanText(standingState.right.name)) return 'right';
-      return '';
+
+      const resolveByToken = (token) => {
+        const normalized = cleanText(token);
+        if (!normalized) return '';
+        const lowered = normalized.toLowerCase();
+        if (['좌', 'left', 'l'].includes(lowered)) return 'left';
+        if (['우', 'right', 'r'].includes(lowered)) return 'right';
+        if (normalized === cleanText(standingState.left.id)) return 'left';
+        if (normalized === cleanText(standingState.right.id)) return 'right';
+        if (normalized === cleanText(standingState.left.name)) return 'left';
+        if (normalized === cleanText(standingState.right.name)) return 'right';
+        return '';
+      };
+
+      // 1순위: 별도 포커스 키(화자포커스/포커스)
+      const focusSlot = resolveByToken(focusTarget);
+      if (focusSlot) return focusSlot;
+
+      // 2순위: 화자명
+      return resolveByToken(speaker);
     };
 
-    const applyStandingFocus = ({ speaker = '', activeSlot = '' } = {}) => {
-      const resolvedSlot = resolveActiveStandingSlot({ speaker, activeSlot });
+    const applyStandingFocus = ({ speaker = '', activeSlot = '', focusTarget = '' } = {}) => {
+      const resolvedSlot = resolveActiveStandingSlot({ speaker, activeSlot, focusTarget });
       [standingLeftElement, standingRightElement].forEach((element) => {
         if (!element) return;
         const isVisible = element.dataset.visible === 'true';
@@ -960,7 +1056,7 @@
       });
     };
 
-    const applyStandingDirective = (directive = null, { speaker = '' } = {}) => {
+    const applyStandingDirective = (directive = null, { speaker = '', focusTarget = '' } = {}) => {
       if (!standingLeftElement || !standingRightElement) return;
       if (directive?.clear) {
         applyStandingSlotStyle('left', { url: '' });
@@ -968,7 +1064,7 @@
       }
       if (directive?.slots?.left) applyStandingSlotStyle('left', directive.slots.left);
       if (directive?.slots?.right) applyStandingSlotStyle('right', directive.slots.right);
-      applyStandingFocus({ speaker, activeSlot: directive?.activeSlot || '' });
+      applyStandingFocus({ speaker, activeSlot: directive?.activeSlot || '', focusTarget });
     };
 
     const setIllustration = ({ url = '', animation = '' } = {}) => {
@@ -1390,7 +1486,10 @@
           url: current.illustrationUrl,
           animation: current.illustrationAnimation
         });
-        applyStandingDirective(current.standing, { speaker: current.speaker || '' });
+        applyStandingDirective(current.standing, {
+          speaker: current.speaker || '',
+          focusTarget: current.speakerFocus || ''
+        });
         applyAudioDirective('bgm', current.bgm);
         applyAudioDirective('bgs', current.bgs);
         applyAudioDirective('voice', current.voice, { restartOnSameUrl: true });
@@ -1422,7 +1521,11 @@
       nameElement.textContent = applyTemplateVariables(current.speaker || '???', templateVariables);
       lineElement.textContent = applyTemplateVariables(current.line || '', templateVariables);
       // 줄마다 화자 기준 하이라이트를 다시 계산해 "누가 말하는지"를 즉시 드러낸다.
-      applyStandingFocus({ speaker: current.speaker || '', activeSlot: current.standing?.activeSlot || '' });
+      applyStandingFocus({
+        speaker: current.speaker || '',
+        activeSlot: current.standing?.activeSlot || '',
+        focusTarget: current.speakerFocus || ''
+      });
       setBackground(current.backgroundUrl);
       const choices = extractChoices(current)
         .filter((choice) => evaluateConditionExpression(choice.condition, templateVariables))

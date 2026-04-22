@@ -68,7 +68,7 @@ voice = play|assets/audio/pilgrim_intro_01.ogg|0.9|off
 효과 = 신뢰도+1
 
 [흐름제어]
-점프 = rebirth_offer#vision_open
+점프 = rebirth_intro#comfort
 
 ---
 

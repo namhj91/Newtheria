@@ -31,6 +31,35 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 18%, rgba(0, 0, 0, 0.18) 54%, rgba(0, 0, 0, 0.6) 100%);
 }
 
+.dialogue-prototype__actors {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.dialogue-prototype__actors[data-has-actors="true"] {
+  opacity: 1;
+}
+
+.dialogue-prototype__actors[data-animation="fade"] {
+  animation: dialogue-actors-fade 260ms ease-out;
+}
+
+.dialogue-prototype__actors[data-animation="float"] {
+  animation: dialogue-actors-float 2.4s ease-in-out infinite;
+}
+
+.dialogue-prototype__actors[data-animation="zoom-in"] {
+  animation: dialogue-actors-zoom-in 280ms ease-out;
+}
+
+.dialogue-prototype__actors[data-animation="shake"] {
+  animation: dialogue-actors-shake 360ms ease-out;
+}
+
 .dialogue-prototype__light,
 .dialogue-prototype__particles,
 .dialogue-prototype__transition {
@@ -356,6 +385,27 @@
 @keyframes dialogue-enter-up {
   0% { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dialogue-actors-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialogue-actors-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes dialogue-actors-zoom-in {
+  from { transform: scale(1.06); opacity: .72; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes dialogue-actors-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
 }
 
 

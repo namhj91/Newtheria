@@ -835,6 +835,7 @@
     root.innerHTML = `
       <div class="dialogue-prototype__bg" aria-hidden="true">
       </div>
+      <div class="dialogue-prototype__actors" aria-hidden="true"></div>
       <div class="dialogue-prototype__light" aria-hidden="true"></div>
       <div class="dialogue-prototype__particles" aria-hidden="true"></div>
       <div class="dialogue-prototype__transition" aria-hidden="true"></div>
@@ -856,6 +857,7 @@
     mount.replaceChildren(root);
 
     const bg = root.querySelector('.dialogue-prototype__bg');
+    const actorsLayer = root.querySelector('.dialogue-prototype__actors');
     const lightLayer = root.querySelector('.dialogue-prototype__light');
     const particleLayer = root.querySelector('.dialogue-prototype__particles');
     const transitionLayer = root.querySelector('.dialogue-prototype__transition');
@@ -885,6 +887,12 @@
     let isDialogueEnded = false;
     // 같은 배경 URL을 연속 렌더할 때 불필요한 재로딩을 피하기 위해 상태를 기억한다.
     let currentBackgroundUrl = '';
+    // 그림/스탠딩은 전용 DOM 대신 "배경과 동일한 background-image 렌더 방식"으로 누적 상태를 유지한다.
+    let currentIllustrationUrl = '';
+    const standingRenderState = {
+      left: '',
+      right: ''
+    };
     const backgroundLoadCache = new Map();
     const debugListeners = new Set();
     const traceEntries = [];
@@ -990,6 +998,87 @@
       });
     };
 
+    const IMAGE_EMPTY_TOKENS = new Set(['off', 'none', 'clear', '-']);
+    const isExplicitClearToken = (value = '') => {
+      const normalized = cleanText(value).toLowerCase();
+      return Boolean(normalized) && IMAGE_EMPTY_TOKENS.has(normalized);
+    };
+
+    const applyIllustrationState = (url = '') => {
+      const normalized = cleanText(url);
+      if (isExplicitClearToken(normalized)) {
+        currentIllustrationUrl = '';
+        return;
+      }
+      if (normalized) {
+        currentIllustrationUrl = normalized;
+      }
+    };
+
+    const applyStandingState = (directive = null) => {
+      if (!directive) return;
+      if (directive.clear) {
+        standingRenderState.left = '';
+        standingRenderState.right = '';
+      }
+      const leftUrl = cleanText(directive?.slots?.left?.url);
+      const rightUrl = cleanText(directive?.slots?.right?.url);
+      if (isExplicitClearToken(leftUrl)) {
+        standingRenderState.left = '';
+      } else if (leftUrl) {
+        standingRenderState.left = leftUrl;
+      }
+      if (isExplicitClearToken(rightUrl)) {
+        standingRenderState.right = '';
+      } else if (rightUrl) {
+        standingRenderState.right = rightUrl;
+      }
+    };
+
+    const renderActorLayer = (animationName = '') => {
+      if (!actorsLayer) return;
+      const renderItems = [];
+      // 우/좌 스탠딩 + 컷인(그림)을 모두 CSS background-image 다중 레이어로 합성한다.
+      if (standingRenderState.right) {
+        renderItems.push({
+          url: standingRenderState.right,
+          size: 'min(44vw, 620px) auto',
+          position: 'right clamp(0px, 1.8vw, 28px) bottom'
+        });
+      }
+      if (standingRenderState.left) {
+        renderItems.push({
+          url: standingRenderState.left,
+          size: 'min(44vw, 620px) auto',
+          position: 'left clamp(0px, 1.8vw, 28px) bottom'
+        });
+      }
+      if (currentIllustrationUrl) {
+        renderItems.push({
+          url: currentIllustrationUrl,
+          size: 'contain',
+          position: 'center bottom'
+        });
+      }
+
+      if (renderItems.length === 0) {
+        actorsLayer.style.backgroundImage = 'none';
+        actorsLayer.style.backgroundSize = '';
+        actorsLayer.style.backgroundPosition = '';
+        actorsLayer.style.backgroundRepeat = '';
+        actorsLayer.dataset.hasActors = 'false';
+        actorsLayer.dataset.animation = '';
+        return;
+      }
+
+      actorsLayer.style.backgroundImage = renderItems.map((item) => `url("${item.url}")`).join(', ');
+      actorsLayer.style.backgroundSize = renderItems.map((item) => item.size).join(', ');
+      actorsLayer.style.backgroundPosition = renderItems.map((item) => item.position).join(', ');
+      actorsLayer.style.backgroundRepeat = renderItems.map(() => 'no-repeat').join(', ');
+      actorsLayer.dataset.hasActors = 'true';
+      actorsLayer.dataset.animation = cleanText(animationName).toLowerCase();
+    };
+
     const applyAudioDirective = (channelName, directive, { restartOnSameUrl = false } = {}) => {
       if (!directive) return;
       const audio = audioChannels[channelName];
@@ -1057,7 +1146,7 @@
         }
       });
       const durationMs = commands.at(-1)?.durationMs ?? 320;
-      [bg].forEach((layer) => {
+      [bg, actorsLayer].forEach((layer) => {
         if (!layer) return;
         layer.style.transition = `transform ${durationMs}ms ease`;
         layer.style.transform = `translate(${cameraState.x}px, ${cameraState.y}px) scale(${cameraState.scale})`;
@@ -1366,6 +1455,9 @@
         // 예: start 줄에서 `playerName=순례자`를 주입하면 이후 줄의 `{{playerName}}`도 정상 치환.
         sharedVariables = { ...sharedVariables, ...(current.variables || {}) };
         sharedVariables = applyEffects(sharedVariables, current.effects || []);
+        applyIllustrationState(current.illustrationUrl);
+        applyStandingState(current.standing);
+        renderActorLayer(current.illustrationAnimation);
         applyAudioDirective('bgm', current.bgm);
         applyAudioDirective('bgs', current.bgs);
         applyAudioDirective('voice', current.voice, { restartOnSameUrl: true });

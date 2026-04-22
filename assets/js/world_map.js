@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.78(260422-배경기반일러렌더전환)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.79(260422-배경방식스탠딩일러복원)';
 
 const MAP_SIZE = 200;
 

@@ -33,7 +33,6 @@ sfx = assets/audio/soft_chime.ogg
 변수 = playerName=순례자;goddessName=아스테리아;신뢰도=1;별조각=0;환생의지=0;윤회기억=1;서약상태=대기
 
 [흐름제어]
-자동넘김 = 1300
 
 ---
 @rebirth_intro#comfort
@@ -50,7 +49,6 @@ voice = play|assets/audio/asteria_intro_01.ogg|0.88|off
 카메라 = pan(6,-4,340)
 
 [흐름제어]
-자동넘김 = 1400
 
 ---
 @rebirth_intro#pilgrim_answer
@@ -69,7 +67,6 @@ voice = play|assets/audio/pilgrim_intro_01.ogg|0.9|off
 효과 = 신뢰도+1
 
 [흐름제어]
-자동넘김 = 1200
 점프 = rebirth_offer#vision_open
 
 ---
@@ -90,7 +87,6 @@ ui = hud=on;name=on;choices=lock;skip=on
 효과 = 환생의지+1
 
 [흐름제어]
-자동넘김 = 1300
 
 ---
 @rebirth_offer#new_world
@@ -113,7 +109,6 @@ sfx = assets/audio/vision_expand.ogg
 효과 = 윤회기억+1
 
 [흐름제어]
-자동넘김 = 1450
 
 ---
 @rebirth_offer#promise
@@ -129,7 +124,6 @@ voice = play|assets/audio/asteria_offer_02.ogg|0.9|off
 카메라 = pan(-6,3,320)
 
 [흐름제어]
-자동넘김 = 1300
 
 ---
 @rebirth_offer#choice
@@ -162,7 +156,6 @@ sfx = assets/audio/decision_confirm.ogg
 효과 = 환생의지+1;서약상태=수락
 
 [흐름제어]
-자동넘김 = 1200
 점프 = rebirth_climax#blessing_start
 
 ---
@@ -179,7 +172,6 @@ sfx = assets/audio/decision_confirm.ogg
 효과 = 환생의지+1;신뢰도+1
 
 [흐름제어]
-자동넘김 = 1300
 점프 = rebirth_climax#blessing_start
 
 ---
@@ -197,7 +189,6 @@ sfx = assets/audio/decision_confirm.ogg
 효과 = 환생의지+1;별조각+1;서약상태=기억수락
 
 [흐름제어]
-자동넘김 = 1200
 점프 = rebirth_climax#blessing_start
 
 ---
@@ -221,7 +212,6 @@ sfx = assets/audio/ritual_begin.ogg
 조명 = tint(#fff1b0,0.24,420)
 
 [흐름제어]
-자동넘김 = 1200
 
 ---
 @rebirth_climax#no_dialogue_blessing_fx
@@ -237,6 +227,7 @@ sfx = assets/audio/heart_star_merge.ogg
 효과 = 별조각+1
 
 [흐름제어]
+; 대사 없는 연출 블록이라 화면이 멈춘 것처럼 보이지 않도록 최소 자동넘김만 유지한다.
 자동넘김 = 700
 점프 = rebirth_climax#blessing_words
 
@@ -259,7 +250,6 @@ ui = hud=off;name=on;choices=lock;skip=on
 효과 = 신뢰도+1;서약상태=축복완료
 
 [흐름제어]
-자동넘김 = 1500
 
 ---
 @rebirth_climax#pilgrim_vow
@@ -275,7 +265,6 @@ voice = play|assets/audio/pilgrim_vow_01.ogg|0.9|off
 효과 = 환생의지+1
 
 [흐름제어]
-자동넘김 = 1200
 점프 = rebirth_ending#farewell
 
 ---
@@ -293,7 +282,6 @@ voice = play|assets/audio/pilgrim_vow_01.ogg|0.9|off
 씬전환 = fade-white(480)
 
 [흐름제어]
-자동넘김 = 1300
 
 ---
 @rebirth_ending#light_vortex
@@ -307,7 +295,6 @@ voice = play|assets/audio/pilgrim_vow_01.ogg|0.9|off
 카메라 = zoom(1.12,220)
 
 [흐름제어]
-자동넘김 = 1100
 
 ---
 @rebirth_ending#new_world_arrival

@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.69(260422-대화점프디버그보강)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.70(260422-샘플대화자동넘김대폭축소)';
 
 const MAP_SIZE = 200;
 

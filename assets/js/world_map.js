@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.58(260421-대사스크립트NDS전환)';
+const WORLD_VERSION_FALLBACK = 'ver.0.1.59(260422-대사없는블록진행정지수정)';
 
 const MAP_SIZE = 200;
 

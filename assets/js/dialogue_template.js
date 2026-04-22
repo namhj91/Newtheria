@@ -663,7 +663,10 @@
 
     lines.forEach((rawLine) => {
       const line = cleanText(rawLine);
-      if (!line || line === '---') {
+      // 빈 줄은 블록 종료로 보지 않는다.
+      // 이유: 비전문가 스크립트에서 가독성을 위해 블록 내부에 공백 줄을 자주 넣기 때문.
+      if (!line) return;
+      if (line === '---') {
         flush();
         return;
       }

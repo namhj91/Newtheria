@@ -294,6 +294,7 @@ focus = goddess
 
 <block:마지막_배경>
 {
+bg = assets/img/background.jpg
 line = (빛이 순례자를 완전히 집어삼키기 직전, 아스테리아가 장난스러운 미소를 거두고 다정하게 속삭인다.)
 wait = 700
 }

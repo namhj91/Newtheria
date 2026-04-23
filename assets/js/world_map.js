@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.1.79(260422-배경방식스탠딩일러복원)';
+const WORLD_VERSION_FALLBACK = 'ver.0.2.8(260423-대표캐릭터세이브분리)';
 
 const MAP_SIZE = 200;
 

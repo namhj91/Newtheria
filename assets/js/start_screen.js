@@ -1,7 +1,13 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.1.79(260422-배경방식스탠딩일러복원)';
+const START_VERSION_FALLBACK = 'ver.0.2.8(260423-대표캐릭터세이브분리)';
+const STORAGE_KEYS = {
+  characterCatalog: 'newtheria.characters',
+  settingsMeta: 'newtheria.settings.meta',
+  saveSlotsMeta: 'newtheria.saveSlots.meta',
+  saveSlotsData: 'newtheria.saveSlots.data'
+};
 
 const CARD_MENU_ITEMS = [
   { route: 'new', icon: '🧭', label: '새로운 여정', desc: '처음부터 새로운 세계를 시작합니다.' },
@@ -17,6 +23,63 @@ const rootStyle = document.documentElement.style;
 let discardController = null;
 let rerollController = null;
 let isRerolling = false;
+
+const bootstrapPersistentStorage = () => {
+  // 시작 화면에서 캐릭터/설정/세이브 메타 기본값을 1회 시드한다.
+  // - 캐릭터 정보: localStorage
+  // - 설정/세이브 슬롯 메타: localStorage
+  // 로컬에는 대표 캐릭터만 유지한다. (대부분 캐릭터는 세이브 슬롯 데이터에 저장)
+  const defaultCharacterCatalog = {
+    goddess: {
+      id: 'goddess',
+      name: '아스테리아',
+      layers: ['assets/img/goddess.png']
+    },
+    pilgrim: {
+      id: 'pilgrim',
+      name: '순례자',
+      layers: ['assets/img/player.png']
+    }
+  };
+  const defaultSettingsMeta = {
+    language: 'ko-KR',
+    textSpeed: 'normal',
+    autoAdvance: false,
+    updatedAt: new Date().toISOString()
+  };
+  const defaultSaveSlotsMeta = {
+    updatedAt: new Date().toISOString(),
+    activeSlotId: 'slot1',
+    slots: [
+      { id: 'slot1', label: '슬롯 1', hasData: false, updatedAt: '' },
+      { id: 'slot2', label: '슬롯 2', hasData: false, updatedAt: '' },
+      { id: 'slot3', label: '슬롯 3', hasData: false, updatedAt: '' }
+    ]
+  };
+  const defaultSaveSlotsData = {
+    activeSlotId: 'slot1',
+    slots: {
+      slot1: { characters: {}, flags: {}, dialogueProgress: null },
+      slot2: { characters: {}, flags: {}, dialogueProgress: null },
+      slot3: { characters: {}, flags: {}, dialogueProgress: null }
+    }
+  };
+
+  const seedIfMissing = (key, value) => {
+    if (!window.localStorage) return;
+    if (window.localStorage.getItem(key) != null) return;
+    window.localStorage.setItem(key, JSON.stringify(value));
+  };
+
+  try {
+    seedIfMissing(STORAGE_KEYS.characterCatalog, defaultCharacterCatalog);
+    seedIfMissing(STORAGE_KEYS.settingsMeta, defaultSettingsMeta);
+    seedIfMissing(STORAGE_KEYS.saveSlotsMeta, defaultSaveSlotsMeta);
+    seedIfMissing(STORAGE_KEYS.saveSlotsData, defaultSaveSlotsData);
+  } catch (error) {
+    console.warn('시작 화면 스토리지 초기화에 실패했습니다.', error);
+  }
+};
 
 const UI = {
   cardVerticalStep: 14,
@@ -324,6 +387,7 @@ const updateStartVersionTag = async () => {
 
 const bootstrap = () => {
   const cardTemplateApi = window.NewtheriaCardTemplates;
+  bootstrapPersistentStorage();
   applyResponsiveUiTuning();
   initializeCards();
   bindCardInteractions();

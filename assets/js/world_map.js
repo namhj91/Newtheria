@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.2.13(260423-일러디버그탭정리)';
+const WORLD_VERSION_FALLBACK = 'ver.0.2.14(260423-모바일스탠딩위치보정)';
 
 const MAP_SIZE = 200;
 

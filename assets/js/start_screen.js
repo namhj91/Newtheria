@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.2.13(260423-일러디버그탭정리)';
+const START_VERSION_FALLBACK = 'ver.0.2.14(260423-모바일스탠딩위치보정)';
 const STORAGE_KEYS = {
   characterCatalog: 'newtheria.characters',
   settingsMeta: 'newtheria.settings.meta',

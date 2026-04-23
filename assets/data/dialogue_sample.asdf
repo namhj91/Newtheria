@@ -4,8 +4,6 @@
 <event:오프닝>
 <scene#0:도입>
 {
-; 임시 캐릭터 번들 (향후에는 외부 캐릭터 리스트/번들로 대체)
-cast_json = "{\"actors\":[{\"id\":\"goddess\",\"name\":\"아스테리아\",\"layers\":[\"assets/img/goddess.png\"]},{\"id\":\"pilgrim\",\"name\":\"순례자\",\"layers\":[\"assets/img/player.png\"]}]}"
 actor = goddess
 actor = pilgrim
 slot_left = goddess

@@ -213,6 +213,19 @@
         background: cleanText(currentBlock.bg || currentBlock.background),
         jump: cleanText(currentBlock.jump),
         end: parseBoolean(currentBlock.end),
+        // 스킵 잠금 문법:
+        // - skip_lock = on|off (권장)
+        // - skip = lock|unlock, skip_disabled = true|false (별칭)
+        // 별도 해제 지시가 없으면 scene 전환 전까지 상태를 유지한다.
+        skipLockDirective: readOptionalBlockValue(currentBlock, [
+          'skip_lock',
+          'skiplock',
+          'skip_disabled',
+          'skipdisabled',
+          'skip',
+          '스킵잠금',
+          '스킵불가'
+        ]),
         sfx: cleanText(currentBlock.sfx),
         // standing_left/right가 "미지정"인지 "명시적으로 비움"인지 구분해야
         // 블록마다 기본 배치를 의도치 않게 초기화하지 않는다.
@@ -643,6 +656,7 @@
         <p class="dialogue-prototype__line"></p>
         <button class="dialogue-prototype__next" type="button" aria-label="다음 대사">▼</button>
       </section>
+      <button class="dialogue-prototype__ui-toggle" type="button" aria-pressed="false">UI 숨김</button>
       <button class="dialogue-prototype__skip" type="button">SKIP</button>
     `;
     mount.replaceChildren(root);
@@ -659,6 +673,7 @@
       name: root.querySelector('.dialogue-prototype__name'),
       line: root.querySelector('.dialogue-prototype__line'),
       next: root.querySelector('.dialogue-prototype__next'),
+      uiToggle: root.querySelector('.dialogue-prototype__ui-toggle'),
       skip: root.querySelector('.dialogue-prototype__skip')
     };
 
@@ -682,6 +697,32 @@
     let activeLineTimer = null;
     let activeAutoNextTimer = null;
     let isLineAnimating = false;
+    let skipLocked = false;
+    let skipLockSceneKey = '';
+    let isUiHidden = false;
+
+    const parseSkipLockDirective = (value) => {
+      const token = cleanText(value).toLowerCase();
+      if (!token) return null;
+      if (['on', 'true', '1', 'lock', 'locked', 'disable', 'disabled', '불가', '잠금'].includes(token)) return true;
+      if (['off', 'false', '0', 'unlock', 'enabled', 'enable', '가능', '해제'].includes(token)) return false;
+      return null;
+    };
+
+    const applySkipButtonState = () => {
+      if (!el.skip) return;
+      el.skip.disabled = skipLocked;
+      el.skip.setAttribute('aria-disabled', skipLocked ? 'true' : 'false');
+      el.skip.textContent = skipLocked ? 'SKIP LOCKED' : 'SKIP';
+    };
+
+    const applyUiHiddenState = () => {
+      root.classList.toggle('is-ui-hidden', isUiHidden);
+      if (el.uiToggle) {
+        el.uiToggle.setAttribute('aria-pressed', isUiHidden ? 'true' : 'false');
+        el.uiToggle.textContent = isUiHidden ? 'UI 표시' : 'UI 숨김';
+      }
+    };
 
     const emitDebug = () => {
       const leftActor = standingState.actors.get(standingState.left);
@@ -1138,6 +1179,15 @@
       }
 
       const { scene, block } = hit;
+      const sceneKey = `${pointer.eventId}::${scene.sceneIndex}`;
+      if (sceneKey !== skipLockSceneKey) {
+        // 요구사항: 스킵 잠금은 별도 on/off가 없으면 "scene 전환 전까지만" 유지한다.
+        skipLocked = false;
+        skipLockSceneKey = sceneKey;
+      }
+      const skipDirective = parseSkipLockDirective(block.skipLockDirective);
+      if (skipDirective !== null) skipLocked = skipDirective;
+      applySkipButtonState();
       if (showMeta && el.meta) {
         const anchorLabel = block.anchor ? `:${block.anchor}` : '';
         el.meta.textContent = `${pointer.eventId} / scene#${scene.sceneIndex}(${scene.sceneName}) / block#${pointer.order}${anchorLabel}`;
@@ -1203,9 +1253,55 @@
         anchor: block.anchor,
         choiceCount: block.choices.length,
         waitMs,
+        skipLocked,
         typeSpeed: parseIntegerOrDefault(block.typeSpeed, 0),
         particleMode: cleanText(block.particleMode)
       });
+    };
+
+    const findSkipDestination = () => {
+      // SKIP은 "선택지", "씬 전환 직후", "종료 지점"을 만날 때까지 내부적으로 빠르게 전개한다.
+      // 렌더는 최종 목적지 1회만 수행해 체감 속도를 확보한다.
+      const startPtr = { ...pointer };
+      const startHit = getBlockByPointer(model, startPtr);
+      if (!startHit?.block) return null;
+
+      const visited = new Set();
+      let cursor = { ...startPtr };
+      let stepCount = 0;
+
+      while (stepCount < 1000) {
+        stepCount += 1;
+        const key = `${cursor.eventId}|${cursor.sceneIndex}|${cursor.order}`;
+        if (visited.has(key)) return cursor;
+        visited.add(key);
+
+        const hit = getBlockByPointer(model, cursor);
+        if (!hit?.block) return cursor;
+        const { event, scene, block } = hit;
+        const hasChoices = (Array.isArray(block.choices) && block.choices.length > 0)
+          || (Array.isArray(block.hiddenChoices) && block.hiddenChoices.length > 0);
+        if (hasChoices || block.end) return cursor;
+
+        let nextPtr = null;
+        if (block.jump) {
+          nextPtr = model.anchorMap.get(block.jump) || null;
+          if (!nextPtr) return cursor;
+        } else if (scene.blocks[cursor.order + 1]) {
+          nextPtr = { eventId: cursor.eventId, sceneIndex: cursor.sceneIndex, order: cursor.order + 1 };
+        } else {
+          const idx = event.scenes.findIndex((item) => item.sceneIndex === scene.sceneIndex);
+          if (idx >= 0 && event.scenes[idx + 1]) {
+            nextPtr = { eventId: cursor.eventId, sceneIndex: event.scenes[idx + 1].sceneIndex, order: 0 };
+          }
+        }
+
+        if (!nextPtr) return cursor;
+        if (nextPtr.sceneIndex !== cursor.sceneIndex || nextPtr.eventId !== cursor.eventId) return nextPtr;
+        cursor = nextPtr;
+      }
+
+      return cursor;
     };
 
     const goNext = () => {
@@ -1298,8 +1394,23 @@
 
     el.skip?.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (typeof onSkip === 'function') onSkip({ root, mount });
-      else root.remove();
+      if (skipLocked) {
+        log('skip-blocked', { reason: 'skip-lock' });
+        return;
+      }
+      const destination = findSkipDestination();
+      if (!destination) return;
+      log('skip-fast-forward', {
+        from: { ...pointer },
+        to: destination
+      });
+      goToPointer(destination);
+    });
+
+    el.uiToggle?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      isUiHidden = !isUiHidden;
+      applyUiHiddenState();
     });
 
     const initialFilters = { eventId, sceneId: sceneId || nodeId, anchor };
@@ -1311,6 +1422,8 @@
         .then((loaded) => applyModel(loaded, initialFilters))
         .catch(reportError);
     }
+    applyUiHiddenState();
+    applySkipButtonState();
 
     return {
       root,

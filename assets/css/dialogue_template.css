@@ -410,6 +410,14 @@
     padding: 14px 14px 20px;
   }
 
+  .dialogue-prototype__actor {
+    /* 모바일에서는 대화 패널이 하단 시야를 크게 차지하므로,
+       스탠딩 기준점을 올려 "하단 쏠림 + 짧아 보임" 체감을 줄인다. */
+    bottom: clamp(88px, 14svh, 148px);
+    width: min(44vw, 360px);
+    height: min(82svh, 760px);
+  }
+
   .dialogue-prototype__line {
     line-height: 1.48;
   }
@@ -513,6 +521,13 @@
 
   .dialogue-prototype__choices {
     height: min(44svh, 320px);
+  }
+
+  .dialogue-prototype__actor {
+    /* 초소형 구간은 좌우 여백을 더 확보하면서 기준점은 살짝만 내린다. */
+    bottom: clamp(82px, 12svh, 132px);
+    width: min(46vw, 320px);
+    height: min(80svh, 700px);
   }
 
   /* 모바일 카드 타이포/패딩은 공용 템플릿에서 처리한다. */

@@ -220,6 +220,27 @@
         standingRight: readOptionalBlockValue(currentBlock, ['standing_right', 'standingright', '스탠딩우', 'move_right']),
         standingFocus: cleanText(currentBlock.standing_focus || currentBlock.standingfocus || currentBlock.스탠딩포커스 || currentBlock.focus),
         standingAnimation: cleanText(currentBlock.standing_animation || currentBlock.standinganimation || currentBlock.스탠딩애니메이션),
+        standingAnimationLeft: cleanText(
+          currentBlock.standing_animation_left
+          || currentBlock.standinganimation_left
+          || currentBlock.standing_animation_l
+          || currentBlock.standinganimationl
+          || currentBlock.스탠딩애니메이션좌
+        ),
+        standingAnimationRight: cleanText(
+          currentBlock.standing_animation_right
+          || currentBlock.standinganimation_right
+          || currentBlock.standing_animation_r
+          || currentBlock.standinganimationr
+          || currentBlock.스탠딩애니메이션우
+        ),
+        standingAnimationActor: cleanText(
+          currentBlock.standing_animation_actor
+          || currentBlock.standinganimation_actor
+          || currentBlock.standing_animation_by_actor
+          || currentBlock.standinganimationbyactor
+          || currentBlock.스탠딩애니메이션액터
+        ),
         standingHide: cleanText(currentBlock.hide),
         standingSetLayers: cleanText(currentBlock.set_layers),
         // 대기/타자기 연출 문법:
@@ -909,10 +930,91 @@
           : standingState.focus && standingState.focus === standingState.right ? 'right'
             : 'none';
         el.actors.dataset.focus = focusSlot;
-        const animation = cleanText(block.standingAnimation).toLowerCase();
-        if (animation) el.actors.dataset.animation = animation;
-        else el.actors.removeAttribute('data-animation');
       }
+      const clearSlotAnimation = (slotEl) => {
+        if (!slotEl) return;
+        slotEl.removeAttribute('data-animation');
+      };
+      const setSlotAnimation = (slotEl, animationName = '') => {
+        if (!slotEl) return;
+        const normalized = cleanText(animationName).toLowerCase();
+        if (normalized) slotEl.dataset.animation = normalized;
+        else slotEl.removeAttribute('data-animation');
+      };
+      const parseScopedAnimations = (rawAnimation = '') => {
+        const scoped = {
+          left: '',
+          right: '',
+          byActor: {}
+        };
+        cleanText(rawAnimation)
+          .split(',')
+          .map((token) => cleanText(token))
+          .filter(Boolean)
+          .forEach((token) => {
+            const kv = token.match(/^([^:=]+)\s*[:=]\s*([a-z0-9_-]+)$/i);
+            if (!kv) return;
+            const scope = cleanText(kv[1]).toLowerCase();
+            const animationName = cleanText(kv[2]).toLowerCase();
+            if (!animationName) return;
+            if (['left', 'l', '좌', 'left-slot'].includes(scope)) scoped.left = animationName;
+            else if (['right', 'r', '우', 'right-slot'].includes(scope)) scoped.right = animationName;
+            else if (['all', 'both', '*', '전체'].includes(scope)) {
+              scoped.left = animationName;
+              scoped.right = animationName;
+            } else {
+              // left/right/all 예약어가 아니면 "actorId 지정"으로 간주한다.
+              // 예) standing_animation = goddess:float,pilgrim:shake
+              scoped.byActor[cleanText(kv[1])] = animationName;
+            }
+          });
+        return scoped;
+      };
+      const parseActorAnimationList = (rawActorAnimation = '') => {
+        const actorMap = {};
+        cleanText(rawActorAnimation)
+          .split(',')
+          .map((token) => cleanText(token))
+          .filter(Boolean)
+          .forEach((token) => {
+            const kv = token.match(/^([^:=]+)\s*[:=]\s*([a-z0-9_-]+)$/i);
+            if (!kv) return;
+            const actorId = cleanText(kv[1]);
+            const animationName = cleanText(kv[2]).toLowerCase();
+            if (!actorId || !animationName) return;
+            actorMap[actorId] = animationName;
+          });
+        return actorMap;
+      };
+      const globalAnimation = cleanText(block.standingAnimation).toLowerCase();
+      const scopedAnimations = parseScopedAnimations(block.standingAnimation);
+      const explicitActorAnimationMap = parseActorAnimationList(block.standingAnimationActor);
+      const currentLeftSlotActorId = cleanText(standingState.left);
+      const currentRightSlotActorId = cleanText(standingState.right);
+      const leftActorAnimation = currentLeftSlotActorId
+        ? (explicitActorAnimationMap[currentLeftSlotActorId] || scopedAnimations.byActor[currentLeftSlotActorId] || '')
+        : '';
+      const rightActorAnimation = currentRightSlotActorId
+        ? (explicitActorAnimationMap[currentRightSlotActorId] || scopedAnimations.byActor[currentRightSlotActorId] || '')
+        : '';
+      const leftAnimation = cleanText(
+        leftActorAnimation
+        || block.standingAnimationLeft
+        || scopedAnimations.left
+        || globalAnimation
+      ).toLowerCase();
+      const rightAnimation = cleanText(
+        rightActorAnimation
+        || block.standingAnimationRight
+        || scopedAnimations.right
+        || globalAnimation
+      ).toLowerCase();
+      // 블록 단위로 애니메이션 상태를 초기화해 이전 블록 연출이 누적되지 않게 한다.
+      clearSlotAnimation(el.actorLeft);
+      clearSlotAnimation(el.actorRight);
+      // actorId 기준 매핑 → 슬롯 키 → 전체 공통 순서로 우선순위를 부여한다.
+      setSlotAnimation(el.actorLeft, leftAnimation);
+      setSlotAnimation(el.actorRight, rightAnimation);
 
       setActorLayers(el.actorLeft, leftLayers);
       setActorLayers(el.actorRight, rightLayers);

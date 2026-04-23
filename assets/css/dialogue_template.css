@@ -44,19 +44,19 @@
   opacity: 1;
 }
 
-.dialogue-prototype__actors[data-animation="fade"] {
+.dialogue-prototype__actor[data-animation="fade"] {
   animation: dialogue-actors-fade 260ms ease-out;
 }
 
-.dialogue-prototype__actors[data-animation="float"] {
+.dialogue-prototype__actor[data-animation="float"] {
   animation: dialogue-actors-float 2.4s ease-in-out infinite;
 }
 
-.dialogue-prototype__actors[data-animation="zoom-in"] {
+.dialogue-prototype__actor[data-animation="zoom-in"] {
   animation: dialogue-actors-zoom-in 280ms ease-out;
 }
 
-.dialogue-prototype__actors[data-animation="shake"] {
+.dialogue-prototype__actor[data-animation="shake"] {
   animation: dialogue-actors-shake 360ms ease-out;
 }
 

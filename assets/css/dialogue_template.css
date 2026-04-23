@@ -435,6 +435,18 @@
     background-size: auto 100%;
   }
 
+  .dialogue-prototype__actor--left .dialogue-prototype__actor-layer {
+    /* 왼쪽 슬롯은 "안쪽(대화창 방향=오른쪽)"이 더 보이도록 오른쪽 기준으로 붙인다. */
+    background-position: top right;
+  }
+
+  .dialogue-prototype__actor--right .dialogue-prototype__actor-layer {
+    /* 주의: 우측 슬롯 컨테이너는 scaleX(-1)로 좌우 반전된다.
+       따라서 "화면 기준 왼쪽(안쪽)"을 더 보이게 하려면
+       반전 전 레이어 기준점을 top right로 줘야 최종 결과가 left처럼 보인다. */
+    background-position: top right;
+  }
+
   .dialogue-prototype__actor--left {
     /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
     left: clamp(-48px, -6vw, -14px);

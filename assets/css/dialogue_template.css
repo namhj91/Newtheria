@@ -412,22 +412,26 @@
 
   .dialogue-prototype__actor {
     /* 모바일 스탠딩은 "화면 높이 기준"으로 맞춰 일러가 작아 보이지 않게 고정한다.
-       대화 패널 위에 겹쳐 보이더라도 캐릭터 키 비율을 우선 보장한다. */
+       대화 패널/배경 일부를 가리더라도 캐릭터 키 비율을 우선 보장한다. */
     bottom: 0;
-    width: min(62vw, 420px);
+    /* 화면 높이와 거의 같은 체감 크기를 만들기 위해 너비를 크게 잡는다.
+       (contain 비율 유지라서, 세로로 긴 일러일수록 실효 높이가 커진다.) */
+    width: min(86vw, 620px);
     height: 100svh;
     transform: translate3d(0, 0, 0);
     transition: opacity 260ms ease, transform 320ms cubic-bezier(.2, .9, .2, 1), filter 180ms ease;
   }
 
   .dialogue-prototype__actor--left {
-    left: clamp(-22px, -2vw, 0px);
+    /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
+    left: clamp(-48px, -6vw, -14px);
     /* 기본 상태는 화면 밖 대기: 포커스될 때만 안쪽으로 슬라이드 인한다. */
     transform: translate3d(-116%, 0, 0);
   }
 
   .dialogue-prototype__actor--right {
-    right: clamp(-22px, -2vw, 0px);
+    /* 우측 스탠딩은 화면 오른쪽으로 "살짝" 삐져나오게 고정한다. */
+    right: clamp(-48px, -6vw, -14px);
     transform: translate3d(116%, 0, 0) scaleX(-1);
   }
 

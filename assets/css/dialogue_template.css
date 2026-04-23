@@ -435,6 +435,16 @@
     background-size: auto 100%;
   }
 
+  .dialogue-prototype__actor--left .dialogue-prototype__actor-layer {
+    /* 왼쪽 슬롯은 "안쪽(대화창 방향=오른쪽)"이 더 보이도록 오른쪽 기준으로 붙인다. */
+    background-position: top right;
+  }
+
+  .dialogue-prototype__actor--right .dialogue-prototype__actor-layer {
+    /* 오른쪽 슬롯은 "안쪽(대화창 방향=왼쪽)"이 더 보이도록 왼쪽 기준으로 붙인다. */
+    background-position: top left;
+  }
+
   .dialogue-prototype__actor--left {
     /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
     left: clamp(-48px, -6vw, -14px);

@@ -1,130 +1,275 @@
 ; Aetheria Script Data File
 ; UTF-8
-; 샘플 목적: 문법 키를 폭넓게 시연하되, 로어 친화형으로 아스테리아/순례자 연속 대화를 구성한다.
+; 샘플 목적: 기존 샘플 대사를 삭제하고, 요청된 원문 내용을 로어 친화형 아스테리아/순례자 대화로 재구성한다.
+; 문법 시연 목적: scene 캐스팅, 블록 대사, 배경/포커스/스탠딩/파티클/자동 넘김(wait)/선택지(choice, hidden_choice)/점프(jump)/종료(end)를 모두 포함한다.
 
-<event:은하의_성역_입문>
-<scene#0:문턱의_위로>
+<event:별바다_재기동_의식>
+<scene#0:깊은우주_기동>
 {
-; scene 기본 캐스팅: actor id 기반
+; scene 기본 캐스팅
 actor = goddess
 actor = pilgrim
 slot_left = goddess
 slot_right = pilgrim
 focus = goddess
-; cast_json 시연(선택): 외부 번들이 없어도 파서 문법을 시연할 수 있도록 최소 구조를 넣는다.
-cast_json = {"actors":[{"id":"goddess","name":"별의 여신 아스테리아","layers":["assets/img/goddess.png"]},{"id":"pilgrim","name":"순례자","layers":["assets/img/player.png"]}]}
+; 최소 cast_json 예시(파서 문법 시연용)
+cast_json = {"actors":[{"id":"goddess","name":"아스테리아","layers":["assets/img/goddess.png"]},{"id":"pilgrim","name":"순례자","layers":["assets/img/player.png"]}]}
 }
 ---
 
-<block:성역_환영>
+<block:배경_기술>
 {
-actor = goddess
-speaker = 별의 여신 아스테리아
-focus = goddess
-standing_animation = fade
-particle = snow
-particle_count = 26
-particle_duration = 3800
+; 배경 설명 블록(화자 없이 내레이션성 연출)
 bg = assets/img/background.jpg
-type_speed = 21
-line = 순례자님, 기나긴 우주의 밤을 건너 마침내 이 성역에 당도하셨군요. 이제는 숨을 고르셔도 됩니다. 낡은 세계에서 홀로 감당하셔야 했던 무게를, 여기에서는 더 이상 혼자 지지 않으셔도 됩니다.
-wait = 1200
-}
----
-
-<block:순례자의_고백>
-{
-actor = pilgrim
-speaker = 순례자
-focus = pilgrim
-standing_animation = float
-type_speed = 24
-line = 저는 메마른 땅과 무너지는 도시 사이를 끝없이 떠돌았습니다. 발자국마다 상실이 따라붙었고, 기도는 번번이 허공으로 흩어졌습니다. 그런데도 지금 이 성역 앞에 서니… 경외와 안도가 함께 밀려옵니다. 이 안식이 정말 저에게도 허락된 것인지, 아직 확신이 서지 않습니다.
-}
----
-
-<block:우주의_섭리>
-{
-actor = goddess
-focus = goddess
-standing_animation = zoom-in
-particle = ember
-particle_count = 14
-particle_duration = 3000
-type_speed = 22
-line = 그 불안은 자연스러운 떨림입니다, 순례자님. 지난 세계의 멸망은 허무한 파탄이 아니라, 새 시작을 열기 위한 우주의 섭리였습니다. 쇠락한 껍데기를 벗고도 끝내 희망을 놓지 않은 영혼만이, 다음 차원의 빛을 온전히 품을 수 있습니다.
+particle = snow
+particle_count = 24
+particle_duration = 3400
+standing_animation = fade
+type_speed = 20
+line = (배경: 끝을 알 수 없는 짙은 우주. 은하수가 거대한 강물처럼 흐르고, 형형색색의 별빛들이 물거품처럼 피어올랐다 스러지는 몽환적인 공간. 그 중심에서 눈을 뜬 순례자.)
 wait = 900
 }
 ---
 
-<block:장막_개문>
+<block:아스테리아_기상>
 {
 actor = goddess
+speaker = 아스테리아
 focus = goddess
 move_left = goddess
 move_right = pilgrim
-set_layers = goddess:assets/img/goddess.png
-standing_animation = fade
-particle = snow
-line = 보십시오. 제가 장막 너머로 새로운 지평을 열겠습니다. 저곳에는 잿빛 폭풍도, 절망의 잔해도 남아 있지 않습니다. 오직 은하수의 축복만이 대지를 적시고 있습니다.
+standing_animation = float
+type_speed = 21
+line = 어라, 드디어 눈을 떴네? 안녕, 나의 작은 순례자. 기분은 좀 어때요?
 }
 ---
 
-<block:경외와_망설임>
+<block:순례자_혼란>
+{
+actor = pilgrim
+speaker = 순례자
+focus = pilgrim
+standing_animation = shake
+type_speed = 23
+line = …뭐? 윽, 머리야… 여긴 또 어디야. 나 방금 전까지 분명히…
+}
+---
+
+<block:아스테리아_적응안내>
+{
+actor = goddess
+focus = goddess
+type_speed = 21
+line = 쉿, 너무 애써서 기억하려고 하지 마. 데이터 로딩… 아, 아니. 영혼이 이 공간의 주파수에 적응하려면 시간이 좀 걸리거든. 갑자기 무리하면 머리만 더 아플 테니까 진정해요.
+wait = 700
+}
+---
+
+<block:순례자_반발>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 데이터? 영혼? 장난해? 지금 내 눈앞에 홀로그램 같은 게 둥둥 떠다니는데 진정이 되겠냐고. 넌 대체 누군데 날 아는 것처럼 말해?
+}
+---
+
+<block:아스테리아_자기소개>
+{
+actor = goddess
+speaker = 아스테리아
+focus = goddess
+set_layers = goddess:assets/img/goddess.png
+standing_animation = zoom-in
+particle = ember
+particle_count = 12
+particle_duration = 2800
+type_speed = 20
+line = 나? 나는 아스테리아. 이 끝없이 펼쳐진 별바다를 관리하는 별의 여신이랄까? 뭐, 네 입장에선 새로운 시작 지점에서 안내를 돕는 꽤 친절한 튜토리얼 NPC라고 생각해도 좋아요. 아, 스킵 버튼 같은 건 없으니까 내 말 잘 들어야 해?
+}
+---
+
+<block:순례자_귀환요청>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 여신? NPC? 대체 무슨 미친 소리를 하는 거야… 스킵은 무슨, 지금 당장 여기서 내보내 달라고! 나 집에 가야 해.
+}
+---
+
+<block:아스테리아_노란빛지시>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 집? 흐음… 유감스럽지만 거기로 돌아가는 길은 이미 끊어졌어요. 자, 진정하고 내 손끝이 가리키는 곳을 한 번 볼래?
+wait = 850
+}
+---
+
+<block:손끝_연출>
+{
+line = (아스테리아가 길고 하얀 손가락을 들어 우주의 한구석을 가리킨다. 수만 개의 은하수 너머, 유독 눈이 시리도록 샛노랗게 타오르는 작은 빛이 일렁인다.)
+wait = 800
+}
+---
+
+<block:순례자_노란빛반응>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 저건… 뭔데? 쳐다보고 있으니까 왠지 가슴이 꽉 막힌 것처럼 답답해져. 기분이 이상해.
+}
+---
+
+<block:아스테리아_원세계고지>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 당연히 그렇겠지. 수많은 별들이 태어나고 져서 흘러가는 이 별바다에서도, 저긴 유독 눈에 띄는 곳이거든. 넌 저 수많은 별빛들 중에서도 가장 샛노랗게 반짝이던 곳에서 왔어요. 아주 작고 위태롭지만, 치열하게 타오르던 네가 살던 세계란다.
+}
+---
+
+<block:순례자_죽음질문>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 저 노란 빛에서… 내가 왔다고? 그럼 나, 죽은 거야? 진짜로?
+choice = 죽음을 인정한다 -> 아스테리아_대기실비유
+choice = 현실을 부정한다 -> 아스테리아_대기실비유
+hidden_choice = 모든 카드를 버리고 침묵한다 -> 아스테리아_대기실비유
+}
+---
+
+<block:아스테리아_대기실비유>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = '죽음'이라는 단어는 너무 극단적이고 칙칙하잖아? 그냥 잠시 전원이 꺼진 상태, 혹은 본 서버에서 로그아웃하고 다음 패치를 기다리는 대기실에 온 거라고 생각해 봐요. 꽤 낭만적인 뷰 아냐?
+jump = 순례자_분노
+}
+---
+
+<block:순례자_분노>
 {
 actor = pilgrim
 focus = pilgrim
 standing_animation = shake
 type_speed = 23
-line = 말로 다 할 수 없을 만큼 아름답습니다… 숨이 멎을 듯한 광경입니다. 하지만 저런 흠결 없는 땅이 정말 제가 딛고 살아도 되는 곳입니까? 저는 아직도 상처를 많이 지닌 사람입니다.
+line = 말장난하지 마! 내가 어떻게 살았는데… 거기엔 아직 내가 해야 할 일들이 산더미처럼 남아있었단 말이야!
 }
 ---
 
-<block:요람의_선언>
+<block:아스테리아_빼돌림고백>
 {
 actor = goddess
 focus = goddess
 type_speed = 20
-line = 물론입니다. 그곳은 바로 순례자님 같은 영혼을 위해, 수억 광년 전부터 준비된 안식처이자 새로운 요람입니다. 성역의 문턱을 넘는 순간, 과거의 무거운 육체와 비극의 굴레는 해로운 잔재가 아닌 별먼지로 흩어질 것입니다.
-wait = 950
-}
----
-
-<block:자격에_대한_두려움>
-{
-actor = pilgrim
-focus = pilgrim
-type_speed = 24
-line = 그렇다면… 제가 품고 온 슬픈 기억들은 어떻습니까? 그 기억이 새 세상에 얼룩을 남기지는 않겠습니까. 저는 정말 백지처럼 다시 태어날 자격이 있는지 두렵습니다. 부디 제게 길을 알려 주십시오.
-choice = 기억을 내려다본다 -> 기억의_성좌
-choice = 침묵 속에서 고개를 든다 -> 기억의_성좌
-hidden_choice = 모든 선택을 버리고 여신을 바라본다 -> 기억의_성좌
-}
----
-
-<block:기억의_성좌>
-{
-actor = goddess
-speaker = 별의 여신 아스테리아
-focus = goddess
-standing_animation = float
-type_speed = 21
-line = 기억은 지워야 할 오점이 아닙니다. 순례자님의 지나온 삶은 앞으로의 영혼을 지탱할 성좌가 되어 밤하늘에 새겨질 것입니다. 이제 곧 부여될 생명은 족쇄도, 운명의 장난도 없는 완전한 자유의지 그 자체입니다.
+line = 알아, 네가 그곳에서 얼마나 발버둥 쳤는지. 네 영혼의 데이터에 다 기록되어 있거든. 제법 무겁고, 여기저기 긁혀서 상처투성이지만… 그래도 꽤 따뜻한 온기가 남아있네. 그래서 내가 널 이쪽으로 빼돌린 거야. 원래라면 저 별바다의 파도에 휩쓸려 우주의 먼지로 초기화됐어야 할 운명이지만.
 wait = 900
 }
 ---
 
-<block:결의의_응답>
+<block:순례자_의문>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 빼돌려? 나한테 대체 뭘 바라는데? 나 가진 거 아무것도 없어. 돈도, 힘도.
+}
+---
+
+<block:아스테리아_제안>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 하핫! 그렇게 날 세우고 경계할 필요 없어요. 난 그저 네가 가진 그 샛노란 별의 끈질긴 반짝임이 마음에 들었을 뿐이야. 그래서 너에게 특별한 제안을 하나 하려고.
+}
+---
+
+<block:순례자_되묻기>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 제안?
+}
+---
+
+<block:아스테리아_VIP환생>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 응. 한 번 더 기회를 줄게. 완전히 새로운 차원의 별에서, 새로운 삶을 살아볼 수 있는 VIP 환생 티켓이랄까? 물론 선택은 네 몫이야. 여기서 이대로 영원히 우주의 미아로 둥둥 떠다녀도 되고.
+wait = 850
+}
+---
+
+<block:순례자_체념>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 하… 새로운 삶? 내 의사는 묻지도 않고 마음대로 죽여놓고선, 이제 와서 선심 쓰는 척하는 거야? 어차피 선택지 같은 건 애초에 없었잖아. 여신인지 NPC인지, 네가 하라는 대로 해야 하는 분위기인데.
+}
+---
+
+<block:아스테리아_계약확정>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 정답! 역시 눈치가 빠르네. 진행이 수월해서 아주 마음에 들어. 이래서 내가 샛노란 별 출신들을 좋아한다니까? 자, 그럼 잔말 말고 계약 성립인 걸로 할게요. 짐 챙길 건 없지? 어차피 레벨 1부터, 인벤토리 텅텅 비운 맨몸으로 시작해야 하니까.
+}
+---
+
+<block:순례자_준비요청>
+{
+actor = pilgrim
+focus = pilgrim
+type_speed = 23
+line = 야, 잠깐만! 아직 마음의 준비가 안 됐다고! 그리고 거기가 대체 어떤 곳인지, 내가 가서 뭘 해야 하는지는 알려주고 보내야 할 거 아냐!
+}
+---
+
+<block:아스테리아_스포금지>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 미리 다 알면 재미없지. 스포일러는 절대 금지야! 규칙은 간단해요. 그냥 네가 숨 쉬고, 걷고, 부딪히며 직접 알아가면 돼. 그게 새로운 삶의 묘미 아니겠어?
+wait = 700
+}
+---
+
+<block:빛의소용돌이_연출>
+{
+particle = snow
+particle_count = 32
+particle_duration = 4200
+line = (아스테리아의 발끝에서부터 거대한 빛의 소용돌이가 일며 순례자의 몸을 감싸기 시작한다. 순례자의 몸이 서서히 반투명해진다.)
+wait = 800
+}
+---
+
+<block:순례자_소멸직전>
 {
 actor = pilgrim
 focus = pilgrim
 hide = left
-type_speed = 23
-line = 이제 알겠습니다. 저는 과거를 부정하지 않고도, 과거와 평화롭게 작별할 수 있군요. 두려움 대신 의지를 선택하겠습니다. 새로 주어질 삶을 향해, 흔들림 없이 첫걸음을 내딛겠습니다.
+type_speed = 24
+line = 야! 아스테리아!! 내 말 아직 안 끝났… 윽, 눈부셔…!
 }
 ---
 
-<block:별의_당부>
+<block:아스테리아_튜토리얼종료>
 {
 actor = goddess
 focus = goddess
@@ -133,42 +278,35 @@ move_right = pilgrim
 standing_animation = fade
 particle = off
 type_speed = 20
-line = 용기 있는 선택이십니다, 순례자님. 새로 태어나 걷게 될 세상에서는 다가오지 않은 슬픔을 미리 두려워하기보다, 매 순간 피어나는 기쁨을 온몸으로 만끽해 주십시오. 그리고 길이 낯설어 외롭거나 잠시 길을 잃는 밤이 오더라도, 하늘을 올려다보십시오. 제가 흩뿌려 둔 별들이 언제나 변함없는 길잡이가 되어 드릴 것입니다.
-wait = 1200
+line = 자, 튜토리얼은 여기까지. 이제 네가 그곳에서도 예전처럼, 아니 예전보다 훨씬 더 눈부시게 빛날 수 있을지 지켜보고 있을게요.
 }
 ---
 
-<scene#1:빛의_입구>
+<scene#1:전송직전_속삭임>
 {
 actor = goddess
 actor = pilgrim
 slot_left = goddess
 slot_right = pilgrim
-focus = pilgrim
+focus = goddess
 }
 ---
 
-<block:헌사의_맹세>
+<block:마지막_배경>
 {
-actor = pilgrim
-speaker = 순례자
-focus = pilgrim
-type_speed = 22
-line = 아스테리아님, 끝없는 자비와 은혜에 깊이 감사드립니다. 훗날 제가 자유 속에서 일구어낼 삶의 궤적 자체를, 당신께 바치는 가장 아름다운 헌사로 삼겠습니다. 이제 빛으로 물든 새 세상으로 들어가겠습니다.
+line = (빛이 순례자를 완전히 집어삼키기 직전, 아스테리아가 장난스러운 미소를 거두고 다정하게 속삭인다.)
+wait = 700
 }
 ---
 
-<block:장엄한_축복>
+<block:아스테리아_최종축복>
 {
 actor = goddess
-speaker = 별의 여신 아스테리아
+speaker = 아스테리아
 focus = goddess
-particle = snow
-particle_count = 30
-particle_duration = 4200
 standing_animation = zoom-in
 type_speed = 19
-line = 축복을 내리겠습니다, 순례자님. 낡은 시대의 상처 입은 방랑자였던 당신은 이제 새로운 우주의 첫 숨결을 지닌 빛나는 존재로 다시 깨어납니다. 당신의 모든 앞날에 가장 다정하고도 숭고한 작별과 응원을 보냅니다. 부디 찬란하게 살아가십시오.
+line = 잘 가, 나의 작은 순례자. 부디 새로운 별에서는 덜 아프고, 더 많이 웃으며… 그렇게 잘 살아봐요. 당신의 새로운 여행에 별빛의 축복이 함께하길.
 end = true
 }
 ---

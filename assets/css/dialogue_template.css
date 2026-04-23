@@ -133,17 +133,19 @@
   z-index: 5;
   pointer-events: none;
   opacity: 0;
+  transition: opacity var(--screen-fx-fade-ms, 180ms) ease;
 }
 
 .dialogue-prototype__screen-fx[data-mode="flash"] {
   background: rgba(255, 255, 255, 0.95);
-  animation: dialogue-screen-flash var(--screen-fx-duration, 220ms) ease-out;
 }
 
 .dialogue-prototype__screen-fx[data-mode="blackout"] {
   background: rgba(0, 0, 0, 1);
+}
+
+.dialogue-prototype__screen-fx[data-state="active"] {
   opacity: 1;
-  animation: dialogue-screen-blackout var(--screen-fx-duration, 700ms) linear;
 }
 
 .dialogue-prototype__transition {
@@ -652,18 +654,6 @@
   60% { transform: translateX(-3px); }
   80% { transform: translateX(2px); }
 }
-
-@keyframes dialogue-screen-flash {
-  0% { opacity: 0.95; }
-  100% { opacity: 0; }
-}
-
-@keyframes dialogue-screen-blackout {
-  0%, 100% { opacity: 1; }
-}
-
-
-
 
 @keyframes choice-pop-in {
   0% { opacity: 0; }

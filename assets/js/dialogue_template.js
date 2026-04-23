@@ -282,6 +282,41 @@
           || currentBlock.screen_blackout_ms,
           0
         ),
+        // 화면 효과 변화시간(서서히 전환) 문법:
+        // - screen_flash_fade = 120       (플래시 전환 ms)
+        // - screen_blackout_fade = 260    (암전 페이드 인/아웃 ms)
+        screenFlashFadeMs: parseIntegerOrDefault(
+          currentBlock.screen_flash_fade
+          || currentBlock.flash_fade
+          || currentBlock.fx_flash_fade
+          || currentBlock.screen_flash_transition
+          || currentBlock.screen_flash_transition_ms,
+          0
+        ),
+        screenBlackoutFadeMs: parseIntegerOrDefault(
+          currentBlock.screen_blackout_fade
+          || currentBlock.blackout_fade
+          || currentBlock.fade_black_speed
+          || currentBlock.screen_blackout_transition
+          || currentBlock.screen_blackout_transition_ms,
+          0
+        ),
+        // 단일 키 확장 문법:
+        // - screen_flash = 220,120      (지속시간, 변화시간)
+        // - screen_blackout = 900,300   (지속시간, 변화시간)
+        // 작성 편의를 위해 raw 값도 보관해 런타임에서 보조 파싱한다.
+        screenFlashRaw: cleanText(
+          currentBlock.screen_flash
+          || currentBlock.flash
+          || currentBlock.fx_flash
+          || currentBlock.screen_flash_ms
+        ),
+        screenBlackoutRaw: cleanText(
+          currentBlock.screen_blackout
+          || currentBlock.blackout
+          || currentBlock.fade_black
+          || currentBlock.screen_blackout_ms
+        ),
         choices: Array.isArray(currentBlock.choices) ? [...currentBlock.choices] : [],
         hiddenChoices: Array.isArray(currentBlock.hiddenChoices) ? [...currentBlock.hiddenChoices] : []
       };
@@ -716,7 +751,7 @@
     let runtimeVariables = {};
     let activeLineTimer = null;
     let activeAutoNextTimer = null;
-    let activeScreenFxTimer = null;
+    let activeScreenFxTimers = [];
     // 글리치 타이머를 화자/본문으로 분리해,
     // 본문 타자기 렌더 중 clear가 화자 글리치까지 끊지 않도록 유지한다.
     let activeGlitchTimers = {
@@ -983,42 +1018,73 @@
     };
 
     const clearScreenFx = () => {
-      if (activeScreenFxTimer) {
-        clearTimeout(activeScreenFxTimer);
-        activeScreenFxTimer = null;
-      }
+      activeScreenFxTimers.forEach((timerId) => clearTimeout(timerId));
+      activeScreenFxTimers = [];
       if (!el.screenFx) return;
       el.screenFx.dataset.mode = 'off';
+      el.screenFx.dataset.state = 'idle';
       el.screenFx.style.removeProperty('--screen-fx-duration');
+      el.screenFx.style.removeProperty('--screen-fx-fade-ms');
     };
 
     const applyScreenFxFromBlock = (block) => {
       if (!el.screenFx) return;
-      const flashMs = Math.max(0, parseIntegerOrDefault(block.screenFlashMs, 0));
-      const blackoutMs = Math.max(0, parseIntegerOrDefault(block.screenBlackoutMs, 0));
+      // 단일 키 확장 문법("지속시간,변화시간")을 파싱한다.
+      const parseFxTuple = (raw = '') => {
+        const text = cleanText(raw);
+        if (!text) return { duration: 0, fade: 0 };
+        const tokens = text
+          .split(/[,:|/]/g)
+          .map((token) => parseIntegerOrDefault(token, 0))
+          .filter((value) => Number.isFinite(value));
+        return {
+          duration: Math.max(0, tokens[0] || 0),
+          fade: Math.max(0, tokens[1] || 0)
+        };
+      };
+      const flashTuple = parseFxTuple(block.screenFlashRaw);
+      const blackoutTuple = parseFxTuple(block.screenBlackoutRaw);
+      const flashMs = Math.max(0, parseIntegerOrDefault(block.screenFlashMs, flashTuple.duration));
+      const blackoutMs = Math.max(0, parseIntegerOrDefault(block.screenBlackoutMs, blackoutTuple.duration));
+      const flashFadeMs = Math.max(0, parseIntegerOrDefault(block.screenFlashFadeMs, flashTuple.fade));
+      const blackoutFadeMs = Math.max(0, parseIntegerOrDefault(block.screenBlackoutFadeMs, blackoutTuple.fade));
+      const hasFlashDirective = flashMs > 0 || flashFadeMs > 0;
+      const hasBlackoutDirective = blackoutMs > 0 || blackoutFadeMs > 0;
       clearScreenFx();
 
-      if (flashMs > 0) {
-        // 번쩍임은 "짧게 보여주고 자동 해제"되는 일회성 오버레이로 처리한다.
-        const durationMs = Math.min(1600, Math.max(80, flashMs));
+      if (hasFlashDirective) {
+        // 번쩍임은 "유지 시간 + 서서히 변화시간"을 각각 제어한다.
+        // fade만 단독 선언된 경우에도 기본 지속시간(220ms)으로 실행한다.
+        const durationMs = Math.min(1600, Math.max(80, flashMs || 220));
+        const fadeMs = Math.min(1200, Math.max(40, flashFadeMs || 140));
         el.screenFx.dataset.mode = 'flash';
+        el.screenFx.dataset.state = 'active';
         el.screenFx.style.setProperty('--screen-fx-duration', `${durationMs}ms`);
-        activeScreenFxTimer = global.setTimeout(() => {
-          activeScreenFxTimer = null;
+        el.screenFx.style.setProperty('--screen-fx-fade-ms', `${fadeMs}ms`);
+        activeScreenFxTimers.push(global.setTimeout(() => {
+          el.screenFx.dataset.state = 'idle';
+        }, durationMs));
+        activeScreenFxTimers.push(global.setTimeout(() => {
           clearScreenFx();
-        }, durationMs);
+        }, durationMs + fadeMs));
         return;
       }
 
-      if (blackoutMs > 0) {
-        // 암전은 지정 시간 동안 유지 후 자동 복귀한다.
-        const durationMs = Math.min(8000, Math.max(120, blackoutMs));
+      if (hasBlackoutDirective) {
+        // 암전도 유지 시간/변화 시간(페이드 인·아웃)을 분리해 제어한다.
+        // fade만 단독 선언된 경우에도 기본 지속시간(700ms)으로 실행한다.
+        const durationMs = Math.min(8000, Math.max(120, blackoutMs || 700));
+        const fadeMs = Math.min(2600, Math.max(60, blackoutFadeMs || 260));
         el.screenFx.dataset.mode = 'blackout';
+        el.screenFx.dataset.state = 'active';
         el.screenFx.style.setProperty('--screen-fx-duration', `${durationMs}ms`);
-        activeScreenFxTimer = global.setTimeout(() => {
-          activeScreenFxTimer = null;
+        el.screenFx.style.setProperty('--screen-fx-fade-ms', `${fadeMs}ms`);
+        activeScreenFxTimers.push(global.setTimeout(() => {
+          el.screenFx.dataset.state = 'idle';
+        }, durationMs));
+        activeScreenFxTimers.push(global.setTimeout(() => {
           clearScreenFx();
-        }, durationMs);
+        }, durationMs + fadeMs));
       }
     };
 
@@ -1436,7 +1502,9 @@
         typeSpeed: parseIntegerOrDefault(block.typeSpeed, 0),
         particleMode: cleanText(block.particleMode),
         screenFlashMs: Math.max(0, parseIntegerOrDefault(block.screenFlashMs, 0)),
-        screenBlackoutMs: Math.max(0, parseIntegerOrDefault(block.screenBlackoutMs, 0))
+        screenBlackoutMs: Math.max(0, parseIntegerOrDefault(block.screenBlackoutMs, 0)),
+        screenFlashFadeMs: Math.max(0, parseIntegerOrDefault(block.screenFlashFadeMs, 0)),
+        screenBlackoutFadeMs: Math.max(0, parseIntegerOrDefault(block.screenBlackoutFadeMs, 0))
       });
     };
 

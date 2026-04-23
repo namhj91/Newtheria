@@ -196,7 +196,8 @@
         standingAnimation: cleanText(currentBlock.standing_animation || currentBlock.standinganimation || currentBlock.스탠딩애니메이션),
         standingHide: cleanText(currentBlock.hide),
         standingSetLayers: cleanText(currentBlock.set_layers),
-        choices: Array.isArray(currentBlock.choices) ? [...currentBlock.choices] : []
+        choices: Array.isArray(currentBlock.choices) ? [...currentBlock.choices] : [],
+        hiddenChoices: Array.isArray(currentBlock.hiddenChoices) ? [...currentBlock.hiddenChoices] : []
       };
 
       if (normalized.anchor) {
@@ -281,7 +282,8 @@
             anchor: header.anchor,
             openBraceSeen: false,
             closeBraceSeen: false,
-            choices: []
+            choices: [],
+            hiddenChoices: []
           };
           return;
         }
@@ -367,6 +369,16 @@
           return;
         }
         currentBlock.choices.push(choice);
+        return;
+      }
+
+      if (kv.key === 'hidden_choice') {
+        const hiddenChoice = parseChoiceValue(kv.value);
+        if (!hiddenChoice) {
+          errors.push(`line ${lineNo + 1}: hidden_choice 문법 오류 (예: hidden_choice = 라벨 -> anchor)`);
+          return;
+        }
+        currentBlock.hiddenChoices.push(hiddenChoice);
         return;
       }
 
@@ -456,6 +468,11 @@
           block.choices.forEach((choice) => {
             if (!anchorMap.has(choice.targetAnchor)) {
               errors.push(`choice 타겟 미존재: ${choice.targetAnchor}`);
+            }
+          });
+          block.hiddenChoices.forEach((choice) => {
+            if (!anchorMap.has(choice.targetAnchor)) {
+              errors.push(`hidden_choice 타겟 미존재: ${choice.targetAnchor}`);
             }
           });
         });
@@ -559,6 +576,11 @@
         <div class="dialogue-prototype__actor dialogue-prototype__actor--right"></div>
       </div>
       <div class="dialogue-prototype__choices" id="dialogueChoices" aria-label="선택지"></div>
+      <div class="dialogue-prototype__drag-overlay" aria-hidden="true"></div>
+      <div class="dialogue-prototype__discard-zone" id="dialogueDiscardZone" aria-hidden="true">
+        <span class="discard-icon">🗑</span>
+        <span>카드를 버리려면 여기로 드래그</span>
+      </div>
       <section class="dialogue-prototype__panel" aria-label="대화창">
         <p class="dialogue-prototype__meta"></p>
         <p class="dialogue-prototype__name"></p>
@@ -575,12 +597,18 @@
       actorLeft: root.querySelector('.dialogue-prototype__actor--left'),
       actorRight: root.querySelector('.dialogue-prototype__actor--right'),
       choices: root.querySelector('#dialogueChoices'),
+      discardZone: root.querySelector('#dialogueDiscardZone'),
       meta: root.querySelector('.dialogue-prototype__meta'),
       name: root.querySelector('.dialogue-prototype__name'),
       line: root.querySelector('.dialogue-prototype__line'),
       next: root.querySelector('.dialogue-prototype__next'),
       skip: root.querySelector('.dialogue-prototype__skip')
     };
+
+    // 카드형 선택지 인스턴스(팬 배치/드래그/디스카드)를 보관해
+    // 선택지 재렌더 시 리스너 누수 없이 안전하게 교체한다.
+    let activeChoiceCardBehavior = null;
+    let activeDiscardZoneController = null;
 
     let model = { events: [], eventMap: new Map(), anchorMap: new Map() };
     let pointer = { eventId: '', sceneIndex: 0, order: 0 };
@@ -766,11 +794,97 @@
       setActorLayers(el.actorRight, rightLayers);
     };
 
-    const renderChoices = (choices = []) => {
+    const renderChoices = (choices = [], context = {}) => {
+      const {
+        restoreChoices = choices,
+        hiddenChoices = [],
+        isHiddenMode = false
+      } = context;
       if (!el.choices) return;
       el.choices.innerHTML = '';
+      activeChoiceCardBehavior?.destroy?.();
+      activeChoiceCardBehavior = null;
+      activeDiscardZoneController?.reset?.();
+      activeDiscardZoneController = null;
       if (!Array.isArray(choices) || choices.length === 0) return;
 
+      // 공용 카드 템플릿(NewtheriaCardTemplates)을 우선 사용해
+      // 시작 화면과 동일한 카드형 선택지 인터랙션(팬/호버/드래그/롱프레스)을 유지한다.
+      if (global.NewtheriaCardTemplates?.renderCardFanCards && global.NewtheriaCardTemplates?.createCardFanBehavior) {
+        const cards = global.NewtheriaCardTemplates.renderCardFanCards(el.choices, choices.map((choice) => ({
+            route: choice.targetAnchor,
+            icon: '✦',
+            label: choice.label,
+            desc: '운명의 갈림길',
+            brand: 'NEWTHERIA',
+            sigil: '✦'
+          })));
+        cards.forEach((card, cardIndex) => {
+          card.classList.add('dialogue-prototype__choice');
+          card.style.setProperty('--choice-delay', `${cardIndex * 30}ms`);
+        });
+
+        activeDiscardZoneController = global.NewtheriaCardTemplates.createDiscardZoneController({
+          zone: el.discardZone,
+          documentBody: root,
+          activeClassName: 'is-drag-discard-active',
+          visibleClassName: 'is-drag-discard-visible',
+          revealDistancePx: 96
+        });
+
+        activeChoiceCardBehavior = global.NewtheriaCardTemplates.createCardFanBehavior({
+          menu: el.choices,
+          cards
+        });
+        activeChoiceCardBehavior.layoutCards();
+        activeChoiceCardBehavior.bindInteractions({
+          onDragStateChange: (isDragging) => {
+            activeDiscardZoneController?.onDragStateChange?.(isDragging);
+          },
+          onDragMove: ({ event, moved }) => {
+            activeDiscardZoneController?.onDragMove?.({ event, moved });
+          },
+          shouldDiscardDrop: ({ event }) => activeDiscardZoneController?.shouldDiscardDrop?.({ event }) || false,
+          onCardDiscarded: (_, remainingCards) => {
+            // 일반 선택지를 모두 버리면 hidden_choice를 노출한다.
+            if (remainingCards.length === 0) {
+              if (!isHiddenMode && Array.isArray(hiddenChoices) && hiddenChoices.length > 0) {
+                log('hidden-choice-reveal', { hiddenChoiceCount: hiddenChoices.length });
+                renderChoices(hiddenChoices, {
+                  restoreChoices,
+                  hiddenChoices,
+                  isHiddenMode: true
+                });
+                return;
+              }
+              // hidden_choice까지 모두 버린 경우 기본 선택지로 복원해 진행 막힘을 방지한다.
+              renderChoices(restoreChoices, {
+                restoreChoices,
+                hiddenChoices,
+                isHiddenMode: false
+              });
+            }
+          },
+          onCardSelected: (card) => {
+            const targetAnchor = cleanText(card?.dataset?.route);
+            const selectedChoice = choices.find((choice) => cleanText(choice.targetAnchor) === targetAnchor);
+            if (!selectedChoice) {
+              reportError(new Error(`선택지 데이터를 찾지 못했습니다: ${targetAnchor}`));
+              return;
+            }
+            const target = model.anchorMap.get(selectedChoice.targetAnchor);
+            if (!target) {
+              reportError(new Error(`choice 타겟 anchor를 찾지 못했습니다: ${selectedChoice.targetAnchor}`));
+              return;
+            }
+            log('choice', { label: selectedChoice.label, targetAnchor: selectedChoice.targetAnchor, isHiddenMode });
+            goToPointer(target);
+          }
+        });
+        return;
+      }
+
+      // 카드 템플릿이 없는 환경에서도 선택 기능 자체는 유지한다.
       choices.forEach((choice, idx) => {
         const button = document.createElement('button');
         button.className = 'dialogue-prototype__choice';
@@ -783,7 +897,7 @@
             reportError(new Error(`choice 타겟 anchor를 찾지 못했습니다: ${choice.targetAnchor}`));
             return;
           }
-          log('choice', { label: choice.label, targetAnchor: choice.targetAnchor });
+          log('choice', { label: choice.label, targetAnchor: choice.targetAnchor, isHiddenMode });
           goToPointer(target);
         });
         el.choices.appendChild(button);
@@ -809,7 +923,11 @@
       if (el.line) el.line.textContent = block.line || '';
       setBackground(block.background);
       applyStandingFromBlock(block);
-      renderChoices(block.choices);
+      renderChoices(block.choices, {
+        restoreChoices: block.choices,
+        hiddenChoices: block.hiddenChoices,
+        isHiddenMode: false
+      });
       saveSessionProgress(block.anchor);
       log('render-block', {
         eventId: pointer.eventId,
@@ -830,9 +948,15 @@
         return;
       }
 
-      // 선택지가 있는 블록은 사용자가 선택 버튼을 눌러야 진행된다.
-      if (Array.isArray(block.choices) && block.choices.length > 0) {
-        log('await-choice', { anchor: block.anchor, choiceCount: block.choices.length });
+      // 일반 선택지/히든 선택지 중 하나라도 있으면 사용자가 카드를 선택해야 진행된다.
+      const hasNormalChoices = Array.isArray(block.choices) && block.choices.length > 0;
+      const hasHiddenChoices = Array.isArray(block.hiddenChoices) && block.hiddenChoices.length > 0;
+      if (hasNormalChoices || hasHiddenChoices) {
+        log('await-choice', {
+          anchor: block.anchor,
+          choiceCount: block.choices.length,
+          hiddenChoiceCount: block.hiddenChoices.length
+        });
         return;
       }
 

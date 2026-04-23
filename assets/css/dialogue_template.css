@@ -387,6 +387,12 @@
 }
 
 @media (max-width: 760px) {
+  .dialogue-prototype__bg {
+    /* 모바일은 세로 비율이 커서 contain 사용 시 상/하단 여백이 커지므로
+       꽉 차게 보이도록 cover로 전환한다. */
+    background-size: cover;
+  }
+
   :root {
     --fan-gap: 64px;
     --fan-tilt: 8deg;

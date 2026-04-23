@@ -25,6 +25,7 @@ bg = assets/img/background.jpg
 choice = 첫 번째 선택 -> 첫번째_선택지
 choice = 두 번째 선택 -> 두번째_선택지
 choice = 세 번째 선택 -> 세번째_선택지
+hidden_choice = 숨겨진 별의 길 -> 히든_선택지
 }
 ---
 
@@ -63,6 +64,15 @@ jump = 선택종료
 speaker_id = goddess
 focus = goddess
 line = 이제 다음 씬으로 넘어가요.
+}
+---
+
+<block:히든_선택지>
+{
+speaker_id = goddess
+focus = goddess
+line = 모든 길을 버렸구나. 그렇다면 숨겨진 길을 열어주지.
+jump = 선택종료
 }
 ---
 

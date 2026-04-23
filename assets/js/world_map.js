@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.2.8(260423-대표캐릭터세이브분리)';
+const WORLD_VERSION_FALLBACK = 'ver.0.2.11(260423-모바일대화배경공백수정)';
 
 const MAP_SIZE = 200;
 

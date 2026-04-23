@@ -387,6 +387,39 @@
   z-index: 3;
 }
 
+.dialogue-prototype__skip[disabled] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.dialogue-prototype__ui-toggle {
+  position: absolute;
+  left: clamp(12px, 2vw, 20px);
+  bottom: clamp(8px, 1.5vh, 16px);
+  border: 0;
+  background: transparent;
+  color: rgba(236, 242, 255, 0.78);
+  letter-spacing: .08em;
+  font-size: .86rem;
+  cursor: pointer;
+  z-index: 3;
+}
+
+/* UI 숨김 모드에서는 대사 패널/선택지/보조 버튼만 숨기고
+   배경/스탠딩 레이어는 그대로 유지한다. */
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__panel,
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__choices,
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__skip,
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__discard-zone,
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__drag-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dialogue-prototype.is-ui-hidden .dialogue-prototype__ui-toggle {
+  opacity: .95;
+}
+
 @media (max-width: 760px) {
   .dialogue-prototype__bg {
     /* 모바일은 세로 비율이 커서 contain 사용 시 상/하단 여백이 커지므로
@@ -471,6 +504,17 @@
   .dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--right[data-visible="true"] {
     opacity: 1;
     transform: translate3d(-50%, 0, 0) scaleX(-1);
+  }
+
+  /* 모바일 + UI 숨김: 현재 포커스 스탠딩을 부드럽게 확대해 감상 모드처럼 보이게 한다. */
+  .dialogue-prototype.is-ui-hidden .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left[data-visible="true"] {
+    transform: translate3d(-50%, -1.5%, 0) scale(1.08);
+    transition-duration: 440ms;
+  }
+
+  .dialogue-prototype.is-ui-hidden .dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--right[data-visible="true"] {
+    transform: translate3d(-50%, -1.5%, 0) scaleX(-1) scale(1.08);
+    transition-duration: 440ms;
   }
 
   .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--right,

@@ -173,6 +173,18 @@
       return sceneMap.get(key);
     };
 
+    // 여러 별칭 키 중 "실제로 입력된 값"을 구분해서 꺼낸다.
+    // - key가 아예 없으면 null 반환 (블록에서 해당 명령 미지정)
+    // - key가 있으면 문자열 정리 후 반환 (빈 문자열 포함)
+    const readOptionalBlockValue = (block, keys = []) => {
+      for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(block, key)) {
+          return cleanText(block[key]);
+        }
+      }
+      return null;
+    };
+
     const flushBlock = () => {
       if (!currentBlock) return;
       const scene = ensureScene(currentEventId, currentSceneIndex, currentSceneName);
@@ -190,8 +202,10 @@
         jump: cleanText(currentBlock.jump),
         end: parseBoolean(currentBlock.end),
         sfx: cleanText(currentBlock.sfx),
-        standingLeft: cleanText(currentBlock.standing_left || currentBlock.standingleft || currentBlock.스탠딩좌 || currentBlock.move_left),
-        standingRight: cleanText(currentBlock.standing_right || currentBlock.standingright || currentBlock.스탠딩우 || currentBlock.move_right),
+        // standing_left/right가 "미지정"인지 "명시적으로 비움"인지 구분해야
+        // 블록마다 기본 배치를 의도치 않게 초기화하지 않는다.
+        standingLeft: readOptionalBlockValue(currentBlock, ['standing_left', 'standingleft', '스탠딩좌', 'move_left']),
+        standingRight: readOptionalBlockValue(currentBlock, ['standing_right', 'standingright', '스탠딩우', 'move_right']),
         standingFocus: cleanText(currentBlock.standing_focus || currentBlock.standingfocus || currentBlock.스탠딩포커스 || currentBlock.focus),
         standingAnimation: cleanText(currentBlock.standing_animation || currentBlock.standinganimation || currentBlock.스탠딩애니메이션),
         standingHide: cleanText(currentBlock.hide),
@@ -740,10 +754,14 @@
         if (['none', 'off', '-', 'clear', '없음'].includes(text.toLowerCase())) return '';
         return text;
       };
-      const leftActorId = normalizeActorToken(block.standingLeft);
-      const rightActorId = normalizeActorToken(block.standingRight);
-      if (leftActorId || cleanText(block.standingLeft) === '') standingState.left = leftActorId;
-      if (rightActorId || cleanText(block.standingRight) === '') standingState.right = rightActorId;
+      // null은 "키 미지정"을 의미하므로 기존 scene 기본 배치를 유지한다.
+      // 문자열(빈 문자열 포함)인 경우에만 명령으로 간주해 슬롯을 갱신한다.
+      const hasLeftDirective = block.standingLeft !== null && block.standingLeft !== undefined;
+      const hasRightDirective = block.standingRight !== null && block.standingRight !== undefined;
+      const leftActorId = hasLeftDirective ? normalizeActorToken(block.standingLeft) : '';
+      const rightActorId = hasRightDirective ? normalizeActorToken(block.standingRight) : '';
+      if (hasLeftDirective) standingState.left = leftActorId;
+      if (hasRightDirective) standingState.right = rightActorId;
 
       const hideTokens = cleanText(block.standingHide)
         .split(',')

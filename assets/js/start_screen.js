@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.2.11(260423-모바일대화배경공백수정)';
+const START_VERSION_FALLBACK = 'ver.0.2.12(260423-스탠딩기본배치유지수정)';
 const STORAGE_KEYS = {
   characterCatalog: 'newtheria.characters',
   settingsMeta: 'newtheria.settings.meta',

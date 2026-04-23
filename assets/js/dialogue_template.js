@@ -213,6 +213,19 @@
         background: cleanText(currentBlock.bg || currentBlock.background),
         jump: cleanText(currentBlock.jump),
         end: parseBoolean(currentBlock.end),
+        // 스킵 잠금 문법:
+        // - skip_lock = on|off (권장)
+        // - skip = lock|unlock, skip_disabled = true|false (별칭)
+        // 별도 해제 지시가 없으면 scene 전환 전까지 상태를 유지한다.
+        skipLockDirective: readOptionalBlockValue(currentBlock, [
+          'skip_lock',
+          'skiplock',
+          'skip_disabled',
+          'skipdisabled',
+          'skip',
+          '스킵잠금',
+          '스킵불가'
+        ]),
         sfx: cleanText(currentBlock.sfx),
         // standing_left/right가 "미지정"인지 "명시적으로 비움"인지 구분해야
         // 블록마다 기본 배치를 의도치 않게 초기화하지 않는다.
@@ -643,6 +656,7 @@
         <p class="dialogue-prototype__line"></p>
         <button class="dialogue-prototype__next" type="button" aria-label="다음 대사">▼</button>
       </section>
+      <button class="dialogue-prototype__ui-toggle" type="button" aria-pressed="false" aria-label="UI 숨기기" title="UI 숨기기">UI 숨김</button>
       <button class="dialogue-prototype__skip" type="button">SKIP</button>
     `;
     mount.replaceChildren(root);
@@ -659,6 +673,7 @@
       name: root.querySelector('.dialogue-prototype__name'),
       line: root.querySelector('.dialogue-prototype__line'),
       next: root.querySelector('.dialogue-prototype__next'),
+      uiToggle: root.querySelector('.dialogue-prototype__ui-toggle'),
       skip: root.querySelector('.dialogue-prototype__skip')
     };
 
@@ -681,7 +696,115 @@
     let runtimeVariables = {};
     let activeLineTimer = null;
     let activeAutoNextTimer = null;
+    let activeGlitchTimers = [];
     let isLineAnimating = false;
+    let skipLocked = false;
+    let skipLockSceneKey = '';
+    let isUiHidden = false;
+
+    const parseSkipLockDirective = (value) => {
+      const token = cleanText(value).toLowerCase();
+      if (!token) return null;
+      if (['on', 'true', '1', 'lock', 'locked', 'disable', 'disabled', '불가', '잠금'].includes(token)) return true;
+      if (['off', 'false', '0', 'unlock', 'enabled', 'enable', '가능', '해제'].includes(token)) return false;
+      return null;
+    };
+
+    const applySkipButtonState = () => {
+      if (!el.skip) return;
+      el.skip.disabled = skipLocked;
+      el.skip.setAttribute('aria-disabled', skipLocked ? 'true' : 'false');
+      el.skip.textContent = skipLocked ? 'SKIP LOCKED' : 'SKIP';
+    };
+
+    const applyUiHiddenState = () => {
+      root.classList.toggle('is-ui-hidden', isUiHidden);
+      if (el.uiToggle) {
+        const label = isUiHidden ? 'UI 표시' : 'UI 숨기기';
+        el.uiToggle.setAttribute('aria-pressed', isUiHidden ? 'true' : 'false');
+        el.uiToggle.setAttribute('aria-label', label);
+        el.uiToggle.setAttribute('title', label);
+        el.uiToggle.textContent = isUiHidden ? 'UI 표시' : 'UI 숨김';
+      }
+    };
+
+    const clearLineEffects = () => {
+      activeGlitchTimers.forEach((timerId) => clearInterval(timerId));
+      activeGlitchTimers = [];
+    };
+
+    const tokenizeInlineEffects = (text = '') => {
+      const source = String(text);
+      const tokens = [];
+      const pattern = /\[\[(spoiler|스포|glitch|깨진글)\s*:\s*([\s\S]*?)\]\]/gi;
+      let lastIndex = 0;
+      let match = pattern.exec(source);
+      while (match) {
+        if (match.index > lastIndex) {
+          tokens.push({ type: 'text', value: source.slice(lastIndex, match.index) });
+        }
+        const directive = cleanText(match[1]).toLowerCase();
+        const value = String(match[2] || '');
+        if (['spoiler', '스포'].includes(directive)) tokens.push({ type: 'spoiler', value });
+        else tokens.push({ type: 'glitch', value });
+        lastIndex = pattern.lastIndex;
+        match = pattern.exec(source);
+      }
+      if (lastIndex < source.length) {
+        tokens.push({ type: 'text', value: source.slice(lastIndex) });
+      }
+      return tokens;
+    };
+
+    const scrambleText = (text = '') => {
+      const glyphs = '█▓▒░#@*&%!?/\\|+=-~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      return Array.from(String(text)).map((char) => {
+        if (char === ' ') return ' ';
+        const index = Math.floor(Math.random() * glyphs.length);
+        return glyphs[index];
+      }).join('');
+    };
+
+    const renderTextWithEffects = (targetEl, text = '') => {
+      if (!targetEl) return false;
+      const tokens = tokenizeInlineEffects(text);
+      const hasEffects = tokens.some((token) => token.type !== 'text');
+      if (!hasEffects) return false;
+      targetEl.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      tokens.forEach((token) => {
+        if (token.type === 'text') {
+          fragment.appendChild(document.createTextNode(token.value));
+          return;
+        }
+        if (token.type === 'spoiler') {
+          const spoiler = document.createElement('button');
+          spoiler.type = 'button';
+          spoiler.className = 'dialogue-prototype__spoiler';
+          spoiler.dataset.revealed = 'false';
+          spoiler.textContent = token.value;
+          spoiler.addEventListener('click', (event) => {
+            // 스포 텍스트 터치는 "대사 진행"이 아니라 공개/비공개 토글로만 처리한다.
+            event.stopPropagation();
+            spoiler.dataset.revealed = spoiler.dataset.revealed === 'true' ? 'false' : 'true';
+          });
+          fragment.appendChild(spoiler);
+          return;
+        }
+        const glitch = document.createElement('span');
+        glitch.className = 'dialogue-prototype__glitch';
+        glitch.dataset.source = token.value;
+        const redraw = () => {
+          glitch.textContent = scrambleText(token.value);
+        };
+        redraw();
+        const timerId = global.setInterval(redraw, 90);
+        activeGlitchTimers.push(timerId);
+        fragment.appendChild(glitch);
+      });
+      targetEl.appendChild(fragment);
+      return true;
+    };
 
     const emitDebug = () => {
       const leftActor = standingState.actors.get(standingState.left);
@@ -766,6 +889,7 @@
         activeAutoNextTimer = null;
       }
       isLineAnimating = false;
+      clearLineEffects();
       pointer = { ...nextPointer };
       renderCurrent();
     };
@@ -840,9 +964,12 @@
       const explicitName = cleanText(resolveTemplateVariables(block.speaker, runtimeVariables));
       if (explicitName) return explicitName;
       const actorId = cleanText(block.speakerId);
-      if (!actorId) return '???';
+      // 요청사항:
+      // - speaker/actor가 모두 비어 있으면 "???" 대신 빈 문자열을 유지한다.
+      // - 이름 미지정 블록(연출 전용 블록 등)에서도 UI가 자연스럽게 보이도록 한다.
+      if (!actorId) return '';
       const actor = scene.cast?.actors?.get?.(actorId) || standingState.actors.get(actorId);
-      return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), actorId);
+      return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), '');
     };
 
     const initializeStandingStateForScene = (scene) => {
@@ -1138,6 +1265,15 @@
       }
 
       const { scene, block } = hit;
+      const sceneKey = `${pointer.eventId}::${scene.sceneIndex}`;
+      if (sceneKey !== skipLockSceneKey) {
+        // 요구사항: 스킵 잠금은 별도 on/off가 없으면 "scene 전환 전까지만" 유지한다.
+        skipLocked = false;
+        skipLockSceneKey = sceneKey;
+      }
+      const skipDirective = parseSkipLockDirective(block.skipLockDirective);
+      if (skipDirective !== null) skipLocked = skipDirective;
+      applySkipButtonState();
       if (showMeta && el.meta) {
         const anchorLabel = block.anchor ? `:${block.anchor}` : '';
         el.meta.textContent = `${pointer.eventId} / scene#${scene.sceneIndex}(${scene.sceneName}) / block#${pointer.order}${anchorLabel}`;
@@ -1145,7 +1281,12 @@
       if (pointer.order === 0) {
         initializeStandingStateForScene(scene);
       }
-      if (el.name) el.name.textContent = resolveActorLabel(scene, block);
+      const resolvedSpeaker = resolveActorLabel(scene, block);
+      clearLineEffects();
+      if (el.name) {
+        const renderedSpeakerWithEffects = renderTextWithEffects(el.name, resolvedSpeaker);
+        if (!renderedSpeakerWithEffects) el.name.textContent = resolvedSpeaker;
+      }
       const resolvedLine = resolveTemplateVariables(block.line || '', runtimeVariables);
       if (activeLineTimer) {
         clearInterval(activeLineTimer);
@@ -1157,7 +1298,13 @@
       }
       if (el.line) {
         const typeSpeed = Math.max(0, parseIntegerOrDefault(block.typeSpeed, 0));
-        if (typeSpeed > 0 && resolvedLine.length > 0) {
+        const renderedWithEffects = renderTextWithEffects(el.line, resolvedLine);
+        if (renderedWithEffects) {
+          // 스포방지/깨진글이 섞인 라인은 토큰 DOM 렌더가 필요하므로
+          // 타입라이터 대신 즉시 렌더링으로 처리한다.
+          isLineAnimating = false;
+        } else if (typeSpeed > 0 && resolvedLine.length > 0) {
+          clearLineEffects();
           isLineAnimating = true;
           let cursor = 0;
           el.line.textContent = '';
@@ -1172,6 +1319,7 @@
           }, typeSpeed);
         } else {
           isLineAnimating = false;
+          clearLineEffects();
           el.line.textContent = resolvedLine;
         }
       }
@@ -1203,9 +1351,65 @@
         anchor: block.anchor,
         choiceCount: block.choices.length,
         waitMs,
+        skipLocked,
         typeSpeed: parseIntegerOrDefault(block.typeSpeed, 0),
         particleMode: cleanText(block.particleMode)
       });
+    };
+
+    const findSkipDestination = () => {
+      // SKIP은 "선택지", "씬 전환 직후", "종료 지점"을 만날 때까지 내부적으로 빠르게 전개한다.
+      // 렌더는 최종 목적지 1회만 수행해 체감 속도를 확보한다.
+      const startPtr = { ...pointer };
+      const startHit = getBlockByPointer(model, startPtr);
+      if (!startHit?.block) return null;
+
+      const visited = new Set();
+      let cursor = { ...startPtr };
+      let stepCount = 0;
+      let simulatedSceneKey = skipLockSceneKey;
+      let simulatedSkipLocked = skipLocked;
+
+      while (stepCount < 1000) {
+        stepCount += 1;
+        const key = `${cursor.eventId}|${cursor.sceneIndex}|${cursor.order}`;
+        if (visited.has(key)) return cursor;
+        visited.add(key);
+
+        const hit = getBlockByPointer(model, cursor);
+        if (!hit?.block) return cursor;
+        const { event, scene, block } = hit;
+        const sceneKey = `${cursor.eventId}::${scene.sceneIndex}`;
+        if (sceneKey !== simulatedSceneKey) {
+          simulatedSkipLocked = false;
+          simulatedSceneKey = sceneKey;
+        }
+        const skipDirective = parseSkipLockDirective(block.skipLockDirective);
+        if (skipDirective !== null) simulatedSkipLocked = skipDirective;
+        const hasChoices = (Array.isArray(block.choices) && block.choices.length > 0)
+          || (Array.isArray(block.hiddenChoices) && block.hiddenChoices.length > 0);
+        // 스킵 정지 조건: 선택지, 종료, 씬 전환, 그리고 "스킵 불가 블록"
+        if (hasChoices || block.end || simulatedSkipLocked) return cursor;
+
+        let nextPtr = null;
+        if (block.jump) {
+          nextPtr = model.anchorMap.get(block.jump) || null;
+          if (!nextPtr) return cursor;
+        } else if (scene.blocks[cursor.order + 1]) {
+          nextPtr = { eventId: cursor.eventId, sceneIndex: cursor.sceneIndex, order: cursor.order + 1 };
+        } else {
+          const idx = event.scenes.findIndex((item) => item.sceneIndex === scene.sceneIndex);
+          if (idx >= 0 && event.scenes[idx + 1]) {
+            nextPtr = { eventId: cursor.eventId, sceneIndex: event.scenes[idx + 1].sceneIndex, order: 0 };
+          }
+        }
+
+        if (!nextPtr) return cursor;
+        if (nextPtr.sceneIndex !== cursor.sceneIndex || nextPtr.eventId !== cursor.eventId) return nextPtr;
+        cursor = nextPtr;
+      }
+
+      return cursor;
     };
 
     const goNext = () => {
@@ -1287,6 +1491,10 @@
     root.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
+      // UI 숨김 모드에서는 배경 감상 전용으로 동작하고,
+      // 우발적인 탭/클릭으로 대사가 넘어가지 않도록 진행 입력을 잠근다.
+      if (isUiHidden) return;
+      if (target.closest('.dialogue-prototype__spoiler')) return;
       if (target.closest('.dialogue-prototype__skip') || target.closest('.dialogue-prototype__choice')) return;
       goNext();
     });
@@ -1298,8 +1506,23 @@
 
     el.skip?.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (typeof onSkip === 'function') onSkip({ root, mount });
-      else root.remove();
+      if (skipLocked) {
+        log('skip-blocked', { reason: 'skip-lock' });
+        return;
+      }
+      const destination = findSkipDestination();
+      if (!destination) return;
+      log('skip-fast-forward', {
+        from: { ...pointer },
+        to: destination
+      });
+      goToPointer(destination);
+    });
+
+    el.uiToggle?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      isUiHidden = !isUiHidden;
+      applyUiHiddenState();
     });
 
     const initialFilters = { eventId, sceneId: sceneId || nodeId, anchor };
@@ -1311,6 +1534,8 @@
         .then((loaded) => applyModel(loaded, initialFilters))
         .catch(reportError);
     }
+    applyUiHiddenState();
+    applySkipButtonState();
 
     return {
       root,

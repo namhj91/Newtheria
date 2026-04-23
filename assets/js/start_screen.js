@@ -1,7 +1,7 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.2.14(260423-모바일스탠딩위치보정)';
+const START_VERSION_FALLBACK = 'ver.0.2.15(260423-모바일포커스슬라이드연출)';
 const STORAGE_KEYS = {
   characterCatalog: 'newtheria.characters',
   settingsMeta: 'newtheria.settings.meta',

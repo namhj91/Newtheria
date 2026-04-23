@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.2.14(260423-모바일스탠딩위치보정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.2.15(260423-모바일포커스슬라이드연출)';
 
 const MAP_SIZE = 200;
 

@@ -431,9 +431,10 @@
        따라서 모바일 상단 정렬 보정은 컨테이너(.actor)뿐 아니라 레이어에도 동일 적용해야
        "아래로 깔려 보이는" 체감이 재발하지 않는다. */
     background-position: top center;
-    /* 모바일 요청사항: 스탠딩이 상단~하단을 모두 채우도록 높이 기준으로 스케일한다.
-       auto 100%는 종횡비를 유지하면서 슬롯 높이(100svh)를 꽉 채운다. */
-    background-size: auto 100%;
+    /* 모바일 요청사항 반영:
+       - 좌/우 치우침 대신 캐릭터를 가운데 기준으로 노출한다.
+       - 일러 전체가 잘리지 않도록 contain으로 축소해 전체 실루엣을 보장한다. */
+    background-size: contain;
   }
 
   .dialogue-prototype__actor--left .dialogue-prototype__actor-layer {
@@ -449,20 +450,19 @@
   }
 
   .dialogue-prototype__actor--left {
-    /* 요청사항 후속 반영: 모바일 포커스 스탠딩 중앙 고정은 취소하고
-       기존 좌측 슬롯 진입 동선을 복원한다. */
-    left: clamp(-24px, -3vw, -14px);
-    transform: translate3d(-116%, 0, 0);
+    /* 모바일에서는 좌/우 슬롯 공통으로 가운데 기준 배치한다. */
+    left: 50%;
+    transform: translate3d(-50%, 12px, 0);
   }
 
   .dialogue-prototype__actor--right {
-    /* 우측 슬롯 역시 중앙 고정 대신 기존 우측 진입 동선을 복원한다. */
-    right: clamp(-24px, -3vw, -14px);
-    left: auto;
-    transform: translate3d(116%, 0, 0) scaleX(-1);
+    /* 우측 슬롯도 같은 중앙 위치를 사용하고, 방향성만 반전한다. */
+    left: 50%;
+    right: auto;
+    transform: translate3d(-50%, 12px, 0) scaleX(-1);
   }
 
-  /* 모바일 연출 규칙(복원): 포커스된 1명만 등장하며, 슬롯 기준 위치로 슬라이드 인한다. */
+  /* 모바일 연출 규칙: 포커스된 1명만 등장하며, 중앙 위치에서 슬라이드 인한다. */
   .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left[data-visible="true"] {
     opacity: 1;
     transform: translate3d(-50%, 0, 0);

@@ -256,7 +256,6 @@ actor = goddess
 focus = goddess
 type_speed = 20
 line = 미리 다 알면 재미없지. 스포일러는 절대 금지야![[스포:절름발이가 범인!]] 규칙은 간단해요. 그냥 네가 숨 쉬고, 걷고, 부딪히며 직접 알아가면 돼. 그게 새로운 삶의 묘미 아니겠어?
-wait = 700
 }
 ---
 
@@ -266,7 +265,7 @@ particle = snow
 particle_count = 32
 particle_duration = 4200
 line = (아스테리아의 발끝에서부터 거대한 빛의 소용돌이가 일며 순례자의 몸을 감싸기 시작한다. 순례자의 몸이 서서히 반투명해진다.)
-wait = 800
+wait = 1800
 }
 ---
 

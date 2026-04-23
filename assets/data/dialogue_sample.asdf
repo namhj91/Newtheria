@@ -45,7 +45,7 @@ line = 어라, 드디어 눈을 떴네? 안녕, 나의 작은 순례자. 기분�
 <block:순례자_혼란>
 {
 actor = pilgrim
-speaker = 순례자
+speaker = ???
 focus = pilgrim
 ; 인라인 actor 지정 예시(동일 문법): 순례자만 shake, 여신은 float 유지
 standing_animation = goddess:float,pilgrim:shake

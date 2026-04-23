@@ -465,12 +465,12 @@
   /* 모바일 연출 규칙(복원): 포커스된 1명만 등장하며, 슬롯 기준 위치로 슬라이드 인한다. */
   .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left[data-visible="true"] {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(-50%, 0, 0);
   }
 
   .dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--right[data-visible="true"] {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scaleX(-1);
+    transform: translate3d(-50%, 0, 0) scaleX(-1);
   }
 
   .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--right,

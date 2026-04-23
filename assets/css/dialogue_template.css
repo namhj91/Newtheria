@@ -435,17 +435,6 @@
     background-size: auto 100%;
   }
 
-  .dialogue-prototype__actor--left .dialogue-prototype__actor-layer {
-    /* 중앙 기준(top center)으로 두면 세로 풀높이 확대 시 중앙부 크롭 체감이 커진다.
-       좌측 슬롯은 top left 앵커를 사용해 얼굴/몸통 핵심 영역이 중앙에서 잘리지 않게 보정한다. */
-    background-position: top left;
-  }
-
-  .dialogue-prototype__actor--right .dialogue-prototype__actor-layer {
-    /* 우측 슬롯은 좌측과 대칭으로 top right 앵커를 사용해 중앙부 크롭을 줄인다. */
-    background-position: top right;
-  }
-
   .dialogue-prototype__actor--left {
     /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
     left: clamp(-48px, -6vw, -14px);

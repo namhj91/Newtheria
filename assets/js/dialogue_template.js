@@ -29,6 +29,18 @@
   };
 
   const parseBoolean = (value) => ['1', 'true', 'yes', 'on', '예', 'end'].includes(cleanText(value).toLowerCase());
+  const parseIntegerOrDefault = (value, fallback = 0) => {
+    const parsed = Number.parseInt(cleanText(value), 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  // {player_name} 같은 템플릿 토큰을 현재 변수 스냅샷으로 치환한다.
+  const resolveTemplateVariables = (text = '', variables = {}) => String(text).replace(/\{([a-zA-Z0-9_.-]+)\}/g, (full, key) => {
+    if (Object.prototype.hasOwnProperty.call(variables, key)) {
+      const value = variables[key];
+      return value == null ? '' : String(value);
+    }
+    return full;
+  });
   const STORAGE_KEYS = {
     characterCatalog: 'newtheria.characters',
     dialogueProgress: 'newtheria.dialogue.progress',
@@ -210,6 +222,14 @@
         standingAnimation: cleanText(currentBlock.standing_animation || currentBlock.standinganimation || currentBlock.스탠딩애니메이션),
         standingHide: cleanText(currentBlock.hide),
         standingSetLayers: cleanText(currentBlock.set_layers),
+        // 대기/타자기 연출 문법:
+        // - wait = 800          (밀리초 후 자동 진행)
+        // - type_speed = 24     (문자당 24ms 타자기 속도)
+        waitMs: parseIntegerOrDefault(currentBlock.wait || currentBlock.delay || currentBlock.pause || currentBlock.auto_next_ms, 0),
+        typeSpeed: parseIntegerOrDefault(currentBlock.type_speed || currentBlock.typewriter_speed || currentBlock.type_ms, 0),
+        particleMode: cleanText(currentBlock.particle || currentBlock.particles || currentBlock.fx_particle || currentBlock.vfx_particle).toLowerCase(),
+        particleCount: parseIntegerOrDefault(currentBlock.particle_count || currentBlock.particles_count, 18),
+        particleDuration: parseIntegerOrDefault(currentBlock.particle_duration || currentBlock.particles_duration, 3200),
         choices: Array.isArray(currentBlock.choices) ? [...currentBlock.choices] : [],
         hiddenChoices: Array.isArray(currentBlock.hiddenChoices) ? [...currentBlock.hiddenChoices] : []
       };
@@ -585,6 +605,7 @@
     root.className = 'dialogue-prototype';
     root.innerHTML = `
       <div class="dialogue-prototype__bg" aria-hidden="true"></div>
+      <div class="dialogue-prototype__particles" data-mode="off" aria-hidden="true"></div>
       <div class="dialogue-prototype__actors" data-has-actors="false" data-focus="none" aria-hidden="true">
         <div class="dialogue-prototype__actor dialogue-prototype__actor--left"></div>
         <div class="dialogue-prototype__actor dialogue-prototype__actor--right"></div>
@@ -607,6 +628,7 @@
 
     const el = {
       bg: root.querySelector('.dialogue-prototype__bg'),
+      particles: root.querySelector('.dialogue-prototype__particles'),
       actors: root.querySelector('.dialogue-prototype__actors'),
       actorLeft: root.querySelector('.dialogue-prototype__actor--left'),
       actorRight: root.querySelector('.dialogue-prototype__actor--right'),
@@ -635,6 +657,10 @@
     };
     let trace = [];
     const debugListeners = new Set();
+    let runtimeVariables = {};
+    let activeLineTimer = null;
+    let activeAutoNextTimer = null;
+    let isLineAnimating = false;
 
     const emitDebug = () => {
       const leftActor = standingState.actors.get(standingState.left);
@@ -710,6 +736,15 @@
     };
 
     const goToPointer = (nextPointer) => {
+      if (activeLineTimer) {
+        clearInterval(activeLineTimer);
+        activeLineTimer = null;
+      }
+      if (activeAutoNextTimer) {
+        clearTimeout(activeAutoNextTimer);
+        activeAutoNextTimer = null;
+      }
+      isLineAnimating = false;
       pointer = { ...nextPointer };
       renderCurrent();
     };
@@ -736,6 +771,31 @@
       slotEl.dataset.visible = 'true';
     };
 
+    const applyParticlesFromBlock = (block) => {
+      if (!el.particles) return;
+      const mode = cleanText(block.particleMode).toLowerCase();
+      if (!mode || ['off', 'none', 'clear', '-'].includes(mode)) {
+        el.particles.dataset.mode = 'off';
+        el.particles.replaceChildren();
+        return;
+      }
+      el.particles.dataset.mode = mode;
+      el.particles.replaceChildren();
+
+      const particleCount = Math.min(64, Math.max(4, parseIntegerOrDefault(block.particleCount, 18)));
+      const particleDuration = Math.min(12000, Math.max(600, parseIntegerOrDefault(block.particleDuration, 3200)));
+      for (let i = 0; i < particleCount; i += 1) {
+        const particle = document.createElement('span');
+        particle.className = 'dialogue-prototype__particle';
+        particle.style.left = `${Math.round(Math.random() * 100)}%`;
+        particle.style.setProperty('--particle-delay', `${Math.round(Math.random() * 1200)}ms`);
+        particle.style.setProperty('--particle-duration', `${Math.round(particleDuration * (0.72 + Math.random() * 0.56))}ms`);
+        particle.style.opacity = String(0.4 + Math.random() * 0.5);
+        particle.style.transform = `translateY(${Math.round(Math.random() * 14)}px) scale(${(0.75 + Math.random() * 0.75).toFixed(2)})`;
+        el.particles.appendChild(particle);
+      }
+    };
+
     const setActorLayers = (slotEl, layers = []) => {
       if (!slotEl) return;
       slotEl.replaceChildren();
@@ -756,12 +816,12 @@
     };
 
     const resolveActorLabel = (scene, block) => {
-      const explicitName = cleanText(block.speaker);
+      const explicitName = cleanText(resolveTemplateVariables(block.speaker, runtimeVariables));
       if (explicitName) return explicitName;
       const actorId = cleanText(block.speakerId);
       if (!actorId) return '???';
       const actor = scene.cast?.actors?.get?.(actorId) || standingState.actors.get(actorId);
-      return cleanText(actor?.name, actorId);
+      return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), actorId);
     };
 
     const initializeStandingStateForScene = (scene) => {
@@ -984,24 +1044,65 @@
         initializeStandingStateForScene(scene);
       }
       if (el.name) el.name.textContent = resolveActorLabel(scene, block);
-      if (el.line) el.line.textContent = block.line || '';
+      const resolvedLine = resolveTemplateVariables(block.line || '', runtimeVariables);
+      if (activeLineTimer) {
+        clearInterval(activeLineTimer);
+        activeLineTimer = null;
+      }
+      if (activeAutoNextTimer) {
+        clearTimeout(activeAutoNextTimer);
+        activeAutoNextTimer = null;
+      }
+      if (el.line) {
+        const typeSpeed = Math.max(0, parseIntegerOrDefault(block.typeSpeed, 0));
+        if (typeSpeed > 0 && resolvedLine.length > 0) {
+          isLineAnimating = true;
+          let cursor = 0;
+          el.line.textContent = '';
+          activeLineTimer = global.setInterval(() => {
+            cursor += 1;
+            el.line.textContent = resolvedLine.slice(0, cursor);
+            if (cursor >= resolvedLine.length) {
+              clearInterval(activeLineTimer);
+              activeLineTimer = null;
+              isLineAnimating = false;
+            }
+          }, typeSpeed);
+        } else {
+          isLineAnimating = false;
+          el.line.textContent = resolvedLine;
+        }
+      }
       setBackground({
         value: block.background,
         sceneKey: `${pointer.eventId}::${scene.sceneIndex}`
       });
       applyStandingFromBlock(block);
+      applyParticlesFromBlock(block);
       renderChoices(block.choices, {
         restoreChoices: block.choices,
         hiddenChoices: block.hiddenChoices,
         isHiddenMode: false
       });
       saveSessionProgress(block.anchor);
+      const hasChoices = (Array.isArray(block.choices) && block.choices.length > 0)
+        || (Array.isArray(block.hiddenChoices) && block.hiddenChoices.length > 0);
+      const waitMs = Math.max(0, parseIntegerOrDefault(block.waitMs, 0));
+      if (!hasChoices && waitMs > 0) {
+        activeAutoNextTimer = global.setTimeout(() => {
+          activeAutoNextTimer = null;
+          goNext();
+        }, waitMs);
+      }
       log('render-block', {
         eventId: pointer.eventId,
         sceneIndex: scene.sceneIndex,
         order: pointer.order,
         anchor: block.anchor,
-        choiceCount: block.choices.length
+        choiceCount: block.choices.length,
+        waitMs,
+        typeSpeed: parseIntegerOrDefault(block.typeSpeed, 0),
+        particleMode: cleanText(block.particleMode)
       });
     };
 
@@ -1009,6 +1110,16 @@
       const hit = getBlockByPointer(model, pointer);
       if (!hit?.block) return;
       const { event, scene, block } = hit;
+      if (isLineAnimating && el.line) {
+        // 타자기 출력 중 다음 입력이 들어오면 우선 현재 줄 전체를 즉시 완성한다.
+        if (activeLineTimer) {
+          clearInterval(activeLineTimer);
+          activeLineTimer = null;
+        }
+        el.line.textContent = resolveTemplateVariables(block.line || '', runtimeVariables);
+        isLineAnimating = false;
+        return;
+      }
 
       if (block.end) {
         log('end', { reason: 'block-end-true' });
@@ -1133,7 +1244,17 @@
         goToPointer(nextPtr);
       },
       setVariables() {
-        log('set-variables-skipped', { reason: 'not-implemented-yet' });
+        const patch = arguments[0];
+        if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+          log('set-variables-skipped', { reason: 'patch-object-required' });
+          return;
+        }
+        runtimeVariables = {
+          ...runtimeVariables,
+          ...patch
+        };
+        log('set-variables', { keys: Object.keys(patch) });
+        renderCurrent();
       },
       getDebugState() {
         const leftActor = standingState.actors.get(standingState.left);

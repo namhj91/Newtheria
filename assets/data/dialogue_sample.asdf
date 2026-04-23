@@ -15,10 +15,15 @@ focus = goddess
 <block:intro_start>
 {
 actor = goddess
-speaker = 별의 여신 아스테리아
+speaker = 별의 여신 {goddess_title}
 focus = goddess
 standing_animation = fade
-line = 여정에 온 걸 환영해.
+type_speed = 24
+particle = snow
+particle_count = 22
+particle_duration = 3400
+line = 여정에 온 걸 환영해, {player_name}.
+wait = 900
 choice = 첫 번째 선택 -> 첫번째_선택지
 choice = 두 번째 선택 -> 두번째_선택지
 choice = 세 번째 선택 -> 세번째_선택지
@@ -61,6 +66,7 @@ jump = 선택종료
 {
 speaker_id = goddess
 focus = goddess
+particle = off
 line = 이제 다음 씬으로 넘어가요.
 }
 ---

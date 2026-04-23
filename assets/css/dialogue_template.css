@@ -425,6 +425,13 @@
     transition: opacity 260ms ease, transform 320ms cubic-bezier(.2, .9, .2, 1), filter 180ms ease;
   }
 
+  .dialogue-prototype__actor-layer {
+    /* 실제 스탠딩 이미지는 .dialogue-prototype__actor-layer에 그려진다.
+       따라서 모바일 상단 정렬 보정은 컨테이너(.actor)뿐 아니라 레이어에도 동일 적용해야
+       "아래로 깔려 보이는" 체감이 재발하지 않는다. */
+    background-position: top center;
+  }
+
   .dialogue-prototype__actor--left {
     /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
     left: clamp(-48px, -6vw, -14px);

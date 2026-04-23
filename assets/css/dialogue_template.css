@@ -411,11 +411,41 @@
   }
 
   .dialogue-prototype__actor {
-    /* 모바일에서는 대화 패널이 하단 시야를 크게 차지하므로,
-       스탠딩 기준점을 올려 "하단 쏠림 + 짧아 보임" 체감을 줄인다. */
-    bottom: clamp(88px, 14svh, 148px);
-    width: min(44vw, 360px);
-    height: min(82svh, 760px);
+    /* 모바일 스탠딩은 "화면 높이 기준"으로 맞춰 일러가 작아 보이지 않게 고정한다.
+       대화 패널 위에 겹쳐 보이더라도 캐릭터 키 비율을 우선 보장한다. */
+    bottom: 0;
+    width: min(62vw, 420px);
+    height: 100svh;
+    transform: translate3d(0, 0, 0);
+    transition: opacity 260ms ease, transform 320ms cubic-bezier(.2, .9, .2, 1), filter 180ms ease;
+  }
+
+  .dialogue-prototype__actor--left {
+    left: clamp(-22px, -2vw, 0px);
+    /* 기본 상태는 화면 밖 대기: 포커스될 때만 안쪽으로 슬라이드 인한다. */
+    transform: translate3d(-116%, 0, 0);
+  }
+
+  .dialogue-prototype__actor--right {
+    right: clamp(-22px, -2vw, 0px);
+    transform: translate3d(116%, 0, 0) scaleX(-1);
+  }
+
+  /* 모바일 연출 규칙: data-focus로 지정된 한 명만 등장한다. */
+  .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left[data-visible="true"] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--right[data-visible="true"] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleX(-1);
+  }
+
+  .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--right,
+  .dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--left,
+  .dialogue-prototype__actors[data-focus="none"] .dialogue-prototype__actor {
+    opacity: 0;
   }
 
   .dialogue-prototype__line {
@@ -524,10 +554,9 @@
   }
 
   .dialogue-prototype__actor {
-    /* 초소형 구간은 좌우 여백을 더 확보하면서 기준점은 살짝만 내린다. */
-    bottom: clamp(82px, 12svh, 132px);
-    width: min(46vw, 320px);
-    height: min(80svh, 700px);
+    /* 초소형에서도 "전체 높이 기준" 원칙을 유지하고, 폭만 살짝 줄여 겹침을 완화한다. */
+    width: min(66vw, 360px);
+    height: 100svh;
   }
 
   /* 모바일 카드 타이포/패딩은 공용 템플릿에서 처리한다. */

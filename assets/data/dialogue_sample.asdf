@@ -24,9 +24,6 @@ bg = assets/img/background.jpg
 particle = snow
 particle_count = 24
 particle_duration = 3400
-standing_animation = fade
-type_speed = 20
-line = (배경: 끝을 알 수 없는 짙은 우주. 은하수가 거대한 강물처럼 흐르고, 형형색색의 별빛들이 물거품처럼 피어올랐다 스러지는 몽환적인 공간. 그 중심에서 눈을 뜬 순례자.)
 wait = 900
 }
 ---

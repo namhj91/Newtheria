@@ -152,24 +152,30 @@
         <summary>1) 데이터 소스</summary>
         <div class="group">
           <label for="csvUrl">스크립트 URL</label>
-          <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.nds" />
+          <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.asdf" />
 
-          <label for="csvFile">스크립트 파일 직접 선택(.nds/.txt)</label>
-          <input id="csvFile" type="file" accept=".nds,.txt,text/plain" />
+          <label for="csvFile">스크립트 파일 직접 선택(.asdf/.txt)</label>
+          <input id="csvFile" type="file" accept=".asdf,.txt,text/plain" />
         </div>
       </details>
 
       <details id="sectionAnchor" open>
-        <summary>2) 태그/앵커</summary>
+        <summary>2) 시작 위치</summary>
         <div class="group">
           <div class="row">
             <div>
-              <label for="sceneTag">scene/tag (예: intro, chapter1)</label>
-              <input id="sceneTag" type="text" value="rebirth_intro" />
+              <label for="eventId">eventId (예: opening)</label>
+              <input id="eventId" type="text" value="opening" />
             </div>
             <div>
-              <label for="anchorId">anchor (예: start, choice)</label>
-              <input id="anchorId" type="text" value="awakening" />
+              <label for="sceneId">sceneId (예: 0, 1, 2)</label>
+              <input id="sceneId" type="text" value="0" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="anchorId">anchor (선택)</label>
+              <input id="anchorId" type="text" value="intro_start" />
             </div>
           </div>
 
@@ -203,7 +209,7 @@
 
       <details id="sectionGuide">
         <summary>5) 문법 힌트</summary>
-        <p class="hint">NDS v2 섹션 문법: <code>@scene#anchor</code> + <code>[흐름제어/대사출력/소리제어/변수제어]</code> + <code>키 = 값</code> + <code>---</code>.<br/>선택지는 <code>[선택지]</code> 섹션에서 <code>- 라벨 => scene#anchor</code> 형식으로 작성합니다.<br/>점프 예시: <code>점프 = intro#end</code> (선택지 없이 앵커 이동), 포커스 예시: <code>화자포커스 = asteria_base</code></p>
+        <p class="hint">헤더형 .asdf 문법을 사용합니다.<br/><code>&lt;event:이름&gt;</code> / <code>&lt;scene#n:이름&gt;</code> / <code>&lt;block:anchor&gt;</code>를 사용하고, 블록 종료는 <code>---</code> 입니다.<br/>블록 내부는 <code>{ ... }</code>로 감싸고 <code>key = value</code>만 허용합니다.<br/>씬 헤더 직후 <code>{ actor / slot_left / slot_right / focus }</code>로 기본 스탠딩을 정의하며, <code>actor = id</code>는 (1) scene 번들 → (2) 활성 세이브 슬롯 캐릭터 → (3) 대표 캐릭터 localStorage 순서로 조회됩니다.<br/>진행 포인터는 같은 탭에서 <code>sessionStorage(newtheria.dialogue.progress)</code>로 복원됩니다.</p>
       </details>
     </div>
   </section>
@@ -215,7 +221,8 @@
   <script>
     const mount = document.getElementById('prototypeMount');
     const csvUrlInput = document.getElementById('csvUrl');
-    const sceneTagInput = document.getElementById('sceneTag');
+    const eventIdInput = document.getElementById('eventId');
+    const sceneIdInput = document.getElementById('sceneId');
     const anchorIdInput = document.getElementById('anchorId');
     const backgroundInput = document.getElementById('backgroundUrl');
     const csvFileInput = document.getElementById('csvFile');
@@ -228,37 +235,11 @@
     const controlsPanel = document.getElementById('testControlsPanel');
     const toggleControlsButton = document.getElementById('toggleControls');
 
-    const normalizeSceneAnchorInput = (sceneRaw = '', anchorRaw = '') => {
-      // 테스트 입력 편의: @scene#anchor 한 줄 입력도 허용하고,
-      // 기존 2칸(scene + anchor) 입력도 그대로 유지한다.
-      const sceneText = String(sceneRaw || '').trim();
-      const anchorText = String(anchorRaw || '').trim();
-
-      // 케이스 1) anchor 칸에 @scene#anchor를 붙여 넣은 경우
-      const mergedAnchorMatch = anchorText.match(/^@?([^#\s]+)#([^#\s]+)$/);
-      if (mergedAnchorMatch) {
-        return {
-          sceneTag: mergedAnchorMatch[1].trim(),
-          anchorId: mergedAnchorMatch[2].trim()
-        };
-      }
-
-      // 케이스 2) scene 칸에 @scene#anchor를 붙여 넣은 경우
-      const mergedSceneMatch = sceneText.match(/^@?([^#\s]+)#([^#\s]+)$/);
-      if (mergedSceneMatch) {
-        return {
-          sceneTag: mergedSceneMatch[1].trim(),
-          anchorId: mergedSceneMatch[2].trim()
-        };
-      }
-
-      return {
-        sceneTag: sceneText.replace(/^@/, ''),
-        anchorId: anchorText.replace(/^#/, '')
-      };
-    };
-
-    const getFilters = () => normalizeSceneAnchorInput(sceneTagInput.value, anchorIdInput.value);
+    const getFilters = () => ({
+      eventId: String(eventIdInput.value || '').trim(),
+      sceneId: String(sceneIdInput.value || '').trim(),
+      anchor: String(anchorIdInput.value || '').trim()
+    });
 
     const prototype = window.NewtheriaDialogueTemplate.createDialogueTemplate({
       mount,
@@ -275,12 +256,15 @@
 
     // 변수/분기 상태를 테스트 화면에서 즉시 확인할 수 있도록 추적 패널을 연결한다.
     const renderDebugSnapshot = (state = {}) => {
-      const safeVariables = state.variables || {};
+      const safeVariables = {
+        currentEventId: state.currentEventId || '',
+        currentSceneIndex: state.currentSceneIndex ?? '',
+      };
       const safeTrace = Array.isArray(state.trace) ? state.trace : [];
       variableSnapshot.value = JSON.stringify(safeVariables, null, 2);
       traceSnapshot.value = safeTrace
         .slice(-20)
-        .map((entry) => `[${entry.at}] ${entry.type} ${JSON.stringify(entry.payload || {})}`)
+        .map((entry) => `[${entry.at}] ${entry.type} ${JSON.stringify(entry.data || {})}`)
         .join('\n');
     };
     prototype.subscribeDebug(renderDebugSnapshot);

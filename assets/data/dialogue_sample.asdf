@@ -1,0 +1,76 @@
+; Aetheria Script Data File
+; UTF-8
+
+<event:오프닝>
+<scene#0:도입>
+{
+; 임시 캐릭터 번들 (향후에는 외부 캐릭터 리스트/번들로 대체)
+cast_json = "{\"actors\":[{\"id\":\"goddess\",\"name\":\"아스테리아\",\"layers\":[\"assets/img/goddess.png\"]},{\"id\":\"pilgrim\",\"name\":\"순례자\",\"layers\":[\"assets/img/player.png\"]}]}"
+actor = goddess
+actor = pilgrim
+slot_left = goddess
+slot_right = pilgrim
+focus = goddess
+}
+---
+
+<block:intro_start>
+{
+actor = goddess
+speaker = 별의 여신 아스테리아
+focus = goddess
+standing_animation = fade
+line = 여정에 온 걸 환영해.
+bg = assets/img/background.jpg
+choice = 첫 번째 선택 -> 첫번째_선택지
+choice = 두 번째 선택 -> 두번째_선택지
+choice = 세 번째 선택 -> 세번째_선택지
+}
+---
+
+<block:첫번째_선택지>
+{
+speaker_id = pilgrim
+focus = pilgrim
+line = 첫 번째 선택을 골랐군요.
+jump = 선택종료
+}
+---
+
+<block:두번째_선택지>
+{
+speaker_id = goddess
+focus = goddess
+move_left = pilgrim
+move_right = goddess
+line = 두 번째 선택을 골랐군요.
+jump = 선택종료
+}
+---
+
+<block:세번째_선택지>
+{
+speaker_id = pilgrim
+focus = pilgrim
+hide = goddess
+line = 세 번째 선택을 골랐군요.
+jump = 선택종료
+}
+---
+
+<block:선택종료>
+{
+speaker_id = goddess
+focus = goddess
+line = 이제 다음 씬으로 넘어가요.
+}
+---
+
+<scene#1:후속>
+<block>
+{
+speaker = 순례자
+line = 알겠어, 계속 가보자.
+end = true
+}
+---

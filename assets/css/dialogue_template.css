@@ -60,6 +60,51 @@
   animation: dialogue-actors-shake 360ms ease-out;
 }
 
+.dialogue-prototype__actor {
+  position: absolute;
+  bottom: 0;
+  width: min(36vw, 520px);
+  height: min(78vh, 860px);
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: contain;
+  filter: brightness(0.42) saturate(0.86);
+  opacity: 0;
+  transform: translateY(16px) scale(0.99);
+  transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
+}
+
+.dialogue-prototype__actor[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.dialogue-prototype__actor-layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: contain;
+}
+
+.dialogue-prototype__actor--left {
+  left: clamp(8px, 4vw, 54px);
+}
+
+.dialogue-prototype__actor--right {
+  right: clamp(8px, 4vw, 54px);
+  transform: translateY(16px) scaleX(-0.99);
+}
+
+.dialogue-prototype__actor--right[data-visible="true"] {
+  transform: translateY(0) scaleX(-1);
+}
+
+.dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left,
+.dialogue-prototype__actors[data-focus="right"] .dialogue-prototype__actor--right {
+  filter: brightness(1) saturate(1);
+}
+
 .dialogue-prototype__light,
 .dialogue-prototype__particles,
 .dialogue-prototype__transition {

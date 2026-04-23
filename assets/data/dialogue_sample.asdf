@@ -86,6 +86,7 @@ standing_animation_actor = goddess:zoom-in,pilgrim:fade
 particle = ember
 particle_count = 12
 particle_duration = 2800
+skip_lock = on
 type_speed = 20
 line = 나? 나는 아스테리아. 이 끝없이 펼쳐진 별바다를 관리하는 별의 여신이랄까? 뭐, 네 입장에선 새로운 시작 지점에서 안내를 돕는 꽤 친절한 튜토리얼 NPC라고 생각해도 좋아요. 아, 스킵 버튼 같은 건 없으니까 내 말 잘 들어야 해?
 }

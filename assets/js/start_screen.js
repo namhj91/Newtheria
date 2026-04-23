@@ -1,7 +1,9 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
-const START_VERSION_FALLBACK = 'ver.0.2.15(260423-모바일포커스슬라이드연출)';
+// 문서 파싱 실패/네트워크 실패 시에는 고정 안내 문구를 표시한다.
+// 매 PR마다 fallback 버전 문자열을 수동 갱신하지 않기 위한 정책이다.
+const START_VERSION_FALLBACK = 'version 불러오기 실패';
 const STORAGE_KEYS = {
   characterCatalog: 'newtheria.characters',
   settingsMeta: 'newtheria.settings.meta',

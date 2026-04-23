@@ -684,10 +684,29 @@
       if (typeof onError === 'function') onError(error);
     };
 
-    const setBackground = (value = '') => {
-      const url = cleanText(value || backgroundUrl);
-      if (!url || !el.bg) return;
-      el.bg.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+    // 배경 유지 정책:
+    // - 같은 scene 안에서는 block에 배경이 "명시적으로" 주어졌을 때만 변경한다.
+    // - scene이 바뀌면, 새 scene 첫 block에 배경이 없을 경우 기본 backgroundUrl로 초기화한다.
+    // 이렇게 하면 block마다 배경이 기본값으로 덮이는 현상을 막고, scene 경계에서는 의도된 초기화가 가능하다.
+    let lastRenderedSceneKey = '';
+    const setBackground = ({ value = '', sceneKey = '' } = {}) => {
+      const explicitUrl = cleanText(value);
+      const fallbackUrl = cleanText(backgroundUrl);
+      const isSceneChanged = Boolean(sceneKey) && sceneKey !== lastRenderedSceneKey;
+      let nextUrl = '';
+
+      if (explicitUrl) {
+        // block에 배경이 있으면 항상 그 값을 우선 적용한다.
+        nextUrl = explicitUrl;
+      } else if (isSceneChanged && fallbackUrl) {
+        // scene 전환 시에는 기본 배경으로만 초기화한다.
+        nextUrl = fallbackUrl;
+      }
+
+      if (nextUrl && el.bg) {
+        el.bg.style.backgroundImage = `url("${nextUrl.replace(/"/g, '\\"')}")`;
+      }
+      if (sceneKey) lastRenderedSceneKey = sceneKey;
     };
 
     const goToPointer = (nextPointer) => {
@@ -966,7 +985,10 @@
       }
       if (el.name) el.name.textContent = resolveActorLabel(scene, block);
       if (el.line) el.line.textContent = block.line || '';
-      setBackground(block.background);
+      setBackground({
+        value: block.background,
+        sceneKey: `${pointer.eventId}::${scene.sceneIndex}`
+      });
       applyStandingFromBlock(block);
       renderChoices(block.choices, {
         restoreChoices: block.choices,

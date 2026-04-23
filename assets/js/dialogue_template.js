@@ -656,7 +656,7 @@
         <p class="dialogue-prototype__line"></p>
         <button class="dialogue-prototype__next" type="button" aria-label="다음 대사">▼</button>
       </section>
-      <button class="dialogue-prototype__ui-toggle" type="button" aria-pressed="false">UI 숨김</button>
+      <button class="dialogue-prototype__ui-toggle" type="button" aria-pressed="false" aria-label="UI 숨기기" title="UI 숨기기">UI 숨김</button>
       <button class="dialogue-prototype__skip" type="button">SKIP</button>
     `;
     mount.replaceChildren(root);
@@ -696,6 +696,7 @@
     let runtimeVariables = {};
     let activeLineTimer = null;
     let activeAutoNextTimer = null;
+    let activeGlitchTimers = [];
     let isLineAnimating = false;
     let skipLocked = false;
     let skipLockSceneKey = '';
@@ -719,9 +720,92 @@
     const applyUiHiddenState = () => {
       root.classList.toggle('is-ui-hidden', isUiHidden);
       if (el.uiToggle) {
+        const label = isUiHidden ? 'UI 표시' : 'UI 숨기기';
         el.uiToggle.setAttribute('aria-pressed', isUiHidden ? 'true' : 'false');
+        el.uiToggle.setAttribute('aria-label', label);
+        el.uiToggle.setAttribute('title', label);
         el.uiToggle.textContent = isUiHidden ? 'UI 표시' : 'UI 숨김';
       }
+    };
+
+    const clearLineEffects = () => {
+      activeGlitchTimers.forEach((timerId) => clearInterval(timerId));
+      activeGlitchTimers = [];
+    };
+
+    const tokenizeInlineEffects = (text = '') => {
+      const source = String(text);
+      const tokens = [];
+      const pattern = /\[\[(spoiler|스포|glitch|깨진글)\s*:\s*([\s\S]*?)\]\]/gi;
+      let lastIndex = 0;
+      let match = pattern.exec(source);
+      while (match) {
+        if (match.index > lastIndex) {
+          tokens.push({ type: 'text', value: source.slice(lastIndex, match.index) });
+        }
+        const directive = cleanText(match[1]).toLowerCase();
+        const value = String(match[2] || '');
+        if (['spoiler', '스포'].includes(directive)) tokens.push({ type: 'spoiler', value });
+        else tokens.push({ type: 'glitch', value });
+        lastIndex = pattern.lastIndex;
+        match = pattern.exec(source);
+      }
+      if (lastIndex < source.length) {
+        tokens.push({ type: 'text', value: source.slice(lastIndex) });
+      }
+      return tokens;
+    };
+
+    const scrambleText = (text = '') => {
+      const glyphs = '█▓▒░#@*&%!?/\\|+=-~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      return Array.from(String(text)).map((char) => {
+        if (char === ' ') return ' ';
+        const index = Math.floor(Math.random() * glyphs.length);
+        return glyphs[index];
+      }).join('');
+    };
+
+    const renderLineWithEffects = (text = '') => {
+      if (!el.line) return false;
+      const tokens = tokenizeInlineEffects(text);
+      const hasEffects = tokens.some((token) => token.type !== 'text');
+      if (!hasEffects) return false;
+
+      clearLineEffects();
+      el.line.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      tokens.forEach((token) => {
+        if (token.type === 'text') {
+          fragment.appendChild(document.createTextNode(token.value));
+          return;
+        }
+        if (token.type === 'spoiler') {
+          const spoiler = document.createElement('button');
+          spoiler.type = 'button';
+          spoiler.className = 'dialogue-prototype__spoiler';
+          spoiler.dataset.revealed = 'false';
+          spoiler.textContent = token.value;
+          spoiler.addEventListener('click', (event) => {
+            // 스포 텍스트 터치는 "대사 진행"이 아니라 공개/비공개 토글로만 처리한다.
+            event.stopPropagation();
+            spoiler.dataset.revealed = spoiler.dataset.revealed === 'true' ? 'false' : 'true';
+          });
+          fragment.appendChild(spoiler);
+          return;
+        }
+        const glitch = document.createElement('span');
+        glitch.className = 'dialogue-prototype__glitch';
+        glitch.dataset.source = token.value;
+        const redraw = () => {
+          glitch.textContent = scrambleText(token.value);
+        };
+        redraw();
+        const timerId = global.setInterval(redraw, 90);
+        activeGlitchTimers.push(timerId);
+        fragment.appendChild(glitch);
+      });
+      el.line.appendChild(fragment);
+      return true;
     };
 
     const emitDebug = () => {
@@ -807,6 +891,7 @@
         activeAutoNextTimer = null;
       }
       isLineAnimating = false;
+      clearLineEffects();
       pointer = { ...nextPointer };
       renderCurrent();
     };
@@ -881,9 +966,12 @@
       const explicitName = cleanText(resolveTemplateVariables(block.speaker, runtimeVariables));
       if (explicitName) return explicitName;
       const actorId = cleanText(block.speakerId);
-      if (!actorId) return '???';
+      // 요청사항:
+      // - speaker/actor가 모두 비어 있으면 "???" 대신 빈 문자열을 유지한다.
+      // - 이름 미지정 블록(연출 전용 블록 등)에서도 UI가 자연스럽게 보이도록 한다.
+      if (!actorId) return '';
       const actor = scene.cast?.actors?.get?.(actorId) || standingState.actors.get(actorId);
-      return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), actorId);
+      return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), '');
     };
 
     const initializeStandingStateForScene = (scene) => {
@@ -1207,7 +1295,13 @@
       }
       if (el.line) {
         const typeSpeed = Math.max(0, parseIntegerOrDefault(block.typeSpeed, 0));
-        if (typeSpeed > 0 && resolvedLine.length > 0) {
+        const renderedWithEffects = renderLineWithEffects(resolvedLine);
+        if (renderedWithEffects) {
+          // 스포방지/깨진글이 섞인 라인은 토큰 DOM 렌더가 필요하므로
+          // 타입라이터 대신 즉시 렌더링으로 처리한다.
+          isLineAnimating = false;
+        } else if (typeSpeed > 0 && resolvedLine.length > 0) {
+          clearLineEffects();
           isLineAnimating = true;
           let cursor = 0;
           el.line.textContent = '';
@@ -1222,6 +1316,7 @@
           }, typeSpeed);
         } else {
           isLineAnimating = false;
+          clearLineEffects();
           el.line.textContent = resolvedLine;
         }
       }
@@ -1269,6 +1364,8 @@
       const visited = new Set();
       let cursor = { ...startPtr };
       let stepCount = 0;
+      let simulatedSceneKey = skipLockSceneKey;
+      let simulatedSkipLocked = skipLocked;
 
       while (stepCount < 1000) {
         stepCount += 1;
@@ -1279,9 +1376,17 @@
         const hit = getBlockByPointer(model, cursor);
         if (!hit?.block) return cursor;
         const { event, scene, block } = hit;
+        const sceneKey = `${cursor.eventId}::${scene.sceneIndex}`;
+        if (sceneKey !== simulatedSceneKey) {
+          simulatedSkipLocked = false;
+          simulatedSceneKey = sceneKey;
+        }
+        const skipDirective = parseSkipLockDirective(block.skipLockDirective);
+        if (skipDirective !== null) simulatedSkipLocked = skipDirective;
         const hasChoices = (Array.isArray(block.choices) && block.choices.length > 0)
           || (Array.isArray(block.hiddenChoices) && block.hiddenChoices.length > 0);
-        if (hasChoices || block.end) return cursor;
+        // 스킵 정지 조건: 선택지, 종료, 씬 전환, 그리고 "스킵 불가 블록"
+        if (hasChoices || block.end || simulatedSkipLocked) return cursor;
 
         let nextPtr = null;
         if (block.jump) {
@@ -1383,6 +1488,10 @@
     root.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
+      // UI 숨김 모드에서는 배경 감상 전용으로 동작하고,
+      // 우발적인 탭/클릭으로 대사가 넘어가지 않도록 진행 입력을 잠근다.
+      if (isUiHidden) return;
+      if (target.closest('.dialogue-prototype__spoiler')) return;
       if (target.closest('.dialogue-prototype__skip') || target.closest('.dialogue-prototype__choice')) return;
       goNext();
     });

@@ -11,6 +11,7 @@ actor = pilgrim
 slot_left = goddess
 slot_right = pilgrim
 focus = goddess
+bg = assets/img/background.jpg
 }
 ---
 
@@ -21,7 +22,6 @@ speaker = 별의 여신 아스테리아
 focus = goddess
 standing_animation = fade
 line = 여정에 온 걸 환영해.
-bg = assets/img/background.jpg
 choice = 첫 번째 선택 -> 첫번째_선택지
 choice = 두 번째 선택 -> 두번째_선택지
 choice = 세 번째 선택 -> 세번째_선택지

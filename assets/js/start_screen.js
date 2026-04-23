@@ -58,12 +58,169 @@ const bootstrapPersistentStorage = () => {
       { id: 'slot3', label: '슬롯 3', hasData: false, updatedAt: '' }
     ]
   };
-  const defaultSaveSlotsData = {
+  const CHARACTER_POOLS_PATH = 'assets/data/character_common_pools.json';
+
+  // 샘플 캐릭터 빌더
+  // - 고정 규칙: ID 0=아스테리아, ID 1=플레이어(순례자)
+  // - family가 없는 캐릭터는 family=null, surname=''를 사용한다.
+  // - 혈연 관계는 parent/children id 참조로 저장한다.
+  const buildSampleCharacters = () => ({
+    pilgrim_pc: {
+      id: 1,
+      actorId: 'pilgrim_pc',
+      uniqueSeed: '1000000001',
+      role: 'pc',
+      family: null,
+      givenName: '순례자',
+      surname: '',
+      name: '순례자',
+      gender: '미정',
+      age: 24,
+      heightCm: 175,
+      weightKg: 68,
+      race: '인간',
+      raceInheritanceRule: '부모 종족 계승',
+      familyLinks: {
+        // 부모가 미확정일 때는 null
+        fatherId: null,
+        motherId: null,
+        // 자식은 캐릭터 id 배열로 관리
+        childrenIds: []
+      },
+      traits: {
+        // 선천 특성은 공용 카탈로그 id를 참조한다. (용량 절감)
+        innateTraitIds: [103, 106],
+        acquired: ['성역 문헌 해독', '야영 생존술']
+      },
+      layers: ['assets/img/player.png'],
+      stats: { STR: 9, DEX: 11, CON: 10, INT: 10, WIS: 12, CHA: 8 },
+      alignment: {
+        // -100 ~ 100: 양수는 왼쪽 성향, 음수는 오른쪽 성향
+        aggressionVsModeration: -12,
+        settlementVsWandering: -34,
+        honorVsPragmatism: 28
+      },
+      // 캐릭터 개인 상태(경제/위치/인벤토리)
+      wallet: {
+        gold: 120,
+        silver: 35,
+        copper: 10
+      },
+      location: {
+        regionId: 'sanctuary_outskirts',
+        tile: { x: 12, y: 34, z: 0 },
+        landmarkId: 'pilgrim_camp'
+      },
+      inventory: {
+        maxSlots: 24,
+        items: [
+          { itemId: 'item_compass_old', qty: 1 },
+          { itemId: 'item_ration_basic', qty: 3 }
+        ]
+      },
+      // 숙원 참조는 중복 키를 줄이기 위해 aspiration 객체로 통합한다.
+      aspiration: {
+        currentId: null,
+        poolId: 1
+      }
+    },
+    asteria_npc: {
+      id: 0,
+      actorId: 'asteria_npc',
+      uniqueSeed: '1000000000',
+      role: 'npc',
+      family: null,
+      givenName: '아스테리아',
+      surname: '',
+      name: '아스테리아',
+      gender: '여성형 신격',
+      age: 312,
+      heightCm: 178,
+      weightKg: 0,
+      race: '신성체',
+      raceInheritanceRule: '부모 종족 계승',
+      familyLinks: {
+        fatherId: null,
+        motherId: null,
+        childrenIds: []
+      },
+      traits: {
+        innateTraitIds: [101, 104],
+        acquired: ['의회 중재', '성광 결계 운용']
+      },
+      layers: ['assets/img/goddess.png'],
+      stats: { STR: 8, DEX: 10, CON: 12, INT: 14, WIS: 16, CHA: 15 },
+      alignment: {
+        aggressionVsModeration: -48,
+        settlementVsWandering: 40,
+        honorVsPragmatism: 18
+      },
+      // 캐릭터 개인 상태(경제/위치/인벤토리)
+      wallet: {
+        gold: 980,
+        silver: 420,
+        copper: 0
+      },
+      location: {
+        regionId: 'sanctuary_core',
+        tile: { x: 88, y: 12, z: 0 },
+        landmarkId: 'astral_hall'
+      },
+      inventory: {
+        maxSlots: 40,
+        items: [
+          { itemId: 'item_astral_seal', qty: 2 },
+          { itemId: 'item_star_shard', qty: 5 }
+        ]
+      },
+      // 숙원 참조는 중복 키를 줄이기 위해 aspiration 객체로 통합한다.
+      aspiration: {
+        currentId: null,
+        poolId: 1
+      }
+    }
+  });
+
+  // 슬롯 시드 데이터 빌더
+  // - 대용량 공용 풀(선천 특성/숙원 후보)은 세이브에 중복 저장하지 않는다.
+  // - 공용 정책(selectionPolicy/behaviorProfile)은 외부 파일에서 로드한다.
+  // - 저장 용량 절감을 위해 trait/aspiration은 문자열 대신 id 참조를 우선 사용한다.
+  const buildDefaultSaveSlotsData = () => ({
+    // 세이브 스키마 버전: 구조 변경 시 마이그레이션 기준으로 사용한다.
+    saveSchemaVersion: '1.0.0',
     activeSlotId: 'slot1',
     slots: {
-      slot1: { characters: {}, flags: {}, dialogueProgress: null },
+      slot1: {
+        catalogRefs: { characterPools: CHARACTER_POOLS_PATH },
+        characters: buildSampleCharacters(),
+        flags: {},
+        dialogueProgress: null
+      },
       slot2: { characters: {}, flags: {}, dialogueProgress: null },
       slot3: { characters: {}, flags: {}, dialogueProgress: null }
+    }
+  });
+
+  const defaultSaveSlotsData = buildDefaultSaveSlotsData();
+
+  const poolsCache = {
+    data: null,
+    indexes: null
+  };
+
+  // 공용 풀(JSON) 로드 후 인덱스를 만들어 런타임 조회 비용을 줄인다.
+  const preloadCharacterPools = async () => {
+    const utils = globalThis.NewtheriaCharacterDataUtils;
+    if (!utils?.buildCharacterIndexes) return;
+
+    try {
+      const response = await fetch(CHARACTER_POOLS_PATH, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`character pools fetch failed: ${response.status}`);
+      const pools = await response.json();
+      poolsCache.data = pools;
+      poolsCache.indexes = utils.buildCharacterIndexes({ pools });
+    } catch (error) {
+      console.warn('캐릭터 공용 풀 프리로드에 실패했습니다.', error);
     }
   };
 
@@ -74,6 +231,17 @@ const bootstrapPersistentStorage = () => {
   };
 
   try {
+    // 샘플 캐릭터 데이터 무결성 검증 (id 중복/참조 누락 방지)
+    const utils = globalThis.NewtheriaCharacterDataUtils;
+    if (utils?.validateCharacterData) {
+      const result = utils.validateCharacterData({
+        characters: defaultSaveSlotsData?.slots?.slot1?.characters || {}
+      });
+      if (!result.ok) {
+        console.warn('샘플 캐릭터 데이터 검증 오류:', result.errors);
+      }
+    }
+
     seedIfMissing(STORAGE_KEYS.characterCatalog, defaultCharacterCatalog);
     seedIfMissing(STORAGE_KEYS.settingsMeta, defaultSettingsMeta);
     seedIfMissing(STORAGE_KEYS.saveSlotsMeta, defaultSaveSlotsMeta);
@@ -81,6 +249,9 @@ const bootstrapPersistentStorage = () => {
   } catch (error) {
     console.warn('시작 화면 스토리지 초기화에 실패했습니다.', error);
   }
+
+  // 인덱스는 비동기로 준비한다. (UI 초기화 블로킹 방지)
+  void preloadCharacterPools();
 };
 
 const UI = {

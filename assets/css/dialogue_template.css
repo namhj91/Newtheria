@@ -227,7 +227,8 @@
 
 .dialogue-prototype__line {
   margin: 14px 0 0;
-  font-size: clamp(1.05rem, 2.2vw, 2rem);
+  /* 데스크탑 line 텍스트가 과도하게 커지는 구간을 줄여 가독성을 안정화한다. */
+  font-size: clamp(0.98rem, 1.9vw, 1.72rem);
   line-height: 1.55;
   color: var(--dialogue-text-main);
   max-height: 7.4em;
@@ -448,19 +449,20 @@
   }
 
   .dialogue-prototype__actor--left {
-    /* 좌측 스탠딩은 화면 왼쪽으로 "살짝" 삐져나오게 고정한다. */
+    /* 요청사항 후속 반영: 모바일 포커스 스탠딩 중앙 고정은 취소하고
+       기존 좌측 슬롯 진입 동선을 복원한다. */
     left: clamp(-24px, -3vw, -14px);
-    /* 기본 상태는 화면 밖 대기: 포커스될 때만 안쪽으로 슬라이드 인한다. */
     transform: translate3d(-116%, 0, 0);
   }
 
   .dialogue-prototype__actor--right {
-    /* 우측 스탠딩은 화면 오른쪽으로 "살짝" 삐져나오게 고정한다. */
+    /* 우측 슬롯 역시 중앙 고정 대신 기존 우측 진입 동선을 복원한다. */
     right: clamp(-24px, -3vw, -14px);
+    left: auto;
     transform: translate3d(116%, 0, 0) scaleX(-1);
   }
 
-  /* 모바일 연출 규칙: data-focus로 지정된 한 명만 등장한다. */
+  /* 모바일 연출 규칙(복원): 포커스된 1명만 등장하며, 슬롯 기준 위치로 슬라이드 인한다. */
   .dialogue-prototype__actors[data-focus="left"] .dialogue-prototype__actor--left[data-visible="true"] {
     opacity: 1;
     transform: translate3d(0, 0, 0);

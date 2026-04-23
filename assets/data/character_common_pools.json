@@ -1,0 +1,119 @@
+{
+  "version": "ver.0.2.55(260423-풀특성id참조최적화)",
+  "selectionPolicy": {
+    "description": "조건 충족 후보 필터링 후 priority + rollRange 가중 추첨으로 1개 숙원을 선택한다.",
+    "steps": [
+      "triggerConditions 충족 후보 추출",
+      "priority 높은 순 정렬",
+      "rollRange 기반 확률 추첨",
+      "선택된 숙원 id를 캐릭터 aspirationId에 기록"
+    ]
+  },
+  "innateTraitCatalog": [
+    { "id": 101, "code": "star_blessing", "name": "별의 가호", "effectHint": "야간 시야/탐지 보정" },
+    { "id": 102, "code": "iron_vein", "name": "강골 체질", "effectHint": "출혈·골절 저항 보정" },
+    { "id": 103, "code": "swift_reflex", "name": "순간 반응", "effectHint": "선공·회피 판정 보정" },
+    { "id": 104, "code": "mana_resonance", "name": "마력 공명", "effectHint": "의식/주문 유지력 보정" },
+    { "id": 105, "code": "silver_tongue", "name": "은빛 언변", "effectHint": "협상·설득 성공률 보정" },
+    { "id": 106, "code": "frontier_instinct", "name": "개척 본능", "effectHint": "미지 지역 탐사 페널티 완화" }
+  ],
+  "aspirationPoolCatalog": [
+    {
+      "id": 1,
+      "key": "default",
+      "aspirationIds": [201, 202, 203, 204, 205, 206]
+    }
+  ],
+  "aspirationDefinitions": [
+    {
+      "id": 201,
+      "code": "blood_revenge",
+      "name": "피의 복수",
+      "triggerConditions": ["호전", "명예", "방랑", "부모살해이벤트"],
+      "priority": 95,
+      "rollRange": 24,
+      "behaviorProfile": {
+        "decisionBias": { "combatEngage": 0.85, "retreat": 0.1, "mercy": 0.15, "riskTaking": 0.9 },
+        "preferredActions": ["원수 추적", "결투 수락", "위협 선제 제거"],
+        "avoidActions": ["협상 타협", "장기 은둔"],
+        "styleTags": ["공세적", "직선적", "명예집착"],
+        "longTermDirective": "살해자 처단을 최우선 목표로 둔다."
+      }
+    },
+    {
+      "id": 202,
+      "code": "world_best_merchant",
+      "name": "세계 제일의 상인",
+      "triggerConditions": ["온건", "방랑", "실리", "대형교역성공누적"],
+      "priority": 80,
+      "rollRange": 20,
+      "behaviorProfile": {
+        "decisionBias": { "tradeFocus": 0.95, "combatEngage": 0.25, "allianceBuild": 0.8, "riskTaking": 0.55 },
+        "preferredActions": ["교역로 확장", "시장 정보 수집", "관세 협상"],
+        "avoidActions": ["무의미한 전투", "감정적 보복"],
+        "styleTags": ["실리형", "네트워크지향", "협상가"],
+        "longTermDirective": "대륙 최대 교역망을 구축하고 경제 패권을 확보한다."
+      }
+    },
+    {
+      "id": 203,
+      "code": "oath_of_guardian",
+      "name": "성역의 수호 맹세",
+      "triggerConditions": ["정착", "명예", "성역방어전3회승리"],
+      "priority": 72,
+      "rollRange": 16,
+      "behaviorProfile": {
+        "decisionBias": { "defensePriority": 0.92, "territoryHold": 0.88, "expedition": 0.35, "sacrifice": 0.7 },
+        "preferredActions": ["요충지 방어", "민간 보호", "방벽 증강"],
+        "avoidActions": ["무계획 원정", "영토 포기"],
+        "styleTags": ["수비적", "책임감", "헌신"],
+        "longTermDirective": "성역을 영구 보전하고 후계 세대를 안전하게 지킨다."
+      }
+    },
+    {
+      "id": 204,
+      "code": "truth_seeker",
+      "name": "진실 추적자",
+      "triggerConditions": ["온건", "명예", "금서해독성공"],
+      "priority": 68,
+      "rollRange": 14,
+      "behaviorProfile": {
+        "decisionBias": { "investigation": 0.93, "dialogue": 0.8, "combatEngage": 0.32, "secrecy": 0.78 },
+        "preferredActions": ["단서 수집", "증언 검증", "비밀문서 확보"],
+        "avoidActions": ["근거 없는 처벌", "조기 결론"],
+        "styleTags": ["탐구형", "신중함", "증거중심"],
+        "longTermDirective": "세계의 은폐된 진실을 밝혀 구조적 위협을 해소한다."
+      }
+    },
+    {
+      "id": 205,
+      "code": "star_sanctuary",
+      "name": "별 성역 영속",
+      "triggerConditions": ["정착", "명예", "성역붕괴위기차단"],
+      "priority": 90,
+      "rollRange": 22,
+      "behaviorProfile": {
+        "decisionBias": { "sanctuaryFirst": 0.97, "diplomacy": 0.76, "warDeclaration": 0.2, "ritualFocus": 0.88 },
+        "preferredActions": ["성역 질서 유지", "의례 강화", "위기 예지 대응"],
+        "avoidActions": ["권능 남용", "불필요한 외부 개입"],
+        "styleTags": ["수호자", "질서지향", "장기계획"],
+        "longTermDirective": "별 성역의 존속과 우주 질서의 균형을 유지한다."
+      }
+    },
+    {
+      "id": 206,
+      "code": "balance_of_fate",
+      "name": "운명의 균형",
+      "triggerConditions": ["온건", "실리", "대형분쟁중재5회"],
+      "priority": 83,
+      "rollRange": 18,
+      "behaviorProfile": {
+        "decisionBias": { "mediation": 0.94, "allianceBuild": 0.82, "combatEngage": 0.28, "resourceOptimization": 0.86 },
+        "preferredActions": ["분쟁 중재", "보상 설계", "세력 균형 조정"],
+        "avoidActions": ["편향 개입", "전면전 확대"],
+        "styleTags": ["중재자", "균형지향", "현실주의"],
+        "longTermDirective": "세력 간 균형을 유지해 대륙 규모의 붕괴를 방지한다."
+      }
+    }
+  ]
+}

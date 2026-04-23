@@ -765,14 +765,12 @@
       }).join('');
     };
 
-    const renderLineWithEffects = (text = '') => {
-      if (!el.line) return false;
+    const renderTextWithEffects = (targetEl, text = '') => {
+      if (!targetEl) return false;
       const tokens = tokenizeInlineEffects(text);
       const hasEffects = tokens.some((token) => token.type !== 'text');
       if (!hasEffects) return false;
-
-      clearLineEffects();
-      el.line.replaceChildren();
+      targetEl.replaceChildren();
       const fragment = document.createDocumentFragment();
       tokens.forEach((token) => {
         if (token.type === 'text') {
@@ -796,15 +794,23 @@
         const glitch = document.createElement('span');
         glitch.className = 'dialogue-prototype__glitch';
         glitch.dataset.source = token.value;
+        const measure = document.createElement('span');
+        measure.className = 'dialogue-prototype__glitch-measure';
+        measure.textContent = token.value;
+        const live = document.createElement('span');
+        live.className = 'dialogue-prototype__glitch-live';
+        live.setAttribute('aria-hidden', 'true');
+        glitch.appendChild(measure);
+        glitch.appendChild(live);
         const redraw = () => {
-          glitch.textContent = scrambleText(token.value);
+          live.textContent = scrambleText(token.value);
         };
         redraw();
         const timerId = global.setInterval(redraw, 90);
         activeGlitchTimers.push(timerId);
         fragment.appendChild(glitch);
       });
-      el.line.appendChild(fragment);
+      targetEl.appendChild(fragment);
       return true;
     };
 
@@ -1283,7 +1289,12 @@
       if (pointer.order === 0) {
         initializeStandingStateForScene(scene);
       }
-      if (el.name) el.name.textContent = resolveActorLabel(scene, block);
+      const resolvedSpeaker = resolveActorLabel(scene, block);
+      clearLineEffects();
+      if (el.name) {
+        const renderedSpeakerWithEffects = renderTextWithEffects(el.name, resolvedSpeaker);
+        if (!renderedSpeakerWithEffects) el.name.textContent = resolvedSpeaker;
+      }
       const resolvedLine = resolveTemplateVariables(block.line || '', runtimeVariables);
       if (activeLineTimer) {
         clearInterval(activeLineTimer);
@@ -1295,7 +1306,7 @@
       }
       if (el.line) {
         const typeSpeed = Math.max(0, parseIntegerOrDefault(block.typeSpeed, 0));
-        const renderedWithEffects = renderLineWithEffects(resolvedLine);
+        const renderedWithEffects = renderTextWithEffects(el.line, resolvedLine);
         if (renderedWithEffects) {
           // 스포방지/깨진글이 섞인 라인은 토큰 DOM 렌더가 필요하므로
           // 타입라이터 대신 즉시 렌더링으로 처리한다.

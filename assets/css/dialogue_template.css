@@ -414,7 +414,12 @@
   padding: 0 .16em;
   margin: 0 .05em;
   background: rgba(210, 222, 255, 0.2);
-  color: rgba(228, 236, 255, 0.95);
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  vertical-align: baseline;
   filter: blur(4px);
   cursor: pointer;
   transition: filter 180ms ease, background-color 180ms ease;
@@ -427,8 +432,25 @@
 
 .dialogue-prototype__glitch {
   display: inline-block;
-  color: rgba(247, 213, 106, 0.92);
+  position: relative;
+  color: inherit;
   letter-spacing: .04em;
+  vertical-align: baseline;
+}
+
+.dialogue-prototype__glitch-measure {
+  visibility: hidden;
+  white-space: pre;
+}
+
+.dialogue-prototype__glitch-live {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: pre;
+  width: 100%;
+  color: rgba(247, 213, 106, 0.92);
+  overflow: hidden;
 }
 
 /* UI 숨김 모드에서는 대사 패널/선택지/보조 버튼만 숨기고

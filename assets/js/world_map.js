@@ -1,5 +1,5 @@
 
-const WORLD_VERSION_FALLBACK = 'ver.0.2.12(260423-스탠딩기본배치유지수정)';
+const WORLD_VERSION_FALLBACK = 'ver.0.2.13(260423-일러디버그탭정리)';
 
 const MAP_SIZE = 200;
 

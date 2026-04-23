@@ -637,10 +637,37 @@
     const debugListeners = new Set();
 
     const emitDebug = () => {
+      const leftActor = standingState.actors.get(standingState.left);
+      const rightActor = standingState.actors.get(standingState.right);
+      const leftLayers = standingState.hidden.has(standingState.left) ? [] : (leftActor?.layers || []);
+      const rightLayers = standingState.hidden.has(standingState.right) ? [] : (rightActor?.layers || []);
       const payload = {
         currentEventId: pointer.eventId,
         currentSceneIndex: pointer.sceneIndex,
         currentOrder: pointer.order,
+        standing: {
+          leftSlotActorId: cleanText(standingState.left),
+          rightSlotActorId: cleanText(standingState.right),
+          focusActorId: cleanText(standingState.focus),
+          hiddenActorIds: Array.from(standingState.hidden),
+          actors: Array.from(standingState.actors.entries()).map(([id, actor]) => ({
+            id,
+            name: cleanText(actor?.name, id),
+            layers: Array.isArray(actor?.layers) ? actor.layers.filter(Boolean) : []
+          })),
+          rendered: {
+            left: {
+              actorId: cleanText(standingState.left),
+              layerCount: leftLayers.length,
+              visible: leftLayers.length > 0
+            },
+            right: {
+              actorId: cleanText(standingState.right),
+              layerCount: rightLayers.length,
+              visible: rightLayers.length > 0
+            }
+          }
+        },
         trace: trace.slice(-30)
       };
       if (typeof onDebugStateChange === 'function') onDebugStateChange(payload);
@@ -1087,10 +1114,37 @@
         log('set-variables-skipped', { reason: 'not-implemented-yet' });
       },
       getDebugState() {
+        const leftActor = standingState.actors.get(standingState.left);
+        const rightActor = standingState.actors.get(standingState.right);
+        const leftLayers = standingState.hidden.has(standingState.left) ? [] : (leftActor?.layers || []);
+        const rightLayers = standingState.hidden.has(standingState.right) ? [] : (rightActor?.layers || []);
         return {
           currentEventId: pointer.eventId,
           currentSceneIndex: pointer.sceneIndex,
           currentOrder: pointer.order,
+          standing: {
+            leftSlotActorId: cleanText(standingState.left),
+            rightSlotActorId: cleanText(standingState.right),
+            focusActorId: cleanText(standingState.focus),
+            hiddenActorIds: Array.from(standingState.hidden),
+            actors: Array.from(standingState.actors.entries()).map(([id, actor]) => ({
+              id,
+              name: cleanText(actor?.name, id),
+              layers: Array.isArray(actor?.layers) ? actor.layers.filter(Boolean) : []
+            })),
+            rendered: {
+              left: {
+                actorId: cleanText(standingState.left),
+                layerCount: leftLayers.length,
+                visible: leftLayers.length > 0
+              },
+              right: {
+                actorId: cleanText(standingState.right),
+                layerCount: rightLayers.length,
+                visible: rightLayers.length > 0
+              }
+            }
+          },
           trace: trace.slice(-30)
         };
       },

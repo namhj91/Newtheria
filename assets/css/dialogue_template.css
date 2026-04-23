@@ -127,6 +127,27 @@
   overflow: hidden;
 }
 
+.dialogue-prototype__screen-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--screen-fx-fade-ms, 180ms) ease;
+}
+
+.dialogue-prototype__screen-fx[data-mode="flash"] {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.dialogue-prototype__screen-fx[data-mode="blackout"] {
+  background: rgba(0, 0, 0, 1);
+}
+
+.dialogue-prototype__screen-fx[data-state="active"] {
+  opacity: 1;
+}
+
 .dialogue-prototype__transition {
   z-index: 6;
   opacity: 0;
@@ -633,9 +654,6 @@
   60% { transform: translateX(-3px); }
   80% { transform: translateX(2px); }
 }
-
-
-
 
 @keyframes choice-pop-in {
   0% { opacity: 0; }

@@ -11,7 +11,7 @@ const MAX_AFFAIRS_DEFAULT = 1;
 const TRAIT_ID = { CASANOVA: 311, FEMME_FATALE: 312, INCEST_INCLINATION: 313, ANYTHING_GOES: 314 };
 const SEED_COMPATIBILITY = { axisSize: 1000, axisMid: 500, scorePower: 1.2 };
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
-const NPC_VISIBLE_MAX = 42;
+const NPC_VISIBLE_MAX = 10;
 
 const RACE_POOL = [
   { name: '인간', key: 'human', adultAge: 18, elderAge: 60, maxAge: 85 },
@@ -94,6 +94,10 @@ let actionDeckBehavior = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
+let galaxyDialRotation = 0;
+let galleryRenderState = { wheel: null, cards: [], visible: [] };
+let isGalaxyDragging = false;
+let galaxyDragLastX = 0;
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
@@ -502,20 +506,33 @@ const renderNpcGalaxy = () => {
     }))
   );
 
-  const total = Math.max(cards.length, 1);
-  const startDeg = 204;
-  const endDeg = 336;
-  const radius = Math.min(wheel.clientWidth, wheel.clientHeight) * 0.42;
   cards.forEach((card, index) => {
     const npc = visible[index];
+    if (!npc) return;
+    card.addEventListener('click', () => openNpcProfile(npc));
+  });
+
+  galleryRenderState = { wheel, cards, visible };
+  layoutNpcGalaxyArc();
+};
+
+const layoutNpcGalaxyArc = () => {
+  const { wheel, cards } = galleryRenderState;
+  if (!wheel || cards.length === 0) return;
+
+  // 요청사항 반영: 10장을 호 전체에 꽉 채우고, 다이얼 회전값으로 전체 호를 돌린다.
+  const total = Math.max(cards.length, 1);
+  const startDeg = 210;
+  const endDeg = 330;
+  const radius = Math.min(wheel.clientWidth, wheel.clientHeight) * 0.42;
+  cards.forEach((card, index) => {
     const t = total === 1 ? 0.5 : index / (total - 1);
-    const deg = startDeg + ((endDeg - startDeg) * t);
+    const deg = startDeg + ((endDeg - startDeg) * t) + galaxyDialRotation;
     const rad = (deg * Math.PI) / 180;
     const tx = Math.cos(rad) * radius;
     const ty = Math.sin(rad) * radius;
     card.style.transform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
     card.style.zIndex = String(200 + index);
-    card.addEventListener('click', () => openNpcProfile(npc));
   });
 };
 
@@ -696,6 +713,42 @@ const bindEvents = () => {
       if (npc) openNpcProfile(npc);
     });
   });
+
+  // 사용자 요청 반영: 호 카드를 다이얼처럼 드래그/휠로 회전.
+  npcGalaxy.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    galaxyDialRotation += event.deltaY * 0.045;
+    layoutNpcGalaxyArc();
+  }, { passive: false });
+
+  npcGalaxy.addEventListener('pointerdown', (event) => {
+    isGalaxyDragging = true;
+    galaxyDragLastX = event.clientX;
+    npcGalaxy.classList.add('is-dragging');
+    npcGalaxy.setPointerCapture(event.pointerId);
+  });
+
+  npcGalaxy.addEventListener('pointermove', (event) => {
+    if (!isGalaxyDragging) return;
+    const dx = event.clientX - galaxyDragLastX;
+    galaxyDragLastX = event.clientX;
+    galaxyDialRotation += dx * 0.22;
+    layoutNpcGalaxyArc();
+  });
+
+  npcGalaxy.addEventListener('pointerup', (event) => {
+    if (!isGalaxyDragging) return;
+    isGalaxyDragging = false;
+    npcGalaxy.classList.remove('is-dragging');
+    npcGalaxy.releasePointerCapture(event.pointerId);
+  });
+
+  npcGalaxy.addEventListener('pointercancel', () => {
+    isGalaxyDragging = false;
+    npcGalaxy.classList.remove('is-dragging');
+  });
+
+  window.addEventListener('resize', () => layoutNpcGalaxyArc());
 };
 
 const bootstrap = async () => {

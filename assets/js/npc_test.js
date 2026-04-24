@@ -94,8 +94,11 @@ let actionDeckBehavior = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
-let galaxyDialRotation = 0;
-let galleryRenderState = { wheel: null, cards: [], visible: [] };
+let galaxyDialCursor = 0;
+let galaxyDialVelocity = 0;
+let galaxyInertiaFrame = null;
+let galaxyCardBehavior = null;
+let galleryRenderState = { wheel: null, cards: [], filtered: [], visible: [], baseIndex: -1, cardApi: null };
 let isGalaxyDragging = false;
 let galaxyDragLastX = 0;
 
@@ -106,6 +109,7 @@ const traitNameOf = (traitId) => TRAIT_BY_ID.get(traitId)?.name || `미정특성
 const traitMetaReviewOf = (traitId) => TRAIT_META_REVIEW_BY_ID.get(traitId) || '특성 메타 한줄평 미정';
 const isAdult = (npc) => (npc?.age || 0) >= ADULT_AGE;
 const hasAcquiredTrait = (npc, traitId) => (npc?.traits?.acquiredTraitIds || []).includes(traitId);
+const normalizeLoopIndex = (value, length) => ((value % length) + length) % length;
 
 const computeSeedChecksum = (payload) => payload.split('').reduce((acc, digit) => acc + Number(digit), 0) % 10;
 const attachSeedChecksum = (payload) => `${payload}${computeSeedChecksum(payload)}`;
@@ -490,50 +494,94 @@ const renderNpcGalaxy = () => {
   const cardApi = window.NewtheriaCardTemplates;
   if (!cardApi) return;
 
-  const visible = npcList.filter(matchesFilter).slice(0, NPC_VISIBLE_MAX);
+  const filtered = npcList.filter(matchesFilter);
   const wheel = document.createElement('div');
   wheel.className = 'npc-wheel';
   npcGalaxy.replaceChildren(wheel);
-
-  // 카드 템플릿 적극 활용: 기존 카드 렌더링 유틸을 새 UX에서도 중심 컴포넌트로 사용.
-  const cards = cardApi.renderCardFanCards(
-    wheel,
-    visible.map((npc) => ({
-      route: String(npc.id),
-      icon: npc.gender === '남성' ? '♂' : '♀',
-      label: displayNpcName(npc),
-      desc: `${npc.race} · ${npc.age}세 · ${getFamilyName(npc)}\n특성 ${(npc.traits.acquiredTraitIds || []).length}개`
-    }))
-  );
-
-  cards.forEach((card, index) => {
-    const npc = visible[index];
-    if (!npc) return;
-    card.addEventListener('click', () => openNpcProfile(npc));
-  });
-
-  galleryRenderState = { wheel, cards, visible };
+  galaxyDialCursor = filtered.length > 0 ? normalizeLoopIndex(galaxyDialCursor, filtered.length) : 0;
+  galaxyDialVelocity = 0;
+  galaxyCardBehavior?.destroy?.();
+  galaxyCardBehavior = null;
+  galleryRenderState = { wheel, cards: [], filtered, visible: [], baseIndex: -1, cardApi };
   layoutNpcGalaxyArc();
 };
 
 const layoutNpcGalaxyArc = () => {
-  const { wheel, cards } = galleryRenderState;
-  if (!wheel || cards.length === 0) return;
+  const { wheel, filtered, cardApi } = galleryRenderState;
+  if (!wheel || !cardApi || filtered.length === 0) {
+    if (wheel) wheel.replaceChildren();
+    return;
+  }
 
-  // 요청사항 반영: 10장을 호 전체에 꽉 채우고, 다이얼 회전값으로 전체 호를 돌린다.
+  // 요청사항 반영: 다이얼을 돌려도 10장을 유지하며, 계속 다음 카드로 순환한다.
+  const cursor = normalizeLoopIndex(galaxyDialCursor, filtered.length);
+  const baseIndex = Math.floor(cursor);
+  const fraction = cursor - baseIndex;
+  const visibleCount = Math.min(NPC_VISIBLE_MAX, filtered.length);
+  const needRerender = baseIndex !== galleryRenderState.baseIndex || galleryRenderState.cards.length !== visibleCount;
+
+  if (needRerender) {
+    const visible = Array.from({ length: visibleCount }, (_, slot) => filtered[(baseIndex + slot) % filtered.length]);
+    const cards = cardApi.renderCardFanCards(
+      wheel,
+      visible.map((npc) => ({
+        route: String(npc.id),
+        icon: npc.gender === '남성' ? '♂' : '♀',
+        label: displayNpcName(npc),
+        desc: `${npc.race} · ${npc.age}세 · ${getFamilyName(npc)}\n특성 ${(npc.traits.acquiredTraitIds || []).length}개`
+      }))
+    );
+
+    // 카드 상호작용은 템플릿 기본 동작(꾹클릭/드래그/호버)을 그대로 상속한다.
+    galaxyCardBehavior?.destroy?.();
+    galaxyCardBehavior = cardApi.createCardFanBehavior({ menu: wheel, cards });
+    galaxyCardBehavior.bindInteractions({
+      onCardSelected: (card) => {
+        const npc = findNpcById(Number(card.dataset.route));
+        if (npc) openNpcProfile(npc);
+      }
+    });
+
+    galleryRenderState.cards = cards;
+    galleryRenderState.visible = visible;
+    galleryRenderState.baseIndex = baseIndex;
+  }
+
+  const cards = galleryRenderState.cards;
   const total = Math.max(cards.length, 1);
   const startDeg = 210;
   const endDeg = 330;
+  const slotDeg = total > 1 ? (endDeg - startDeg) / (total - 1) : 0;
+  const fractionShiftDeg = fraction * slotDeg;
   const radius = Math.min(wheel.clientWidth, wheel.clientHeight) * 0.42;
   cards.forEach((card, index) => {
     const t = total === 1 ? 0.5 : index / (total - 1);
-    const deg = startDeg + ((endDeg - startDeg) * t) + galaxyDialRotation;
+    const deg = startDeg + ((endDeg - startDeg) * t) - fractionShiftDeg;
     const rad = (deg * Math.PI) / 180;
     const tx = Math.cos(rad) * radius;
     const ty = Math.sin(rad) * radius;
+    card.style.setProperty('--tx', `${tx}px`);
+    card.style.setProperty('--ty', `${ty}px`);
+    card.style.setProperty('--rot', `${deg + 90}deg`);
+    card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
     card.style.transform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
     card.style.zIndex = String(200 + index);
   });
+};
+
+const runGalaxyInertia = () => {
+  if (galaxyInertiaFrame) return;
+  const tick = () => {
+    galaxyDialCursor += galaxyDialVelocity;
+    galaxyDialVelocity *= 0.94;
+    layoutNpcGalaxyArc();
+    if (Math.abs(galaxyDialVelocity) < 0.00012 || npcList.length === 0) {
+      galaxyInertiaFrame = null;
+      return;
+    }
+    galaxyInertiaFrame = window.requestAnimationFrame(tick);
+  };
+  galaxyInertiaFrame = window.requestAnimationFrame(tick);
 };
 
 const renderTopCompatibilityPairs = () => {
@@ -717,13 +765,22 @@ const bindEvents = () => {
   // 사용자 요청 반영: 호 카드를 다이얼처럼 드래그/휠로 회전.
   npcGalaxy.addEventListener('wheel', (event) => {
     event.preventDefault();
-    galaxyDialRotation += event.deltaY * 0.045;
+    galaxyDialVelocity += event.deltaY * 0.00024;
+    galaxyDialCursor += event.deltaY * 0.0024;
     layoutNpcGalaxyArc();
+    runGalaxyInertia();
   }, { passive: false });
 
   npcGalaxy.addEventListener('pointerdown', (event) => {
+    // 카드 자체의 기본 드래그/꾹클릭은 템플릿 이벤트로 처리되도록 방해하지 않는다.
+    if (event.target.closest('.card-fan-card')) return;
+    if (galaxyInertiaFrame) {
+      window.cancelAnimationFrame(galaxyInertiaFrame);
+      galaxyInertiaFrame = null;
+    }
     isGalaxyDragging = true;
     galaxyDragLastX = event.clientX;
+    galaxyDialVelocity = 0;
     npcGalaxy.classList.add('is-dragging');
     npcGalaxy.setPointerCapture(event.pointerId);
   });
@@ -732,7 +789,9 @@ const bindEvents = () => {
     if (!isGalaxyDragging) return;
     const dx = event.clientX - galaxyDragLastX;
     galaxyDragLastX = event.clientX;
-    galaxyDialRotation += dx * 0.22;
+    const cursorDelta = dx * -0.018;
+    galaxyDialCursor += cursorDelta;
+    galaxyDialVelocity = cursorDelta;
     layoutNpcGalaxyArc();
   });
 
@@ -741,6 +800,7 @@ const bindEvents = () => {
     isGalaxyDragging = false;
     npcGalaxy.classList.remove('is-dragging');
     npcGalaxy.releasePointerCapture(event.pointerId);
+    runGalaxyInertia();
   });
 
   npcGalaxy.addEventListener('pointercancel', () => {

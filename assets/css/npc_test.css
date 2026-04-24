@@ -124,7 +124,7 @@ body {
   overflow: hidden;
   position: relative;
   background: radial-gradient(circle at 50% 130%, rgba(54, 88, 166, .62), rgba(8, 13, 31, .48));
-  touch-action: none;
+  touch-action: auto;
   cursor: grab;
 }
 .npc-gallery.is-spinning .npc-wheel { animation: orbitSpin .85s ease; }

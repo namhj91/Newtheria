@@ -1,0 +1,128 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Pretendard", "Noto Sans KR", sans-serif;
+  background: radial-gradient(circle at top, #182645 0%, #060a16 60%);
+  color: #edf1ff;
+}
+
+.npc-test {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 30px;
+  display: grid;
+  gap: 16px;
+}
+
+.npc-test__header h1,
+.npc-test__panel h2,
+.npc-card h3,
+.npc-card h4 {
+  margin: 0;
+}
+
+.npc-test__header p {
+  margin: 6px 0 0;
+  opacity: 0.85;
+}
+
+.npc-test__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.npc-test__panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(147, 168, 255, 0.35);
+  background: rgba(11, 17, 35, 0.85);
+}
+
+.npc-test__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.npc-test__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button,
+textarea {
+  border-radius: 10px;
+  border: 1px solid rgba(147, 168, 255, 0.45);
+  background: rgba(23, 34, 66, 0.82);
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 400px;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.npc-test__actions--footer {
+  justify-content: space-between;
+  align-items: center;
+}
+
+#npcStatus {
+  font-size: 0.82rem;
+  opacity: 0.84;
+}
+
+.npc-card {
+  border: 1px solid rgba(229, 193, 99, 0.4);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(35, 26, 18, 0.7);
+  display: grid;
+  gap: 8px;
+}
+
+.npc-card p,
+.npc-card ul {
+  margin: 0;
+}
+
+.npc-card ul {
+  padding-left: 18px;
+}
+
+.npc-test__footer a {
+  color: #c8d6ff;
+}
+
+@media (max-width: 980px) {
+  .npc-test__grid {
+    grid-template-columns: 1fr;
+  }
+
+  textarea {
+    min-height: 300px;
+  }
+}

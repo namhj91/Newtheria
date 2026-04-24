@@ -38,6 +38,7 @@
     });
 
     const traitMap = toIdMap(pools?.innateTraitCatalog || []);
+    const acquiredTraitMap = toIdMap(pools?.acquiredTraitCatalog || []);
     const aspirationMap = toIdMap(pools?.aspirationDefinitions || []);
     const aspirationPoolMap = toIdMap(pools?.aspirationPoolCatalog || []);
 
@@ -46,16 +47,48 @@
       const links = character.familyLinks || {};
       const fatherId = cleanId(links.fatherId);
       const motherId = cleanId(links.motherId);
+      const spouseId = cleanId(links.spouseId);
+      const affairPartnerIds = Array.isArray(links.affairPartnerIds) ? links.affairPartnerIds : [];
       const childrenIds = Array.isArray(links.childrenIds) ? links.childrenIds : [];
 
       // 부모 참조 검증
       [
         ['fatherId', fatherId],
-        ['motherId', motherId]
+        ['motherId', motherId],
+        ['spouseId', spouseId]
       ].forEach(([field, id]) => {
         if (id == null) return;
         if (!characterById.has(id)) {
           errors.push(`character(${key}) ${field}=${id} 참조 대상을 찾을 수 없습니다.`);
+        }
+      });
+
+      // 배우자 상호 참조 검증
+      if (spouseId != null && characterById.has(spouseId)) {
+        const spouse = characterById.get(spouseId);
+        const spouseLinks = spouse.familyLinks || {};
+        const spouseBackRef = cleanId(spouseLinks.spouseId);
+        if (spouseBackRef !== character.id) {
+          errors.push(`spouse 불일치: character(${key}) spouseId=${spouseId} 이지만 상대 배우자 참조가 맞지 않습니다.`);
+        }
+      }
+
+      // 연문 관계 참조/상호 참조 검증
+      affairPartnerIds.forEach((partnerRaw) => {
+        const partnerId = cleanId(partnerRaw);
+        if (partnerId == null || !characterById.has(partnerId)) {
+          errors.push(`character(${key}) affairPartnerIds에 유효하지 않은 id가 있습니다: ${partnerRaw}`);
+          return;
+        }
+        if (partnerId === character.id) {
+          errors.push(`character(${key}) affairPartnerIds에 자기 자신 id를 넣을 수 없습니다.`);
+          return;
+        }
+        const partner = characterById.get(partnerId);
+        const partnerAffairs = Array.isArray(partner?.familyLinks?.affairPartnerIds) ? partner.familyLinks.affairPartnerIds : [];
+        const reciprocal = partnerAffairs.some((value) => cleanId(value) === character.id);
+        if (!reciprocal) {
+          errors.push(`affair 불일치: character(${key}) -> ${partnerId} 상호 참조 누락`);
         }
       });
 
@@ -83,6 +116,17 @@
         const traitId = cleanId(traitRaw);
         if (traitId == null || !traitMap.has(traitId)) {
           errors.push(`character(${key}) innateTraitIds에 정의되지 않은 id가 있습니다: ${traitRaw}`);
+        }
+      });
+
+      // 후천 특성 id 참조 검증
+      const acquiredTraitIds = Array.isArray(character?.traits?.acquiredTraitIds)
+        ? character.traits.acquiredTraitIds
+        : [];
+      acquiredTraitIds.forEach((traitRaw) => {
+        const traitId = cleanId(traitRaw);
+        if (traitId == null || !acquiredTraitMap.has(traitId)) {
+          errors.push(`character(${key}) acquiredTraitIds에 정의되지 않은 id가 있습니다: ${traitRaw}`);
         }
       });
 

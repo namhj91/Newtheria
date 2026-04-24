@@ -1,5 +1,5 @@
 {
-  "version": "ver.0.2.55(260423-풀특성id참조최적화)",
+  "version": "ver.0.2.79(260424-후천특성id카탈로그확장)",
   "selectionPolicy": {
     "description": "조건 충족 후보 필터링 후 priority + rollRange 가중 추첨으로 1개 숙원을 선택한다.",
     "steps": [
@@ -16,6 +16,20 @@
     { "id": 104, "code": "mana_resonance", "name": "마력 공명", "effectHint": "의식/주문 유지력 보정" },
     { "id": 105, "code": "silver_tongue", "name": "은빛 언변", "effectHint": "협상·설득 성공률 보정" },
     { "id": 106, "code": "frontier_instinct", "name": "개척 본능", "effectHint": "미지 지역 탐사 페널티 완화" }
+  ],
+  "acquiredTraitCatalog": [
+    { "id": 301, "code": "tactical_sense", "name": "전술 감각", "type": "정신", "rarity": "일반", "description": "전황 판단과 지휘 효율을 높인다." },
+    { "id": 302, "code": "sociability", "name": "사교성", "type": "정신", "rarity": "일반", "description": "대화와 관계 형성에 유리하다." },
+    { "id": 303, "code": "night_vision", "name": "야간 시야", "type": "신체", "rarity": "희귀", "description": "야간 탐색/전투 시 시야 페널티를 완화한다." },
+    { "id": 304, "code": "hunter_instinct", "name": "수렵 본능", "type": "신체", "rarity": "일반", "description": "추적과 사냥 관련 판정에 보너스를 준다." },
+    { "id": 305, "code": "mechanic_repair", "name": "기계 수리", "type": "기타", "rarity": "일반", "description": "장치/설비 수리 성공률을 높인다." },
+    { "id": 306, "code": "herbal_lore", "name": "약초 지식", "type": "정신", "rarity": "일반", "description": "약초 식별과 조합 효율을 높인다." },
+    { "id": 307, "code": "tailoring", "name": "재봉 기술", "type": "기타", "rarity": "일반", "description": "의복 제작과 수선 품질을 높인다." },
+    { "id": 308, "code": "oratory", "name": "연설 능력", "type": "정신", "rarity": "희귀", "description": "집단 설득과 사기 고양에 보너스를 준다." },
+    { "id": 309, "code": "flame_resist", "name": "화염 저항", "type": "신체", "rarity": "희귀", "description": "화염 피해 저항과 내열 적응력을 높인다." },
+    { "id": 310, "code": "terrain_reading", "name": "지형 파악", "type": "기타", "rarity": "일반", "description": "지형 기반 이동/매복 판단을 강화한다." },
+    { "id": 311, "code": "casanova", "name": "카사노바", "type": "기타", "rarity": "영웅", "description": "남성 전용 연문 인원 제한 해제 특성." },
+    { "id": 312, "code": "femme_fatale", "name": "팜므파탈", "type": "기타", "rarity": "영웅", "description": "여성 전용 연문 인원 제한 해제 특성." }
   ],
   "aspirationPoolCatalog": [
     {

@@ -11,7 +11,8 @@
   "actorId": "asteria_npc",
   "uniqueSeed": "0123456789",
   "role": "pc | npc",
-  "family": "000가문 | null",
+  "familyId": "lumenia | null",
+  "family": "루메니아가문(표시용) | null",
   "givenName": "이름",
   "surname": "성(= family, family가 없으면 빈 문자열)",
   "name": "이름 성",
@@ -20,15 +21,16 @@
   "heightCm": 170,
   "weightKg": 60,
   "race": "종족",
-  "raceInheritanceRule": "부모 종족 계승",
   "familyLinks": {
     "fatherId": null,
     "motherId": null,
+    "spouseId": null,
+    "affairPartnerIds": [],
     "childrenIds": []
   },
   "traits": {
     "innateTraitIds": [101, 103],
-    "acquired": ["후천 특성"]
+    "acquiredTraitIds": [301, 306]
   },
   "layers": ["assets/img/example.png"],
   "stats": {
@@ -70,6 +72,9 @@
   "innateTraitCatalog": [
     { "id": 101, "code": "star_blessing", "name": "별의 가호", "effectHint": "야간 시야/탐지 보정" }
   ],
+  "acquiredTraitCatalog": [
+    { "id": 301, "code": "tactical_sense", "name": "전술 감각", "type": "정신", "rarity": "일반", "description": "전황 판단과 지휘 효율을 높인다." }
+  ],
   "aspirationPoolCatalog": [
     { "id": 1, "key": "default", "aspirationIds": [201, 202] }
   ],
@@ -87,7 +92,7 @@
     "characterPools": "assets/data/character_common_pools.json"
   },
   "characters": {
-    "pilgrim_pc": { "familyLinks": { "fatherId": null, "motherId": null, "childrenIds": [] }, "traits": { "innateTraitIds": [101, 103] }, "aspiration": { "currentId": null, "poolId": 1 } }
+    "pilgrim_pc": { "familyLinks": { "fatherId": null, "motherId": null, "spouseId": null, "affairPartnerIds": [], "childrenIds": [] }, "traits": { "innateTraitIds": [101, 103], "acquiredTraitIds": [301, 306] }, "aspiration": { "currentId": null, "poolId": 1 } }
   }
 }
 ```
@@ -96,14 +101,23 @@
 - `id`: 0부터 시작하는 정수. (세이브 슬롯 내부에서 중복 금지)
 - 현재 고정 매핑: `0=아스테리아`, `1=플레이어(순례자)`.
 - `uniqueSeed`: 각 자리가 0~9로만 구성된 **10자리 숫자 문자열**.
-- `family`: 가문명은 `000가문` 형식을 권장한다. (예: `루메니아가문`)
-- `family`: 가문이 없는 캐릭터는 `null`을 사용한다. (예: 순례자, 아스테리아)
+- `familyId`: 저장/참조는 id 기반 문자열을 사용한다. (예: `lumenia`)
+- `family`: 표시용 이름으로 사용한다. (`familyId`에서 런타임으로 계산 가능)
+- `familyId`/`family`: 가문이 없는 캐릭터는 `null`을 사용한다. (예: 순례자, 아스테리아)
+- 기본 규칙: `familyId`/`family`는 본인 `surname`(성씨) 기준으로 생성한다.
+- 예외 규칙: 여성은 결혼 시 배우자의 가문(`familyId`)으로만 편입되고, 본인 `surname`은 유지한다.
 - `surname`: `family`가 있으면 동일 값, 없으면 빈 문자열(`""`).
-- `race`: 기본적으로 부모 종족을 계승한다. (예외 종족 규칙은 별도 문서로 확장)
+- `race`: 기본적으로 부모 종족을 계승한다. (기본 규칙은 시스템 전역으로 적용하며, 캐릭터별 중복 필드는 두지 않는다. 예외 종족 규칙은 별도 문서로 확장)
 - `familyLinks.fatherId`/`motherId`: 부모 캐릭터 id 참조. 미확정은 `null`.
+- `familyLinks.spouseId`: 배우자 캐릭터 id 참조. 미혼/미확정은 `null`.
+- 배우자 규칙: `spouseId`는 1:1 단일 관계만 허용한다. (한 캐릭터가 여러 배우자를 동시에 가질 수 없음)
+- `familyLinks.affairPartnerIds`: 연문 관계 캐릭터 id 배열. 시스템 확률 규칙으로 제한된 수만 허용한다.
+- 특성 예외: 남성 `카사노바`, 여성 `팜므파탈` 특성이 있으면 `affairPartnerIds` 인원 제한을 적용하지 않는다.
 - `familyLinks.childrenIds`: 자식 캐릭터 id 배열.
+- 자녀 규칙: 자식의 성씨/가문은 아버지(`fatherId`) 기준으로 계승한다.
 - `traits.innateTraitIds`: 선천 특성 id 배열. 문자열 대신 id를 저장해 세이브 용량을 줄인다.
-- `traits.acquired`: 후천 특성. 이벤트/훈련/장비/직책 변화로 획득.
+- `traits.acquiredTraitIds`: 후천 특성 id 배열. 이벤트/훈련/장비/직책 변화로 획득.
+- `acquiredTraitCatalog`: 후천 특성 카탈로그. 각 특성은 `type(정신/신체/기타)`, `rarity`, `description`을 포함한다.
 - `layers`: 캐릭터 스탠딩 표현 레이어.
 - `wallet`: 캐릭터 소지금(금/은/동).
 - `location`: 현재 지역/타일 좌표/랜드마크 정보.
@@ -155,9 +169,12 @@
 
 ## 10) 데이터 무결성 검증 규칙
 - `id` 중복 금지: 캐릭터/특성/숙원/숙원풀 id는 각 범위에서 유일해야 한다.
-- 부모/자식 참조 무결성: `fatherId`/`motherId`/`childrenIds`는 존재하는 캐릭터 id여야 한다.
+- 가족 참조 무결성: `fatherId`/`motherId`/`spouseId`/`childrenIds`는 존재하는 캐릭터 id여야 한다.
 - 상호 참조 일관성: 부모의 `childrenIds`에 있는 자식은 자식 쪽 `fatherId` 또는 `motherId`에 부모 id가 있어야 한다.
+- 배우자 상호 참조 일관성: A의 `spouseId=B`이면 B의 `spouseId`도 A여야 한다.
+- 연문 상호 참조 일관성: A의 `affairPartnerIds`에 B가 있으면 B의 배열에도 A가 있어야 한다.
 - 숙원/특성 참조 무결성: `innateTraitIds`, `aspiration.poolId`, `aspiration.currentId`는 공용 카탈로그에 정의된 id만 사용한다.
+- 숙원/특성 참조 무결성: `innateTraitIds`, `acquiredTraitIds`, `aspiration.poolId`, `aspiration.currentId`는 공용 카탈로그에 정의된 id만 사용한다.
 
 ## 11) 런타임 인덱스 규칙
 - 시작 시 공용 풀을 로드한 뒤 `id -> 객체` 인덱스를 생성한다.

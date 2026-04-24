@@ -12,7 +12,7 @@
 
   <main class="npc-test">
     <header class="npc-test__header">
-      <p class="npc-test__version" id="npcVersion">ver.0.2.65(260424-npc랜덤생성가족관계팝업UI)</p>
+      <p class="npc-test__version" id="npcVersion">ver.0.2.69(260424-객체클릭컨텍스트패널확장)</p>
       <h1>NPC 랜덤 생성 & 관계망 테스트</h1>
       <p>100명의 NPC를 즉시 생성하고, 리스트 클릭으로 상세 정보를 팝업에서 확인할 수 있습니다.</p>
     </header>
@@ -29,6 +29,12 @@
         </div>
 
         <section class="npc-summary" id="npcSummary" aria-live="polite"></section>
+
+        <section class="npc-context" id="npcObjectContext" aria-live="polite">
+          <h3>객체 컨텍스트</h3>
+          <p class="npc-context__hint">이름/종족/가문/특성을 누르면 관련 NPC가 여기에 표시됩니다.</p>
+          <ul id="npcContextList" class="npc-context__list"></ul>
+        </section>
       </article>
 
       <article class="npc-panel npc-panel--list">
@@ -38,6 +44,23 @@
       </article>
     </section>
   </main>
+
+  <!-- NPC 상세 정보 팝업 -->
+  <dialog id="npcDetailDialog" class="npc-dialog" aria-label="NPC 상세 정보">
+    <form method="dialog" class="npc-dialog__backdrop-action">
+      <button class="npc-dialog__close" aria-label="닫기">×</button>
+    </form>
+    <section class="npc-dialog__content">
+      <h3 id="dialogNpcName">NPC 이름</h3>
+      <p id="dialogNpcMeta" class="npc-dialog__meta"></p>
+
+      <section class="npc-dialog__stats" aria-label="6대 스탯 레이더 차트">
+        <svg id="npcRadarChart" viewBox="0 0 260 260" role="img" aria-label="NPC 6대 스탯"></svg>
+      </section>
+
+      <div id="dialogNpcDetail" class="npc-dialog__grid"></div>
+    </section>
+  </dialog>
 
   <!-- NPC 상세 정보 팝업 -->
   <dialog id="npcDetailDialog" class="npc-dialog" aria-label="NPC 상세 정보">

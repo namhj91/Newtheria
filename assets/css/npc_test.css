@@ -147,6 +147,53 @@ button:hover {
   font-size: 0.75rem;
 }
 
+.npc-context {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(17, 31, 67, 0.48);
+  border: 1px solid rgba(146, 170, 240, 0.28);
+}
+
+.npc-context h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.npc-context__hint {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
+.npc-context__list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.npc-context__title {
+  font-size: 0.82rem;
+  color: rgba(166, 255, 239, 0.95);
+}
+
+.npc-context__item {
+  width: 100%;
+  text-align: left;
+  min-height: 32px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+}
+
+.npc-context__empty {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
 .npc-list {
   margin: 14px 0 0;
   padding: 0;
@@ -181,9 +228,22 @@ button:hover {
   margin: 0;
 }
 
-.npc-item__name {
+.npc-item__name-button {
+  border: none;
+  background: transparent;
+  color: #f5f8ff;
+  padding: 0;
+  min-height: auto;
+  text-align: left;
   font-size: 1rem;
   font-weight: 700;
+  cursor: pointer;
+}
+
+.npc-item__name-button:hover {
+  text-decoration: underline;
+  box-shadow: none;
+  transform: none;
 }
 
 .npc-item__meta {
@@ -199,10 +259,12 @@ button:hover {
 }
 
 .npc-dialog {
-  width: min(700px, calc(100% - 30px));
+  width: min(760px, calc(100% - 30px));
   border-radius: 22px;
   border: 1px solid rgba(176, 201, 255, 0.4);
-  background: rgba(13, 21, 43, 0.95);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(68, 99, 188, 0.28), transparent 52%),
+    rgba(13, 21, 43, 0.95);
   padding: 0;
   color: inherit;
   box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5);
@@ -231,6 +293,9 @@ button:hover {
 
 .npc-dialog__content {
   padding: 0 18px 20px;
+  transform: translateY(20px);
+  opacity: 0;
+  animation: npcDialogRise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
 }
 
 .npc-dialog__content h3 {
@@ -243,10 +308,55 @@ button:hover {
   color: rgba(203, 226, 255, 0.86);
 }
 
+.npc-dialog__stats {
+  margin-top: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(161, 191, 255, 0.3);
+  background: rgba(31, 49, 93, 0.42);
+  padding: 10px;
+}
+
+#npcRadarChart {
+  width: 100%;
+  max-height: 320px;
+  display: block;
+  margin: 0 auto;
+  transform-origin: 50% 56%;
+}
+
+#npcRadarChart.npc-radar--animate {
+  animation: npcRadarRise 460ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.npc-radar__grid {
+  fill: rgba(130, 155, 236, 0.08);
+  stroke: rgba(169, 196, 255, 0.28);
+  stroke-width: 1;
+}
+
+.npc-radar__axis {
+  stroke: rgba(185, 209, 255, 0.36);
+  stroke-width: 1;
+}
+
+.npc-radar__label {
+  fill: rgba(222, 235, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.npc-radar__value {
+  fill: rgba(69, 223, 255, 0.35);
+  stroke: rgba(126, 248, 255, 0.96);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(102, 237, 255, 0.48));
+}
+
 .npc-dialog__grid {
   margin-top: 14px;
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .npc-dialog__row {
@@ -254,7 +364,7 @@ button:hover {
   padding: 10px;
   border-radius: 12px;
   border: 1px solid rgba(150, 178, 250, 0.3);
-  background: rgba(40, 56, 93, 0.33);
+  background: linear-gradient(135deg, rgba(40, 56, 93, 0.4), rgba(22, 33, 63, 0.45));
 }
 
 .npc-dialog__row dt {
@@ -267,6 +377,46 @@ button:hover {
   font-size: 0.95rem;
 }
 
+.npc-object-link {
+  border: none;
+  background: rgba(120, 165, 255, 0.18);
+  color: #d7e5ff;
+  padding: 2px 8px;
+  min-height: auto;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-right: 4px;
+}
+
+.npc-object-link:hover {
+  background: rgba(144, 188, 255, 0.32);
+  transform: none;
+  box-shadow: none;
+}
+
+
+@keyframes npcDialogRise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes npcRadarRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 980px) {
   .npc-dashboard {
     grid-template-columns: 1fr;
@@ -275,5 +425,9 @@ button:hover {
   .npc-list {
     max-height: none;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .npc-dialog__grid {
+    grid-template-columns: 1fr;
   }
 }

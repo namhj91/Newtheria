@@ -63,7 +63,7 @@ const bootstrapPersistentStorage = () => {
   // 샘플 캐릭터 빌더
   // - 고정 규칙: ID 0=아스테리아, ID 1=플레이어(순례자)
   // - family가 없는 캐릭터는 familyId/family=null, surname=''를 사용한다.
-  // - 가족 관계는 parent/spouse/children id 참조로 저장한다.
+  // - 가족 관계는 parent/spouse/affair/children id 참조로 저장한다.
   const buildSampleCharacters = () => ({
     pilgrim_pc: {
       id: 1,
@@ -85,13 +85,15 @@ const bootstrapPersistentStorage = () => {
         fatherId: null,
         motherId: null,
         spouseId: null,
+        affairPartnerIds: [],
         // 자식은 캐릭터 id 배열로 관리
         childrenIds: []
       },
       traits: {
         // 선천 특성은 공용 카탈로그 id를 참조한다. (용량 절감)
         innateTraitIds: [103, 106],
-        acquired: ['성역 문헌 해독', '야영 생존술']
+        // 후천 특성도 id를 참조한다. (acquiredTraitCatalog)
+        acquiredTraitIds: [301, 306]
       },
       layers: ['assets/img/player.png'],
       stats: { STR: 9, DEX: 11, CON: 10, INT: 10, WIS: 12, CHA: 8 },
@@ -144,11 +146,12 @@ const bootstrapPersistentStorage = () => {
         fatherId: null,
         motherId: null,
         spouseId: null,
+        affairPartnerIds: [],
         childrenIds: []
       },
       traits: {
         innateTraitIds: [101, 104],
-        acquired: ['의회 중재', '성광 결계 운용']
+        acquiredTraitIds: [308, 302]
       },
       layers: ['assets/img/goddess.png'],
       stats: { STR: 8, DEX: 10, CON: 12, INT: 14, WIS: 16, CHA: 15 },

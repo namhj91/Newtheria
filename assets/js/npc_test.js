@@ -12,7 +12,21 @@ const RACE_POOL = [
 // - 기본적으로 개인 성씨를 기준으로 가문 id/이름을 만든다.
 // - 예외적으로 여성은 결혼 시 배우자(남성)의 가문으로 편입된다.
 const FAMILY_NAME_BY_ID = new Map();
-const TRAIT_POOL = ['전술 감각', '사교성', '야간 시야', '수렵 본능', '기계 수리', '약초 지식', '재봉 기술', '연설 능력', '화염 저항', '지형 파악'];
+const TRAIT_CATALOG = [
+  { id: 301, name: '전술 감각', type: '정신', rarity: '일반', description: '전황 판단과 지휘 효율을 높인다.' },
+  { id: 302, name: '사교성', type: '정신', rarity: '일반', description: '대화와 호감도 형성에 유리하다.' },
+  { id: 303, name: '야간 시야', type: '신체', rarity: '희귀', description: '야간 이동/탐색 시 시야 페널티를 완화한다.' },
+  { id: 304, name: '수렵 본능', type: '신체', rarity: '일반', description: '추적과 사냥 효율을 높인다.' },
+  { id: 305, name: '기계 수리', type: '기타', rarity: '일반', description: '장치/설비 수리 성공률을 높인다.' },
+  { id: 306, name: '약초 지식', type: '정신', rarity: '일반', description: '약초 식별 및 조합 효율을 높인다.' },
+  { id: 307, name: '재봉 기술', type: '기타', rarity: '일반', description: '의복/천 장비 제작과 수선에 능하다.' },
+  { id: 308, name: '연설 능력', type: '정신', rarity: '희귀', description: '다수 설득과 사기 고양에 보너스를 준다.' },
+  { id: 309, name: '화염 저항', type: '신체', rarity: '희귀', description: '화염 피해 저항과 내열 적응력을 높인다.' },
+  { id: 310, name: '지형 파악', type: '기타', rarity: '일반', description: '지형 기반 이동/매복 판단을 강화한다.' },
+  { id: 311, name: '카사노바', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (남성 전용 예외)' },
+  { id: 312, name: '팜므파탈', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (여성 전용 예외)' }
+];
+const TRAIT_BY_ID = new Map(TRAIT_CATALOG.map((trait) => [trait.id, trait]));
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
 const generateButton = document.getElementById('generateNpcList');
@@ -57,11 +71,13 @@ let npcIndexes = {
   byId: new Map(),
   byRace: new Map(),
   byFamily: new Map(),
+  byAffair: new Map(),
   byTrait: new Map()
 };
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
+const traitNameOf = (traitId) => TRAIT_BY_ID.get(traitId)?.name || `미정특성#${traitId}`;
 
 const createUniqueSeedGenerator = () => {
   const usedSeeds = new Set();
@@ -151,10 +167,11 @@ const createNpcBase = (id, createSeed) => {
       fatherId: null,
       motherId: null,
       spouseId: null,
+      affairPartnerIds: [],
       childrenIds: []
     },
     traits: {
-      acquired: [pickOne(TRAIT_POOL), pickOne(TRAIT_POOL)]
+      acquiredTraitIds: [pickOne(TRAIT_CATALOG).id, pickOne(TRAIT_CATALOG).id]
     }
   };
 };
@@ -185,18 +202,89 @@ const assignSpouseLinks = (list) => {
     const females = raceMembers
       .filter((npc) => npc.gender === '여성' && npc.age >= 18)
       .sort(() => Math.random() - 0.5);
+    const availableFemaleIds = new Set(females.map((female) => female.id));
 
     males.forEach((male) => {
       if (male.familyLinks.spouseId) return;
-      const partner = females.find((female) => canBeSpousePair(male, female));
+      const partner = females.find((female) => availableFemaleIds.has(female.id) && canBeSpousePair(male, female));
       if (!partner) return;
       // 전체가 커플로 묶이지 않도록 확률 조건을 둔다.
       if (Math.random() >= 0.58) return;
       male.familyLinks.spouseId = partner.id;
       partner.familyLinks.spouseId = male.id;
+      // 1:1 혼인 관계를 보장하기 위해 매칭된 여성은 후보군에서 제거한다.
+      availableFemaleIds.delete(partner.id);
       // 예외 규칙: 여성은 결혼 후 배우자(남성)의 가문으로만 편입한다. (성씨는 유지)
       partner.familyId = male.familyId;
     });
+  });
+
+  // 안전망: 데이터가 오염되더라도 spouseId는 반드시 상호 1:1 참조만 남긴다.
+  const byId = new Map(list.map((npc) => [npc.id, npc]));
+  list.forEach((npc) => {
+    const spouseId = npc.familyLinks.spouseId;
+    if (!spouseId) return;
+    const spouse = byId.get(spouseId);
+    if (!spouse || spouse.familyLinks.spouseId !== npc.id) {
+      npc.familyLinks.spouseId = null;
+    }
+  });
+};
+
+const canBeAffairPair = (left, right) => {
+  if (!left || !right || left.id === right.id) return false;
+  if (left.age < 18 || right.age < 18) return false;
+  if (left.familyLinks.spouseId === right.id) return false;
+  if ((left.familyLinks.affairPartnerIds || []).includes(right.id)) return false;
+  if ((right.familyLinks.affairPartnerIds || []).includes(left.id)) return false;
+  return true;
+};
+
+const hasAffairLimitBypassTrait = (npc) => {
+  const acquiredTraitIds = npc?.traits?.acquiredTraitIds || [];
+  if (npc?.gender === '남성') return acquiredTraitIds.includes(311);
+  if (npc?.gender === '여성') return acquiredTraitIds.includes(312);
+  return false;
+};
+
+const canAcceptMoreAffairs = (npc) => {
+  const current = (npc?.familyLinks?.affairPartnerIds || []).length;
+  // 카사노바/팜므파탈 보유자는 연문 인원 제한을 적용하지 않는다.
+  if (hasAffairLimitBypassTrait(npc)) return true;
+  return current < 1;
+};
+
+const assignAffairLinks = (list) => {
+  // 기본은 낮은 확률/최대 1명, 특성 예외(카사노바/팜므파탈)만 다중 연문을 허용한다.
+  const adults = list.filter((npc) => npc.age >= 18);
+  const byId = new Map(adults.map((npc) => [npc.id, npc]));
+
+  adults.forEach((npc) => {
+    const married = Boolean(npc.familyLinks.spouseId);
+    if (!married || !canAcceptMoreAffairs(npc)) return;
+    if (Math.random() >= 0.08) return;
+
+    const candidates = adults.filter((other) => canBeAffairPair(npc, other) && canAcceptMoreAffairs(other));
+    if (candidates.length === 0) return;
+
+    // 특성 예외:
+    // - 남성 카사노바 / 여성 팜므파탈은 연문 인원 제한 없이 다중 관계 가능.
+    if (hasAffairLimitBypassTrait(npc)) {
+      candidates.forEach((partner) => {
+        if (!canAcceptMoreAffairs(partner) || !canBeAffairPair(npc, partner)) return;
+        if (Math.random() >= 0.22) return;
+        npc.familyLinks.affairPartnerIds.push(partner.id);
+        const partnerState = byId.get(partner.id);
+        partnerState.familyLinks.affairPartnerIds.push(npc.id);
+      });
+      return;
+    }
+
+    const partner = pickOne(candidates.filter((other) => canAcceptMoreAffairs(other)));
+    if (!partner) return;
+    npc.familyLinks.affairPartnerIds.push(partner.id);
+    const partnerState = byId.get(partner.id);
+    partnerState.familyLinks.affairPartnerIds.push(npc.id);
   });
 };
 
@@ -239,6 +327,7 @@ const rebuildIndexes = () => {
     byId: new Map(),
     byRace: new Map(),
     byFamily: new Map(),
+    byAffair: new Map(),
     byTrait: new Map()
   };
 
@@ -251,9 +340,14 @@ const rebuildIndexes = () => {
     if (!npcIndexes.byFamily.has(npc.familyId)) npcIndexes.byFamily.set(npc.familyId, []);
     npcIndexes.byFamily.get(npc.familyId).push(npc.id);
 
-    npc.traits.acquired.forEach((trait) => {
-      if (!npcIndexes.byTrait.has(trait)) npcIndexes.byTrait.set(trait, []);
-      npcIndexes.byTrait.get(trait).push(npc.id);
+    (npc.familyLinks.affairPartnerIds || []).forEach((affairId) => {
+      if (!npcIndexes.byAffair.has(affairId)) npcIndexes.byAffair.set(affairId, []);
+      npcIndexes.byAffair.get(affairId).push(npc.id);
+    });
+
+    (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
+      if (!npcIndexes.byTrait.has(traitId)) npcIndexes.byTrait.set(traitId, []);
+      npcIndexes.byTrait.get(traitId).push(npc.id);
     });
   });
 };
@@ -434,14 +528,17 @@ const openNpcDialog = (npc) => {
     ['종족', createObjectButton(npc.race, () => renderContextPanel(`종족: ${npc.race}`, npcIndexes.byRace.get(npc.race) || []))],
     ['가문', createObjectButton(familyName, () => renderContextPanel(`가문: ${familyName}`, npcIndexes.byFamily.get(npc.familyId) || []))],
     ['배우자', npc.familyLinks.spouseId ? createRelativeListFragment([npc.familyLinks.spouseId]) : '없음'],
+    ['연문 관계', createRelativeListFragment(npc.familyLinks.affairPartnerIds || [])],
     ['아버지', npc.familyLinks.fatherId ? createRelativeListFragment([npc.familyLinks.fatherId]) : '없음'],
     ['어머니', npc.familyLinks.motherId ? createRelativeListFragment([npc.familyLinks.motherId]) : '없음'],
     ['자녀', createRelativeListFragment(npc.familyLinks.childrenIds)],
     ['후천 특성', (() => {
       const frag = document.createDocumentFragment();
-      npc.traits.acquired.forEach((trait, index) => {
-        frag.append(createObjectButton(trait, () => renderContextPanel(`특성: ${trait}`, npcIndexes.byTrait.get(trait) || [])));
-        if (index < npc.traits.acquired.length - 1) frag.append(document.createTextNode(' '));
+      const acquiredTraitIds = npc.traits.acquiredTraitIds || [];
+      acquiredTraitIds.forEach((traitId, index) => {
+        const traitName = traitNameOf(traitId);
+        frag.append(createObjectButton(traitName, () => renderContextPanel(`특성: ${traitName}`, npcIndexes.byTrait.get(traitId) || [])));
+        if (index < acquiredTraitIds.length - 1) frag.append(document.createTextNode(' '));
       });
       return frag;
     })()]
@@ -494,7 +591,8 @@ const renderNpcList = () => {
       const parents = [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean).length;
       const children = npc.familyLinks.childrenIds.length;
       const spouse = npc.familyLinks.spouseId ? 1 : 0;
-      relation.textContent = `배우자 ${spouse} / 부모 연결 ${parents} / 자녀 ${children}`;
+      const affairs = (npc.familyLinks.affairPartnerIds || []).length;
+      relation.textContent = `배우자 ${spouse} / 연문 ${affairs} / 부모 연결 ${parents} / 자녀 ${children}`;
 
       card.append(nameButton, meta, relation);
       card.addEventListener('click', () => openNpcDialog(npc));
@@ -514,6 +612,7 @@ const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
   npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1, createSeed));
   assignSpouseLinks(npcList);
+  assignAffairLinks(npcList);
   assignFamilyLinks(npcList);
   rebuildIndexes();
   buildSummary();

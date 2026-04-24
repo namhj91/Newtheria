@@ -8,7 +8,19 @@ const RACE_POOL = [
   { name: '용인', key: 'dragonborn', adultAge: 22, elderAge: 140, maxAge: 240 }
 ];
 
-const FAMILY_POOL = ['000가문', '101가문', '203가문', '317가문', '404가문', '511가문', '622가문', '731가문', '845가문'];
+// 가문은 id(저장/참조용) + name(표시용)로 분리 관리한다.
+const FAMILY_CATALOG = [
+  { id: 'lumenia', name: '루메니아가문' },
+  { id: 'ironforge', name: '아이언포지가문' },
+  { id: 'windrunner', name: '윈드러너가문' },
+  { id: 'stoneheart', name: '스톤하트가문' },
+  { id: 'silvermoon', name: '실버문가문' },
+  { id: 'bloodhorn', name: '블러드혼가문' },
+  { id: 'sunstrider', name: '선스트라이더가문' },
+  { id: 'redfang', name: '레드팽가문' },
+  { id: 'bronzebeard', name: '브론즈비어드가문' }
+];
+const FAMILY_NAME_BY_ID = new Map(FAMILY_CATALOG.map((family) => [family.id, family.name]));
 const TRAIT_POOL = ['전술 감각', '사교성', '야간 시야', '수렵 본능', '기계 수리', '약초 지식', '재봉 기술', '연설 능력', '화염 저항', '지형 파악'];
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
@@ -103,6 +115,9 @@ const pickRaceNameParts = (raceInfo, gender) => {
   };
 };
 
+// NPC 데이터는 familyId를 저장하고, UI에서는 표시 이름으로 변환해 보여준다.
+const getFamilyName = (npc) => FAMILY_NAME_BY_ID.get(npc?.familyId) || npc?.familyId || '무가문';
+
 const createNpcBase = (id, createSeed) => {
   const raceInfo = pickOne(RACE_POOL);
   const gender = Math.random() < 0.5 ? '남성' : '여성';
@@ -114,7 +129,7 @@ const createNpcBase = (id, createSeed) => {
     actorId: `random_npc_${String(id).padStart(3, '0')}`,
     uniqueSeed: createSeed(),
     role: 'npc',
-    family: pickOne(FAMILY_POOL),
+    familyId: pickOne(FAMILY_CATALOG).id,
     // 이름을 객체화해서 필요한 곳에서 성/이름/전체 이름을 각각 활용할 수 있도록 저장한다.
     name: {
       surname: nameParts.surname,
@@ -124,11 +139,11 @@ const createNpcBase = (id, createSeed) => {
     gender,
     age,
     race: raceInfo.name,
-    raceRule: '부모 종족 동일 계승',
     stats: createStats(),
     familyLinks: {
       fatherId: null,
       motherId: null,
+      spouseId: null,
       childrenIds: []
     },
     traits: {
@@ -138,6 +153,43 @@ const createNpcBase = (id, createSeed) => {
 };
 
 const canBeParent = (npc, child, minParentAgeGap) => npc.race === child.race && npc.age - child.age >= minParentAgeGap;
+
+const canBeSpousePair = (left, right) => {
+  // 성인/동일 종족/서로 미혼/적당한 나이 차 조건을 기본으로 한다.
+  if (!left || !right || left.id === right.id) return false;
+  if (left.race !== right.race) return false;
+  if (left.gender === right.gender) return false;
+  if (left.age < 18 || right.age < 18) return false;
+  if (left.familyLinks.spouseId || right.familyLinks.spouseId) return false;
+  return Math.abs(left.age - right.age) <= 24;
+};
+
+const assignSpouseLinks = (list) => {
+  const byRace = new Map();
+  list.forEach((npc) => {
+    if (!byRace.has(npc.race)) byRace.set(npc.race, []);
+    byRace.get(npc.race).push(npc);
+  });
+
+  byRace.forEach((raceMembers) => {
+    const males = raceMembers
+      .filter((npc) => npc.gender === '남성' && npc.age >= 18)
+      .sort(() => Math.random() - 0.5);
+    const females = raceMembers
+      .filter((npc) => npc.gender === '여성' && npc.age >= 18)
+      .sort(() => Math.random() - 0.5);
+
+    males.forEach((male) => {
+      if (male.familyLinks.spouseId) return;
+      const partner = females.find((female) => canBeSpousePair(male, female));
+      if (!partner) return;
+      // 전체가 커플로 묶이지 않도록 확률 조건을 둔다.
+      if (Math.random() >= 0.58) return;
+      male.familyLinks.spouseId = partner.id;
+      partner.familyLinks.spouseId = male.id;
+    });
+  });
+};
 
 const assignFamilyLinks = (list) => {
   const byRace = new Map();
@@ -155,7 +207,7 @@ const assignFamilyLinks = (list) => {
       const father = pickOne(fatherCandidates);
       child.familyLinks.fatherId = father.id;
       father.familyLinks.childrenIds.push(child.id);
-      child.family = father.family;
+      child.familyId = father.familyId;
       child.name.surname = father.name.surname;
       child.name.full = `${child.name.surname} ${child.name.given}`;
     }
@@ -166,7 +218,7 @@ const assignFamilyLinks = (list) => {
       mother.familyLinks.childrenIds.push(child.id);
 
       if (!child.familyLinks.fatherId) {
-        child.family = mother.family;
+        child.familyId = mother.familyId;
         child.name.surname = mother.name.surname;
         child.name.full = `${child.name.surname} ${child.name.given}`;
       }
@@ -190,8 +242,8 @@ const rebuildIndexes = () => {
     if (!npcIndexes.byRace.has(npc.race)) npcIndexes.byRace.set(npc.race, []);
     npcIndexes.byRace.get(npc.race).push(npc.id);
 
-    if (!npcIndexes.byFamily.has(npc.family)) npcIndexes.byFamily.set(npc.family, []);
-    npcIndexes.byFamily.get(npc.family).push(npc.id);
+    if (!npcIndexes.byFamily.has(npc.familyId)) npcIndexes.byFamily.set(npc.familyId, []);
+    npcIndexes.byFamily.get(npc.familyId).push(npc.id);
 
     npc.traits.acquired.forEach((trait) => {
       if (!npcIndexes.byTrait.has(trait)) npcIndexes.byTrait.set(trait, []);
@@ -365,7 +417,8 @@ const createRelativeListFragment = (ids) => {
 
 const openNpcDialog = (npc) => {
   dialogNpcName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
-  dialogNpcMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${npc.family}`;
+  const familyName = getFamilyName(npc);
+  dialogNpcMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${familyName}`;
 
   renderRadarChart(npc.stats);
 
@@ -373,8 +426,8 @@ const openNpcDialog = (npc) => {
     ['고유 시드', npc.uniqueSeed],
     ['배우 ID', npc.actorId],
     ['종족', createObjectButton(npc.race, () => renderContextPanel(`종족: ${npc.race}`, npcIndexes.byRace.get(npc.race) || []))],
-    ['가문', createObjectButton(npc.family, () => renderContextPanel(`가문: ${npc.family}`, npcIndexes.byFamily.get(npc.family) || []))],
-    ['종족 계승 규칙', npc.raceRule],
+    ['가문', createObjectButton(familyName, () => renderContextPanel(`가문: ${familyName}`, npcIndexes.byFamily.get(npc.familyId) || []))],
+    ['배우자', npc.familyLinks.spouseId ? createRelativeListFragment([npc.familyLinks.spouseId]) : '없음'],
     ['아버지', npc.familyLinks.fatherId ? createRelativeListFragment([npc.familyLinks.fatherId]) : '없음'],
     ['어머니', npc.familyLinks.motherId ? createRelativeListFragment([npc.familyLinks.motherId]) : '없음'],
     ['자녀', createRelativeListFragment(npc.familyLinks.childrenIds)],
@@ -434,7 +487,8 @@ const renderNpcList = () => {
       relation.className = 'npc-item__relation';
       const parents = [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean).length;
       const children = npc.familyLinks.childrenIds.length;
-      relation.textContent = `부모 연결 ${parents} / 자녀 ${children}`;
+      const spouse = npc.familyLinks.spouseId ? 1 : 0;
+      relation.textContent = `배우자 ${spouse} / 부모 연결 ${parents} / 자녀 ${children}`;
 
       card.append(nameButton, meta, relation);
       card.addEventListener('click', () => openNpcDialog(npc));
@@ -453,6 +507,7 @@ const renderNpcList = () => {
 const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
   npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1, createSeed));
+  assignSpouseLinks(npcList);
   assignFamilyLinks(npcList);
   rebuildIndexes();
   buildSummary();

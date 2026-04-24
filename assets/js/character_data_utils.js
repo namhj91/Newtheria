@@ -46,18 +46,30 @@
       const links = character.familyLinks || {};
       const fatherId = cleanId(links.fatherId);
       const motherId = cleanId(links.motherId);
+      const spouseId = cleanId(links.spouseId);
       const childrenIds = Array.isArray(links.childrenIds) ? links.childrenIds : [];
 
       // 부모 참조 검증
       [
         ['fatherId', fatherId],
-        ['motherId', motherId]
+        ['motherId', motherId],
+        ['spouseId', spouseId]
       ].forEach(([field, id]) => {
         if (id == null) return;
         if (!characterById.has(id)) {
           errors.push(`character(${key}) ${field}=${id} 참조 대상을 찾을 수 없습니다.`);
         }
       });
+
+      // 배우자 상호 참조 검증
+      if (spouseId != null && characterById.has(spouseId)) {
+        const spouse = characterById.get(spouseId);
+        const spouseLinks = spouse.familyLinks || {};
+        const spouseBackRef = cleanId(spouseLinks.spouseId);
+        if (spouseBackRef !== character.id) {
+          errors.push(`spouse 불일치: character(${key}) spouseId=${spouseId} 이지만 상대 배우자 참조가 맞지 않습니다.`);
+        }
+      }
 
       // 자식 참조 및 상호 참조 검증
       childrenIds.forEach((childRaw) => {

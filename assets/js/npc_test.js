@@ -1,178 +1,225 @@
-const STORAGE_KEYS = {
-  saveSlotsData: 'newtheria.saveSlots.data'
+const NPC_COUNT = 100;
+
+const RACE_POOL = [
+  { name: '인간', adultAge: 18, elderAge: 60, maxAge: 85 },
+  { name: '엘프', adultAge: 30, elderAge: 180, maxAge: 320 },
+  { name: '드워프', adultAge: 24, elderAge: 120, maxAge: 210 },
+  { name: '하플링', adultAge: 20, elderAge: 80, maxAge: 130 }
+];
+
+const FAMILY_POOL = ['000가문', '101가문', '203가문', '317가문', '404가문', '511가문', '622가문'];
+const SURNAME_POOL = ['하이스', '로웬', '벨란', '트리아', '에단', '모르', '실피', '카딘'];
+const GIVEN_NAME_POOL = ['리아', '이안', '로아', '카엘', '니르', '아렌', '실라', '테오', '미라', '루벤', '다엘', '하린'];
+const TRAIT_POOL = ['전술 감각', '사교성', '야간 시야', '수렵 본능', '기계 수리', '약초 지식', '재봉 기술', '연설 능력'];
+
+const generateButton = document.getElementById('generateNpcList');
+const sortByAgeButton = document.getElementById('sortByAge');
+const sortByNameButton = document.getElementById('sortByName');
+const npcListElement = document.getElementById('npcList');
+const npcSummaryElement = document.getElementById('npcSummary');
+const npcDetailDialog = document.getElementById('npcDetailDialog');
+const dialogNpcName = document.getElementById('dialogNpcName');
+const dialogNpcMeta = document.getElementById('dialogNpcMeta');
+const dialogNpcDetail = document.getElementById('dialogNpcDetail');
+
+let npcList = [];
+
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
+
+const createAgeForRace = (raceInfo) => {
+  // 종족 수명대를 고려해 청년/장년/노년 분포를 적당히 섞는다.
+  const dice = Math.random();
+  if (dice < 0.15) return randomInt(0, raceInfo.adultAge - 1);
+  if (dice < 0.8) return randomInt(raceInfo.adultAge, raceInfo.elderAge - 1);
+  return randomInt(raceInfo.elderAge, raceInfo.maxAge);
 };
 
-// NPC/PC 템플릿 문서를 기준으로, NPC 테스트용 기본 JSON을 준비한다.
-const DEFAULT_NPC_TEMPLATE = {
-  id: 2,
-  actorId: 'test_blacksmith_npc',
-  uniqueSeed: '1000000002',
-  role: 'npc',
-  family: '102가문',
-  givenName: '레오나',
-  surname: '하이스',
-  name: '레오나 하이스',
-  gender: '여성',
-  age: 31,
-  heightCm: 169,
-  weightKg: 59,
-  race: '인간',
-  raceInheritanceRule: '부모 종족 계승',
-  familyLinks: {
-    fatherId: null,
-    motherId: null,
-    childrenIds: []
-  },
-  traits: {
-    innateTraitIds: [103],
-    acquired: ['금속 제련', '야전 수리']
-  },
-  layers: ['assets/img/goddess.png'],
-  stats: { STR: 12, DEX: 10, CON: 11, INT: 10, WIS: 9, CHA: 8 },
-  alignment: {
-    aggressionVsModeration: -5,
-    settlementVsWandering: 36,
-    honorVsPragmatism: 11
-  },
-  wallet: {
-    gold: 35,
-    silver: 12,
-    copper: 8
-  },
-  location: {
-    regionId: 'forge_district',
-    tile: { x: 17, y: 42, z: 0 },
-    landmarkId: 'eastern_forge'
-  },
-  inventory: {
-    maxSlots: 20,
-    items: [
-      { itemId: 'item_hammer_reinforced', qty: 1 },
-      { itemId: 'item_iron_ingot', qty: 6 }
-    ]
-  },
-  aspiration: {
-    currentId: null,
-    poolId: 1
-  }
+const createNpcBase = (id) => {
+  const raceInfo = pickOne(RACE_POOL);
+  const gender = Math.random() < 0.5 ? '남성' : '여성';
+  const surname = pickOne(SURNAME_POOL);
+  const givenName = pickOne(GIVEN_NAME_POOL);
+  const age = createAgeForRace(raceInfo);
+
+  return {
+    id,
+    actorId: `random_npc_${String(id).padStart(3, '0')}`,
+    uniqueSeed: String(1_100_000_000 + id),
+    role: 'npc',
+    family: pickOne(FAMILY_POOL),
+    surname,
+    givenName,
+    name: `${surname} ${givenName}`,
+    gender,
+    age,
+    race: raceInfo.name,
+    raceRule: '부모 종족 동일 계승',
+    familyLinks: {
+      fatherId: null,
+      motherId: null,
+      childrenIds: []
+    },
+    traits: {
+      acquired: [pickOne(TRAIT_POOL), pickOne(TRAIT_POOL)]
+    }
+  };
 };
 
-const npcJsonInput = document.getElementById('npcJsonInput');
-const npcStatus = document.getElementById('npcStatus');
-const npcName = document.getElementById('npcName');
-const npcMeta = document.getElementById('npcMeta');
-const npcCoreInfo = document.getElementById('npcCoreInfo');
-const npcStats = document.getElementById('npcStats');
-const npcTraits = document.getElementById('npcTraits');
-const npcInventory = document.getElementById('npcInventory');
-
-const setStatus = (message, isError = false) => {
-  npcStatus.textContent = message;
-  npcStatus.style.color = isError ? '#ff8d8d' : '#d7e4ff';
+const canBeParent = (npc, child, minParentAgeGap) => {
+  // 같은 종족이면서 부모가 될 수 있는 최소 나이 차이를 만족해야 한다.
+  return npc.race === child.race && npc.age - child.age >= minParentAgeGap;
 };
 
-const stringifyNpc = (npc) => JSON.stringify(npc, null, 2);
+const assignFamilyLinks = (list) => {
+  const byRace = new Map();
+  list.forEach((npc) => {
+    if (!byRace.has(npc.race)) byRace.set(npc.race, []);
+    byRace.get(npc.race).push(npc);
+  });
 
-const fillNpcCoreInfo = (npc) => {
-  const infoItems = [
-    ['ID', npc.id],
+  list.forEach((child) => {
+    const candidates = (byRace.get(child.race) || []).filter((npc) => npc.id !== child.id);
+    const fatherCandidates = candidates.filter((npc) => npc.gender === '남성' && canBeParent(npc, child, 16));
+    const motherCandidates = candidates.filter((npc) => npc.gender === '여성' && canBeParent(npc, child, 15));
+
+    if (fatherCandidates.length > 0 && Math.random() < 0.72) {
+      const father = pickOne(fatherCandidates);
+      child.familyLinks.fatherId = father.id;
+      father.familyLinks.childrenIds.push(child.id);
+      child.family = father.family;
+      child.surname = father.surname;
+      child.name = `${child.surname} ${child.givenName}`;
+    }
+
+    if (motherCandidates.length > 0 && Math.random() < 0.68) {
+      const mother = pickOne(motherCandidates);
+      child.familyLinks.motherId = mother.id;
+      mother.familyLinks.childrenIds.push(child.id);
+
+      // 부계 정보가 비어 있으면 모계 성을 임시 반영한다.
+      if (!child.familyLinks.fatherId) {
+        child.family = mother.family;
+        child.surname = mother.surname;
+        child.name = `${child.surname} ${child.givenName}`;
+      }
+    }
+  });
+};
+
+const findNpcById = (id) => npcList.find((npc) => npc.id === id);
+
+const formatRelativeName = (id, fallback) => {
+  if (!id) return '없음';
+  const npc = findNpcById(id);
+  return npc ? `${npc.name} (#${npc.id})` : fallback;
+};
+
+const buildSummary = () => {
+  const raceCountMap = npcList.reduce((acc, npc) => {
+    acc.set(npc.race, (acc.get(npc.race) || 0) + 1);
+    return acc;
+  }, new Map());
+
+  const linkedChildren = npcList.filter((npc) => npc.familyLinks.fatherId || npc.familyLinks.motherId).length;
+
+  const raceItems = Array.from(raceCountMap.entries())
+    .map(([race, count]) => `<span class="npc-summary__pill">${race} ${count}명</span>`)
+    .join('');
+
+  npcSummaryElement.innerHTML = `
+    <div class="npc-summary__line">총 <strong>${npcList.length}명</strong> 생성 완료</div>
+    <div class="npc-summary__line">부모 정보 연결된 NPC: <strong>${linkedChildren}명</strong></div>
+    <div class="npc-summary__pills">${raceItems}</div>
+  `;
+};
+
+const openNpcDialog = (npc) => {
+  dialogNpcName.textContent = `${npc.name} (#${npc.id})`;
+  dialogNpcMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${npc.family}`;
+
+  const detailRows = [
     ['고유 시드', npc.uniqueSeed],
-    ['가문', npc.family || '무가문'],
-    ['나이', npc.age],
-    ['신장/체중', `${npc.heightCm}cm / ${npc.weightKg}kg`],
-    ['위치', npc.location?.regionId || '-']
+    ['배우 ID', npc.actorId],
+    ['종족 계승 규칙', npc.raceRule],
+    ['아버지', formatRelativeName(npc.familyLinks.fatherId, `ID ${npc.familyLinks.fatherId}`)],
+    ['어머니', formatRelativeName(npc.familyLinks.motherId, `ID ${npc.familyLinks.motherId}`)],
+    ['자녀', npc.familyLinks.childrenIds.length ? npc.familyLinks.childrenIds.map((id) => formatRelativeName(id, `ID ${id}`)).join(', ') : '없음'],
+    ['후천 특성', npc.traits.acquired.join(', ')]
   ];
 
-  npcCoreInfo.replaceChildren(...infoItems.map(([label, value]) => {
-    const li = document.createElement('li');
-    li.textContent = `${label}: ${value}`;
-    return li;
-  }));
+  dialogNpcDetail.replaceChildren(
+    ...detailRows.map(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'npc-dialog__row';
+
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+
+      row.append(dt, dd);
+      return row;
+    })
+  );
+
+  npcDetailDialog.showModal();
 };
 
-const fillNpcStats = (npc) => {
-  const entries = Object.entries(npc.stats || {});
-  npcStats.replaceChildren(...entries.map(([key, value]) => {
-    const li = document.createElement('li');
-    li.textContent = `${key}: ${value}`;
-    return li;
-  }));
+const renderNpcList = () => {
+  npcListElement.replaceChildren(
+    ...npcList.map((npc) => {
+      const card = document.createElement('li');
+      card.className = 'npc-item';
+      card.tabIndex = 0;
+      card.role = 'button';
+      card.setAttribute('aria-label', `${npc.name} 상세 정보 보기`);
+
+      const parents = [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean).length;
+      const children = npc.familyLinks.childrenIds.length;
+
+      card.innerHTML = `
+        <p class="npc-item__name">${npc.name}</p>
+        <p class="npc-item__meta">#${npc.id} · ${npc.race} · ${npc.age}세</p>
+        <p class="npc-item__relation">부모 연결 ${parents} / 자녀 ${children}</p>
+      `;
+
+      const openDialog = () => openNpcDialog(npc);
+      card.addEventListener('click', openDialog);
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openDialog();
+        }
+      });
+
+      return card;
+    })
+  );
 };
 
-const renderNpc = (npc) => {
-  npcName.textContent = npc.name || `${npc.givenName || ''} ${npc.surname || ''}`.trim() || '이름 없음';
-  npcMeta.textContent = `${npc.role || 'unknown'} · ${npc.race || '종족 미정'} · ${npc.gender || '성별 미정'}`;
-
-  fillNpcCoreInfo(npc);
-  fillNpcStats(npc);
-
-  const innateTraits = Array.isArray(npc.traits?.innateTraitIds) ? npc.traits.innateTraitIds.join(', ') : '-';
-  const acquiredTraits = Array.isArray(npc.traits?.acquired) ? npc.traits.acquired.join(', ') : '-';
-  npcTraits.textContent = `선천 특성 ID: ${innateTraits} / 후천 특성: ${acquiredTraits}`;
-
-  const inventoryItems = Array.isArray(npc.inventory?.items)
-    ? npc.inventory.items.map((item) => `${item.itemId} x${item.qty}`).join(', ')
-    : '-';
-  npcInventory.textContent = `슬롯 ${npc.inventory?.maxSlots || 0}칸 · ${inventoryItems}`;
-};
-
-const parseNpcInput = () => {
-  const parsed = JSON.parse(npcJsonInput.value);
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('NPC JSON은 객체여야 합니다.');
-  }
-  return parsed;
-};
-
-const loadNpcFromSlot = () => {
-  const raw = window.localStorage?.getItem(STORAGE_KEYS.saveSlotsData);
-  if (!raw) {
-    throw new Error('세이브 슬롯 데이터가 없습니다. 시작 화면을 먼저 열어 시드를 생성하세요.');
-  }
-
-  const saveBlob = JSON.parse(raw);
-  const characters = saveBlob?.slots?.slot1?.characters || {};
-
-  // role이 npc인 첫 캐릭터를 선택해 테스트 패널로 가져온다.
-  const npc = Object.values(characters).find((character) => character?.role === 'npc');
-  if (!npc) {
-    throw new Error('slot1에서 NPC 데이터를 찾지 못했습니다.');
-  }
-
-  npcJsonInput.value = stringifyNpc(npc);
-  renderNpc(npc);
-  setStatus('slot1 NPC를 불러와 렌더링했습니다.');
-};
-
-const restoreDefaultTemplate = () => {
-  npcJsonInput.value = stringifyNpc(DEFAULT_NPC_TEMPLATE);
-  renderNpc(DEFAULT_NPC_TEMPLATE);
-  setStatus('기본 템플릿으로 복원했습니다.');
+const regenerateNpcList = () => {
+  // 기존 데이터는 완전히 폐기하고 매번 100명을 새로 생성한다.
+  npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1));
+  assignFamilyLinks(npcList);
+  buildSummary();
+  renderNpcList();
 };
 
 const bindEvents = () => {
-  document.getElementById('loadNpcFromSlot').addEventListener('click', () => {
-    try {
-      loadNpcFromSlot();
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'NPC 로드에 실패했습니다.', true);
-    }
+  generateButton.addEventListener('click', regenerateNpcList);
+
+  sortByAgeButton.addEventListener('click', () => {
+    npcList.sort((a, b) => b.age - a.age);
+    renderNpcList();
   });
 
-  document.getElementById('resetNpcTemplate').addEventListener('click', () => {
-    restoreDefaultTemplate();
-  });
-
-  document.getElementById('renderNpc').addEventListener('click', () => {
-    try {
-      const npc = parseNpcInput();
-      renderNpc(npc);
-      setStatus('NPC JSON을 반영했습니다.');
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'JSON 파싱에 실패했습니다.', true);
-    }
+  sortByNameButton.addEventListener('click', () => {
+    npcList.sort((a, b) => a.name.localeCompare(b.name, 'ko-KR'));
+    renderNpcList();
   });
 };
 
-restoreDefaultTemplate();
+regenerateNpcList();
 bindEvents();

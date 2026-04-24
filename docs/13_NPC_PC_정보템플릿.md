@@ -100,11 +100,14 @@
 - `familyId`: 저장/참조는 id 기반 문자열을 사용한다. (예: `lumenia`)
 - `family`: 표시용 이름으로 사용한다. (`familyId`에서 런타임으로 계산 가능)
 - `familyId`/`family`: 가문이 없는 캐릭터는 `null`을 사용한다. (예: 순례자, 아스테리아)
+- 기본 규칙: `familyId`/`family`는 본인 `surname`(성씨) 기준으로 생성한다.
+- 예외 규칙: 여성은 결혼 시 배우자의 가문(`familyId`)으로만 편입되고, 본인 `surname`은 유지한다.
 - `surname`: `family`가 있으면 동일 값, 없으면 빈 문자열(`""`).
 - `race`: 기본적으로 부모 종족을 계승한다. (기본 규칙은 시스템 전역으로 적용하며, 캐릭터별 중복 필드는 두지 않는다. 예외 종족 규칙은 별도 문서로 확장)
 - `familyLinks.fatherId`/`motherId`: 부모 캐릭터 id 참조. 미확정은 `null`.
 - `familyLinks.spouseId`: 배우자 캐릭터 id 참조. 미혼/미확정은 `null`.
 - `familyLinks.childrenIds`: 자식 캐릭터 id 배열.
+- 자녀 규칙: 자식의 성씨/가문은 아버지(`fatherId`) 기준으로 계승한다.
 - `traits.innateTraitIds`: 선천 특성 id 배열. 문자열 대신 id를 저장해 세이브 용량을 줄인다.
 - `traits.acquired`: 후천 특성. 이벤트/훈련/장비/직책 변화로 획득.
 - `layers`: 캐릭터 스탠딩 표현 레이어.

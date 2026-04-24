@@ -8,19 +8,10 @@ const RACE_POOL = [
   { name: '용인', key: 'dragonborn', adultAge: 22, elderAge: 140, maxAge: 240 }
 ];
 
-// 가문은 id(저장/참조용) + name(표시용)로 분리 관리한다.
-const FAMILY_CATALOG = [
-  { id: 'lumenia', name: '루메니아가문' },
-  { id: 'ironforge', name: '아이언포지가문' },
-  { id: 'windrunner', name: '윈드러너가문' },
-  { id: 'stoneheart', name: '스톤하트가문' },
-  { id: 'silvermoon', name: '실버문가문' },
-  { id: 'bloodhorn', name: '블러드혼가문' },
-  { id: 'sunstrider', name: '선스트라이더가문' },
-  { id: 'redfang', name: '레드팽가문' },
-  { id: 'bronzebeard', name: '브론즈비어드가문' }
-];
-const FAMILY_NAME_BY_ID = new Map(FAMILY_CATALOG.map((family) => [family.id, family.name]));
+// 가문 규칙:
+// - 기본적으로 개인 성씨를 기준으로 가문 id/이름을 만든다.
+// - 예외적으로 여성은 결혼 시 배우자(남성)의 가문으로 편입된다.
+const FAMILY_NAME_BY_ID = new Map();
 const TRAIT_POOL = ['전술 감각', '사교성', '야간 시야', '수렵 본능', '기계 수리', '약초 지식', '재봉 기술', '연설 능력', '화염 저항', '지형 파악'];
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
@@ -115,6 +106,21 @@ const pickRaceNameParts = (raceInfo, gender) => {
   };
 };
 
+const normalizeFamilyIdToken = (value = '') => String(value)
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, '_')
+  .replace(/[^a-z0-9가-힣_]/g, '');
+
+const ensureFamilyBySurname = (surname = '') => {
+  const safeSurname = String(surname || '').trim() || '무명';
+  const familyId = `house_${normalizeFamilyIdToken(safeSurname) || 'unknown'}`;
+  if (!FAMILY_NAME_BY_ID.has(familyId)) {
+    FAMILY_NAME_BY_ID.set(familyId, `${safeSurname}가문`);
+  }
+  return familyId;
+};
+
 // NPC 데이터는 familyId를 저장하고, UI에서는 표시 이름으로 변환해 보여준다.
 const getFamilyName = (npc) => FAMILY_NAME_BY_ID.get(npc?.familyId) || npc?.familyId || '무가문';
 
@@ -129,7 +135,8 @@ const createNpcBase = (id, createSeed) => {
     actorId: `random_npc_${String(id).padStart(3, '0')}`,
     uniqueSeed: createSeed(),
     role: 'npc',
-    familyId: pickOne(FAMILY_CATALOG).id,
+    // 기본 규칙: 개인 성씨 기반 가문 소속
+    familyId: ensureFamilyBySurname(nameParts.surname),
     // 이름을 객체화해서 필요한 곳에서 성/이름/전체 이름을 각각 활용할 수 있도록 저장한다.
     name: {
       surname: nameParts.surname,
@@ -187,6 +194,8 @@ const assignSpouseLinks = (list) => {
       if (Math.random() >= 0.58) return;
       male.familyLinks.spouseId = partner.id;
       partner.familyLinks.spouseId = male.id;
+      // 예외 규칙: 여성은 결혼 후 배우자(남성)의 가문으로만 편입한다. (성씨는 유지)
+      partner.familyId = male.familyId;
     });
   });
 };
@@ -217,11 +226,8 @@ const assignFamilyLinks = (list) => {
       child.familyLinks.motherId = mother.id;
       mother.familyLinks.childrenIds.push(child.id);
 
-      if (!child.familyLinks.fatherId) {
-        child.familyId = mother.familyId;
-        child.name.surname = mother.name.surname;
-        child.name.full = `${child.name.surname} ${child.name.given}`;
-      }
+      // 부계 성씨/가문 우선 규칙:
+      // 아버지 정보가 없으면 어머니 성씨로 강제 변경하지 않는다.
     }
   });
 };

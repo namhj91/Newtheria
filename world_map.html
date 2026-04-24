@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="./assets/css/world_map.css" />
 </head>
 <body>
+  <!-- 테스트 페이지 공통: 우상단 고정 위치에서 테스트 허브로 복귀한다. -->
+  <a class="test-hub-button" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
+
   <main class="world-map-screen">
     <header class="world-map-header">
       <h1>NEWTHERIA HEX WORLD MAP</h1>
@@ -14,7 +17,6 @@
       <div class="world-map-actions">
         <button id="regenButton" type="button">맵 다시 생성</button>
         <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
-        <a href="./start_screen.html">시작 화면으로</a>
       </div>
       <form class="world-map-roll-settings" aria-label="맵 리롤 설정">
         <label>

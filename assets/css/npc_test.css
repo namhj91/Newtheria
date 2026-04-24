@@ -14,6 +14,29 @@ body {
   color: #edf1ff;
 }
 
+.test-hub-button {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 168, 255, 0.55);
+  background: rgba(18, 28, 54, 0.92);
+  color: #edf1ff;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+}
+
+.test-hub-button:hover {
+  background: rgba(37, 59, 108, 0.96);
+}
+
 .npc-test {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
@@ -111,10 +134,6 @@ textarea {
 
 .npc-card ul {
   padding-left: 18px;
-}
-
-.npc-test__footer a {
-  color: #c8d6ff;
 }
 
 @media (max-width: 980px) {

@@ -154,6 +154,27 @@
     .test-controls.is-minimized .test-controls__content {
       display: none;
     }
+    .test-hub-button {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 130;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(152, 174, 255, 0.55);
+      background: rgba(12, 20, 42, 0.92);
+      color: #f2f4ff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+    }
+    .test-hub-button:hover {
+      background: rgba(40, 60, 112, 0.94);
+    }
     @media (max-width: 900px) {
       .test-controls {
         width: calc(100vw - 24px);
@@ -168,6 +189,9 @@
   </style>
 </head>
 <body>
+  <!-- 테스트 페이지 공통 내비게이션: 템플릿과 무관하게 우상단에 배치한다. -->
+  <a class="test-hub-button" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
+
   <section class="test-controls is-minimized" id="testControlsPanel">
     <div class="test-controls__header">
       <h2 class="test-controls__title">대화 테스트 설정</h2>

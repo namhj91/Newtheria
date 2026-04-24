@@ -3,57 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NPC Astral Archive</title>
+  <title>NPC Nebula Nexus</title>
   <link rel="stylesheet" href="./assets/css/card_templates.css" />
   <link rel="stylesheet" href="./assets/css/npc_test.css" />
 </head>
 <body>
-  <div class="cosmos" aria-hidden="true">
-    <span class="cosmos__stars cosmos__stars--a"></span>
-    <span class="cosmos__stars cosmos__stars--b"></span>
-    <span class="cosmos__nebula"></span>
+  <div class="starfield" aria-hidden="true">
+    <span class="starfield__layer starfield__layer--slow"></span>
+    <span class="starfield__layer starfield__layer--fast"></span>
+    <span class="starfield__flare"></span>
   </div>
 
   <a class="back-link" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
 
-  <main class="astral-shell">
-    <header class="astral-header glass-void">
-      <div>
-        <p class="version-tag" id="npcVersion">ver.0.7.0(260424-관측소템플릿원형팬재정렬)</p>
-        <h1>Astral NPC Archive</h1>
-        <p>기존 UX를 전면 폐기하고, 별 테마 기반의 완전 신규 탐색 인터페이스로 구성한 NPC 실험실.</p>
+  <main class="nexus-shell">
+    <header class="nexus-header glass-panel">
+      <div class="headline">
+        <p class="version-tag" id="npcVersion">ver.0.10.0(260424-호순환관성템플릿상속)</p>
+        <h1>NPC Nebula Nexus</h1>
+        <p>기존 UX를 완전히 폐기하고, 별빛 기반의 새 인터페이스로 NPC 모든 정보를 단계적으로 탐색합니다.</p>
       </div>
-      <div class="header-actions" id="mainActionDeck" role="group" aria-label="메인 액션 카드"></div>
+      <div id="mainActionDeck" class="header-deck" role="group" aria-label="핵심 액션 카드"></div>
     </header>
 
-    <section class="astral-body">
-      <aside class="astral-nav glass-void">
-        <button type="button" class="nav-tab is-active" data-screen="observatory">관측소</button>
-        <button type="button" class="nav-tab" data-screen="chemistry">속궁합</button>
-        <button type="button" class="nav-tab" data-screen="dynasty">가문</button>
+    <section class="layout-grid">
+      <aside class="left-panel glass-panel">
+        <button type="button" class="main-tab is-active" data-screen="observatory">관측 센터</button>
+        <button type="button" class="main-tab" data-screen="chemistry">속궁합 매트릭스</button>
+        <button type="button" class="main-tab" data-screen="dynasty">가문 아카이브</button>
       </aside>
 
-      <section class="astral-screen glass-void">
+      <section class="main-panel glass-panel">
         <section class="screen is-active" data-screen-panel="observatory">
           <header class="screen-head">
-            <h2>NPC 관측소</h2>
-            <div class="filters">
-              <input id="npcSearchInput" type="search" placeholder="이름 · 종족 · 가문 · 성별 검색" />
+            <h2>NPC 관측 센터</h2>
+            <div class="controls-row">
+              <input id="npcSearchInput" type="search" placeholder="이름 · 종족 · 가문 · 성별" />
               <select id="raceFilter">
                 <option value="">전체 종족</option>
               </select>
+              <button id="openFocusNpc" type="button" class="ghost-btn">선택 NPC 집중 보기</button>
             </div>
           </header>
-          <div id="npcGalaxy" class="npc-galaxy" aria-label="NPC 카드 갤럭시"></div>
+          <div class="metrics" id="overviewMetrics"></div>
+          <div id="npcGalaxy" class="npc-gallery" aria-label="NPC 카드 갤러리"></div>
+          <p class="muted arc-hint">호 다이얼: 마우스 휠/드래그로 10장 카드를 좌우로 회전합니다.</p>
         </section>
 
         <section class="screen" data-screen-panel="chemistry">
           <header class="screen-head">
-            <h2>속궁합 천문대</h2>
-            <p>시드 토러스 거리 기반 점수를 시각적으로 비교합니다.</p>
+            <h2>속궁합 매트릭스</h2>
+            <p class="muted">시드 토러스 거리 기반으로 관계 시너지를 비교합니다.</p>
           </header>
-          <div class="chemistry-layout">
-            <article class="chemistry-card">
+          <div class="chemistry-grid">
+            <article class="chem-card">
               <h3>직접 비교</h3>
               <label>대상 A<select id="compareNpcA"></select></label>
               <label>대상 B<select id="compareNpcB"></select></label>
@@ -61,8 +64,8 @@
               <p id="compatLabel">점수: 없음</p>
               <p id="compatMeta" class="muted">두 NPC를 선택하면 결과가 표시됩니다.</p>
             </article>
-            <article class="chemistry-card">
-              <h3>상위 궁합 쌍</h3>
+            <article class="chem-card">
+              <h3>추천 상위 조합</h3>
               <ol id="topPairs" class="pair-list"></ol>
             </article>
           </div>
@@ -70,10 +73,10 @@
 
         <section class="screen" data-screen-panel="dynasty">
           <header class="screen-head">
-            <h2>가문 관제실</h2>
-            <p>가문 선택 시 패밀리 트리를 조상/후손 방향으로 분리해 확인할 수 있습니다.</p>
+            <h2>가문 아카이브</h2>
+            <p class="muted">가문을 누르면 선으로 연결된 패밀리 트리를 팝업으로 봅니다.</p>
           </header>
-          <div id="familyBoard" class="family-board"></div>
+          <div id="familyBoard" class="family-grid"></div>
         </section>
       </section>
     </section>
@@ -90,6 +93,7 @@
         <button type="button" class="profile-tab" data-profile-tab="relations">관계</button>
         <button type="button" class="profile-tab" data-profile-tab="traits">특성</button>
         <button type="button" class="profile-tab" data-profile-tab="stats">스탯</button>
+        <button type="button" class="profile-tab" data-profile-tab="seed">시드/메타</button>
       </nav>
 
       <div id="profilePanel" class="profile-panel"></div>
@@ -108,8 +112,8 @@
     <form method="dialog" class="modal-close-wrap"><button class="modal-close" aria-label="닫기">×</button></form>
     <section class="modal-body">
       <h3 id="familyTreeTitle">패밀리 트리</h3>
-      <p class="muted">중심 인물을 기준으로 상단은 조상, 하단은 후손을 원형 노드로 배치합니다.</p>
-      <div id="familyPedigreeBoard" class="pedigree-board"></div>
+      <p class="muted">상단으로 갈수록 조상, 하단으로 갈수록 후손이 배치됩니다.</p>
+      <div id="familyPedigreeBoard" class="tree-wrap"></div>
     </section>
   </dialog>
 

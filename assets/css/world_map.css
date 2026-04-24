@@ -14,6 +14,29 @@ body {
   font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
 }
 
+.test-hub-button {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  background: rgba(18, 31, 58, 0.92);
+  color: #f1f5ff;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+}
+
+.test-hub-button:hover {
+  background: rgba(59, 89, 141, 0.95);
+}
+
 .world-map-screen {
   display: grid;
   gap: 16px;

@@ -95,6 +95,13 @@ const compareNpcBSelect = document.getElementById('compareNpcB');
 const compareDialogBar = document.getElementById('compareDialogBar');
 const compareDialogScore = document.getElementById('compareDialogScore');
 const compareDialogMeta = document.getElementById('compareDialogMeta');
+const traitDetailDialog = document.getElementById('traitDetailDialog');
+const traitDialogTitle = document.getElementById('traitDialogTitle');
+const traitDialogBody = document.getElementById('traitDialogBody');
+const familyTreeDialog = document.getElementById('familyTreeDialog');
+const familyTreeTitle = document.getElementById('familyTreeTitle');
+const familyTreeRoot = document.getElementById('familyTreeRoot');
+const detailTabs = Array.from(document.querySelectorAll('.dialog-tab'));
 
 // 외부 파일을 못 읽는 환경을 대비한 최소 fallback 데이터.
 const DEFAULT_NAME_POOLS = {
@@ -123,6 +130,7 @@ const DEFAULT_NAME_POOLS = {
 let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
 let compareSelection = { leftId: null, rightId: null };
+let activeDetailTab = 'overview';
 let npcIndexes = {
   byId: new Map(),
   byRace: new Map(),
@@ -704,7 +712,83 @@ const createRelativeListFragment = (ids) => {
   return fragment;
 };
 
+const activateDetailTab = (tabKey) => {
+  activeDetailTab = tabKey;
+  detailTabs.forEach((button) => {
+    button.classList.toggle('dialog-tab--active', button.dataset.detailTab === tabKey);
+  });
+};
+
+const openTraitDialog = (traitId) => {
+  const trait = TRAIT_BY_ID.get(traitId);
+  if (!trait) return;
+  traitDialogTitle.textContent = `특성: ${trait.name}`;
+  traitDialogBody.innerHTML = `
+    <article class="npc-dialog__row">
+      <dt>설명</dt>
+      <dd>${trait.description}</dd>
+    </article>
+    <article class="npc-dialog__row">
+      <dt>메타 한줄평</dt>
+      <dd>${traitMetaReviewOf(traitId)}</dd>
+    </article>
+    <article class="npc-dialog__row">
+      <dt>분류</dt>
+      <dd>${trait.type} · ${trait.rarity} · ID ${trait.id}</dd>
+    </article>
+  `;
+  if (!traitDetailDialog.open) traitDetailDialog.showModal();
+};
+
+// 가문 족보 트리:
+// - 기준 NPC를 루트로 삼고 부모/자녀를 재귀적으로 펼친다.
+// - 순환 참조를 방지하기 위해 방문 집합을 사용한다.
+const buildFamilyTreeNode = (npcId, depth, visited, maxDepth) => {
+  const npc = findNpcById(npcId);
+  const li = document.createElement('li');
+  if (!npc) {
+    li.textContent = `알 수 없는 구성원 #${npcId}`;
+    return li;
+  }
+  const badge = document.createElement('button');
+  badge.type = 'button';
+  badge.className = `family-node ${depth === 0 ? 'family-node--root' : ''}`;
+  badge.textContent = `${displayNpcName(npc)} · ${npc.age}세`;
+  badge.addEventListener('click', () => openNpcDialog(npc));
+  li.append(badge);
+
+  if (depth >= maxDepth) return li;
+  if (visited.has(npcId)) return li;
+  visited.add(npcId);
+
+  const relatives = [
+    npc.familyLinks.fatherId,
+    npc.familyLinks.motherId,
+    ...(npc.familyLinks.childrenIds || [])
+  ].filter(Boolean);
+
+  if (relatives.length > 0) {
+    const ul = document.createElement('ul');
+    relatives.forEach((relativeId) => {
+      ul.append(buildFamilyTreeNode(relativeId, depth + 1, new Set(visited), maxDepth));
+    });
+    li.append(ul);
+  }
+  return li;
+};
+
+const openFamilyTreeDialog = (rootNpc) => {
+  const familyName = getFamilyName(rootNpc);
+  familyTreeTitle.textContent = `가문 족보: ${familyName}`;
+  familyTreeRoot.replaceChildren();
+  const wrapper = document.createElement('ul');
+  wrapper.append(buildFamilyTreeNode(rootNpc.id, 0, new Set(), 4));
+  familyTreeRoot.append(wrapper);
+  if (!familyTreeDialog.open) familyTreeDialog.showModal();
+};
+
 const openNpcDialog = (npc) => {
+  activateDetailTab(activeDetailTab || 'overview');
   dialogNpcName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
   const familyName = getFamilyName(npc);
   dialogNpcMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${familyName}`;
@@ -715,7 +799,12 @@ const openNpcDialog = (npc) => {
     ['고유 시드', `${npc.uniqueSeed}${isSeedChecksumValid(npc.uniqueSeed) ? '' : ' (체크섬 경고)'}`],
     ['배우 ID', npc.actorId],
     ['종족', createObjectButton(npc.race, () => renderContextPanel(`종족: ${npc.race}`, npcIndexes.byRace.get(npc.race) || []))],
-    ['가문', createObjectButton(familyName, () => renderContextPanel(`가문: ${familyName}`, npcIndexes.byFamily.get(npc.familyId) || []))],
+    ['가문', (() => {
+      const frag = document.createDocumentFragment();
+      frag.append(createObjectButton(familyName, () => renderContextPanel(`가문: ${familyName}`, npcIndexes.byFamily.get(npc.familyId) || [])));
+      frag.append(createObjectButton('족보 트리', () => openFamilyTreeDialog(npc)));
+      return frag;
+    })()],
     ['배우자', npc.familyLinks.spouseId ? createRelativeListFragment([npc.familyLinks.spouseId]) : '없음'],
     ['속궁합(시드 기반)', (() => {
       const spouse = npc.familyLinks.spouseId ? findNpcById(npc.familyLinks.spouseId) : null;
@@ -731,16 +820,23 @@ const openNpcDialog = (npc) => {
       const acquiredTraitIds = npc.traits.acquiredTraitIds || [];
       acquiredTraitIds.forEach((traitId, index) => {
         const traitName = traitNameOf(traitId);
-        const traitMetaReview = traitMetaReviewOf(traitId);
-        frag.append(createObjectButton(`${traitName} · ${traitMetaReview}`, () => renderContextPanel(`특성: ${traitName}`, npcIndexes.byTrait.get(traitId) || [])));
+        frag.append(createObjectButton(`${traitName}`, () => openTraitDialog(traitId)));
+        frag.append(createObjectButton('관련 NPC', () => renderContextPanel(`특성: ${traitName}`, npcIndexes.byTrait.get(traitId) || [])));
         if (index < acquiredTraitIds.length - 1) frag.append(document.createTextNode(' '));
       });
       return frag;
     })()]
   ];
 
+  const visibleRowsByTab = {
+    overview: ['고유 시드', '배우 ID', '종족', '가문', '속궁합(시드 기반)'],
+    relation: ['배우자', '연문 관계', '아버지', '어머니', '자녀'],
+    traits: ['후천 특성']
+  };
+  const visibleSet = new Set(visibleRowsByTab[activeDetailTab] || visibleRowsByTab.overview);
+
   dialogNpcDetail.replaceChildren(
-    ...detailRows.map(([label, value]) => {
+    ...detailRows.filter(([label]) => visibleSet.has(label)).map(([label, value]) => {
       const row = document.createElement('div');
       row.className = 'npc-dialog__row';
 
@@ -789,6 +885,21 @@ const renderNpcList = () => {
       const affairs = (npc.familyLinks.affairPartnerIds || []).length;
       relation.textContent = `배우자 ${spouse} / 연문 ${affairs} / 부모 연결 ${parents} / 자녀 ${children}`;
 
+      // 카드에는 특성 이름만 보여주고, 상세 설명은 팝업에서 확인하도록 분리한다.
+      const chips = document.createElement('div');
+      chips.className = 'npc-item__chips';
+      (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'npc-chip';
+        chip.textContent = traitNameOf(traitId);
+        chip.addEventListener('click', (event) => {
+          event.stopPropagation();
+          openTraitDialog(traitId);
+        });
+        chips.append(chip);
+      });
+
       const actionRow = document.createElement('div');
       actionRow.className = 'npc-item__actions';
 
@@ -812,9 +923,18 @@ const renderNpcList = () => {
         activateTab('compare');
       });
 
-      actionRow.append(compareLeft, compareRight);
+      const familyTreeButton = document.createElement('button');
+      familyTreeButton.type = 'button';
+      familyTreeButton.className = 'npc-item__mini';
+      familyTreeButton.textContent = '가문 트리';
+      familyTreeButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openFamilyTreeDialog(npc);
+      });
 
-      card.append(nameButton, meta, relation, actionRow);
+      actionRow.append(compareLeft, compareRight, familyTreeButton);
+
+      card.append(nameButton, meta, relation, chips, actionRow);
       card.addEventListener('click', () => openNpcDialog(npc));
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -858,6 +978,17 @@ const bindEvents = () => {
 
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => activateTab(button.dataset.tabTarget));
+  });
+  detailTabs.forEach((button) => {
+    button.addEventListener('click', () => {
+      activateDetailTab(button.dataset.detailTab);
+      const openedName = dialogNpcName.textContent || '';
+      const currentNpcId = Number((openedName.match(/#(\d+)\)/) || [])[1]);
+      if (currentNpcId) {
+        const npc = findNpcById(currentNpcId);
+        if (npc) openNpcDialog(npc);
+      }
+    });
   });
 
   openCompareDialogButton.addEventListener('click', () => {

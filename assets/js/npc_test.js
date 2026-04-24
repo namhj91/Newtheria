@@ -1,5 +1,6 @@
 const NPC_COUNT = 300;
 const NAME_POOL_PATH = './assets/data/npc_name_pools.json';
+
 const ADULT_AGE = 18;
 const SPOUSE_MAX_AGE_GAP = 24;
 const SPOUSE_MATCH_CHANCE = 0.58;
@@ -43,9 +44,6 @@ const TRAIT_META_REVIEW_BY_ID = new Map([
   [313, '금기선마저 넘는 집착형 페티시'], [314, '종족 경계도 무시하는 초개방형 페티시']
 ]);
 
-const TRAIT_BY_ID = new Map(TRAIT_CATALOG.map((trait) => [trait.id, trait]));
-const FAMILY_NAME_BY_ID = new Map();
-
 const DEFAULT_NAME_POOLS = {
   human: { male: ['리처드', '윌리엄', '에드워드', '토마스', '로버트'], female: ['메리', '제인', '엘리자베스', '아멜리아', '캐서린'], surnames: ['스미스', '윈저', '랭커스터', '튜더', '브루스'] },
   elf: { male: ['파엔다르', '엘라리안', '실리온', '갈라디르', '레놀라스'], female: ['아라엘', '리리엔', '니무에', '베스퍼', '티란디아'], surnames: ['윈드러너', '실버리프', '스타폴', '문위스퍼', '선스트라이더'] },
@@ -53,45 +51,47 @@ const DEFAULT_NAME_POOLS = {
   dragonborn: { male: ['드라가르', '록사르', '발라사', '아르잔', '토린바르'], female: ['크리나', '파리데', '소라', '젤렌', '다라'], surnames: ['아이언스케일', '플레임텅', '블러드혼', '레드팽', '드래곤베인'] }
 };
 
+const TRAIT_BY_ID = new Map(TRAIT_CATALOG.map((trait) => [trait.id, trait]));
+const FAMILY_NAME_BY_ID = new Map();
+
 const $ = (id) => document.getElementById(id);
-const generateButton = $('generateNpcList');
-const sortByAgeButton = $('sortByAge');
-const sortByNameButton = $('sortByName');
-const openCompareDialogButton = $('openCompareDialog');
-const npcListElement = $('npcList');
-const npcSummaryElement = $('npcSummary');
-const npcDetailDialog = $('npcDetailDialog');
-const dialogNpcName = $('dialogNpcName');
-const dialogNpcMeta = $('dialogNpcMeta');
-const dialogNpcDetail = $('dialogNpcDetail');
-const radarChart = $('npcRadarChart');
-const npcContextList = $('npcContextList');
-const comparePreviewPair = $('comparePreviewPair');
-const comparePreviewBar = $('comparePreviewBar');
-const comparePreviewScore = $('comparePreviewScore');
-const npcCompareDialog = $('npcCompareDialog');
-const compareNpcASelect = $('compareNpcA');
-const compareNpcBSelect = $('compareNpcB');
-const compareDialogBar = $('compareDialogBar');
-const compareDialogScore = $('compareDialogScore');
-const compareDialogMeta = $('compareDialogMeta');
-const traitDetailDialog = $('traitDetailDialog');
-const traitDialogTitle = $('traitDialogTitle');
-const traitDialogBody = $('traitDialogBody');
-const npcActionDeck = $('npcActionDeck');
+const npcGalaxy = $('npcGalaxy');
+const raceFilter = $('raceFilter');
+const npcSearchInput = $('npcSearchInput');
+const compareNpcA = $('compareNpcA');
+const compareNpcB = $('compareNpcB');
+const compatBar = $('compatBar');
+const compatLabel = $('compatLabel');
+const compatMeta = $('compatMeta');
+const topPairs = $('topPairs');
+const familyBoard = $('familyBoard');
+const mainActionDeck = $('mainActionDeck');
+
+const npcProfileDialog = $('npcProfileDialog');
+const profileName = $('profileName');
+const profileMeta = $('profileMeta');
+const profilePanel = $('profilePanel');
+const traitDialog = $('traitDialog');
+const traitTitle = $('traitTitle');
+const traitBody = $('traitBody');
 const familyTreeDialog = $('familyTreeDialog');
 const familyTreeTitle = $('familyTreeTitle');
-const familyTreeRoot = $('familyTreeRoot');
+const ancestorTree = $('ancestorTree');
+const descendantTree = $('descendantTree');
+const lineageRootBadge = $('lineageRootBadge');
 
-const tabButtons = Array.from(document.querySelectorAll('.main-tab'));
-const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
-const detailTabs = Array.from(document.querySelectorAll('.detail-tab'));
+const navTabs = Array.from(document.querySelectorAll('.nav-tab'));
+const screens = Array.from(document.querySelectorAll('[data-screen-panel]'));
+const profileTabs = Array.from(document.querySelectorAll('.profile-tab'));
 
 let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
-let compareSelection = { leftId: null, rightId: null };
-let activeDetailTab = 'overview';
+let selectedA = null;
+let selectedB = null;
+let profileTab = 'identity';
 let actionDeckBehavior = null;
+let currentSearch = '';
+let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -104,7 +104,20 @@ const hasAcquiredTrait = (npc, traitId) => (npc?.traits?.acquiredTraitIds || [])
 
 const computeSeedChecksum = (payload) => payload.split('').reduce((acc, digit) => acc + Number(digit), 0) % 10;
 const attachSeedChecksum = (payload) => `${payload}${computeSeedChecksum(payload)}`;
-const isSeedChecksumValid = (seed) => /^\d{10}$/.test(String(seed || '')) && computeSeedChecksum(String(seed).slice(0, 9)) === Number(String(seed).slice(9));
+const seedToTorusPoint = (seed) => {
+  const payload = String(seed || '').replace(/\D/g, '').slice(0, 9).padEnd(9, '0');
+  return [Number(payload.slice(0, 3)), Number(payload.slice(3, 6)), Number(payload.slice(6, 9))];
+};
+
+const torusAxisDistance = (a, b, size) => Math.min(Math.abs(a - b), size - Math.abs(a - b));
+const calculateSeedCompatibilityPercent = (left, right) => {
+  if (!left || !right) return null;
+  const lp = seedToTorusPoint(left.uniqueSeed);
+  const rp = seedToTorusPoint(right.uniqueSeed);
+  const d = Math.hypot(...lp.map((v, i) => torusAxisDistance(v, rp[i], SEED_COMPATIBILITY.axisSize)));
+  const maxD = Math.sqrt(3 * (SEED_COMPATIBILITY.axisMid ** 2));
+  return Math.round(Math.max(0, Math.min(100, 100 * (1 - (Math.min(d / maxD, 1) ** SEED_COMPATIBILITY.scorePower)))));
+};
 
 const createUniqueSeedGenerator = () => {
   const used = new Set();
@@ -117,20 +130,6 @@ const createUniqueSeedGenerator = () => {
   };
 };
 
-const seedToTorusPoint = (seed) => {
-  const payload = String(seed || '').replace(/\D/g, '').slice(0, 9).padEnd(9, '0');
-  return [Number(payload.slice(0, 3)), Number(payload.slice(3, 6)), Number(payload.slice(6, 9))];
-};
-const torusAxisDistance = (a, b, size) => Math.min(Math.abs(a - b), size - Math.abs(a - b));
-const calculateSeedCompatibilityPercent = (left, right) => {
-  if (!left || !right) return null;
-  const lp = seedToTorusPoint(left.uniqueSeed);
-  const rp = seedToTorusPoint(right.uniqueSeed);
-  const d = Math.hypot(...lp.map((v, i) => torusAxisDistance(v, rp[i], SEED_COMPATIBILITY.axisSize)));
-  const maxD = Math.sqrt(3 * (SEED_COMPATIBILITY.axisMid ** 2));
-  return Math.round(Math.max(0, Math.min(100, 100 * (1 - (Math.min(d / maxD, 1) ** SEED_COMPATIBILITY.scorePower)))));
-};
-
 const normalizeFamilyIdToken = (v = '') => String(v).trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9가-힣_]/g, '');
 const ensureFamilyBySurname = (surname = '') => {
   const safeSurname = String(surname || '').trim() || '무명';
@@ -138,16 +137,16 @@ const ensureFamilyBySurname = (surname = '') => {
   if (!FAMILY_NAME_BY_ID.has(familyId)) FAMILY_NAME_BY_ID.set(familyId, `${safeSurname}가문`);
   return familyId;
 };
-const getFamilyName = (npc) => FAMILY_NAME_BY_ID.get(npc?.familyId) || npc?.familyId || '무가문';
 
+const getFamilyName = (npc) => FAMILY_NAME_BY_ID.get(npc?.familyId) || npc?.familyId || '무가문';
 const createAgeForRace = (raceInfo) => {
   const d = Math.random();
   if (d < 0.14) return randomInt(0, raceInfo.adultAge - 1);
   if (d < 0.82) return randomInt(raceInfo.adultAge, raceInfo.elderAge - 1);
   return randomInt(raceInfo.elderAge, raceInfo.maxAge);
 };
-const createStats = () => ({ STR: randomInt(6, 20), DEX: randomInt(6, 20), CON: randomInt(6, 20), INT: randomInt(6, 20), WIS: randomInt(6, 20), CHA: randomInt(6, 20) });
 
+const createStats = () => ({ STR: randomInt(6, 20), DEX: randomInt(6, 20), CON: randomInt(6, 20), INT: randomInt(6, 20), WIS: randomInt(6, 20), CHA: randomInt(6, 20) });
 const pickRaceNameParts = (raceInfo, gender) => {
   const raceNames = namePools[raceInfo.key] || DEFAULT_NAME_POOLS[raceInfo.key];
   const givenPool = gender === '남성' ? raceNames.male : raceNames.female;
@@ -251,10 +250,12 @@ const canBeAffairPair = (l, r) => l && r && l.id !== r.id && isAdult(l) && isAdu
 const assignAffairLinks = (list) => {
   const adults = list.filter((npc) => isAdult(npc));
   const byId = new Map(adults.map((npc) => [npc.id, npc]));
+
   adults.forEach((npc) => {
     if (!npc.familyLinks.spouseId || !canAcceptMoreAffairs(npc) || Math.random() >= AFFAIR_TRIGGER_CHANCE) return;
     const candidates = adults.filter((other) => canBeAffairPair(npc, other) && canAcceptMoreAffairs(other));
     if (candidates.length === 0) return;
+
     if (hasAffairLimitBypassTrait(npc)) {
       candidates.forEach((partner) => {
         if (!canAcceptMoreAffairs(partner) || !canBeAffairPair(npc, partner) || Math.random() >= AFFAIR_MULTI_CHANCE) return;
@@ -263,6 +264,7 @@ const assignAffairLinks = (list) => {
       });
       return;
     }
+
     const partner = pickOne(candidates);
     npc.familyLinks.affairPartnerIds.push(partner.id);
     byId.get(partner.id).familyLinks.affairPartnerIds.push(npc.id);
@@ -283,327 +285,349 @@ const rebuildIndexes = () => {
     });
   });
 };
+
 const findNpcById = (id) => npcIndexes.byId.get(id);
 
-const activateTab = (tabKey) => {
-  tabButtons.forEach((b) => b.classList.toggle('is-active', b.dataset.tabTarget === tabKey));
-  tabPanels.forEach((p) => p.classList.toggle('is-active', p.dataset.tabPanel === tabKey));
-};
-const activateDetailTab = (tabKey) => {
-  activeDetailTab = tabKey;
-  detailTabs.forEach((b) => b.classList.toggle('is-active', b.dataset.detailTab === tabKey));
+const activateScreen = (screenKey) => {
+  navTabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.screen === screenKey));
+  screens.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.screenPanel === screenKey));
 };
 
-const createObjectButton = (label, onClick, className = 'obj-link') => {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = className;
-  button.textContent = label;
-  button.addEventListener('click', (event) => { event.stopPropagation(); onClick(); });
-  return button;
-};
-
-const createContextItem = (npcId) => {
-  const li = document.createElement('li');
-  const npc = findNpcById(npcId);
-  if (!npc) { li.textContent = `ID ${npcId}`; return li; }
-  li.append(createObjectButton(`${displayNpcName(npc)} · ${npc.race} · ${npc.age}세`, () => openNpcDialog(npc)));
-  return li;
-};
-
-const renderContextPanel = (title, ids) => {
-  npcContextList.replaceChildren();
-  const head = document.createElement('li');
-  head.textContent = `${title} · ${ids?.length || 0}명`;
-  npcContextList.append(head);
-  if (!ids || ids.length === 0) return;
-  npcContextList.append(...ids.slice(0, 30).map(createContextItem));
-  activateTab('context');
-};
-
-const renderComparePreview = () => {
-  const left = findNpcById(compareSelection.leftId);
-  const right = findNpcById(compareSelection.rightId);
-  if (!left || !right) {
-    comparePreviewPair.textContent = '선택된 비교 대상이 없습니다.';
-    comparePreviewBar.style.width = '0%';
-    comparePreviewScore.textContent = '점수: 없음';
-    return;
-  }
-  const score = calculateSeedCompatibilityPercent(left, right);
-  comparePreviewPair.textContent = `${displayNpcName(left)} ↔ ${displayNpcName(right)}`;
-  comparePreviewBar.style.width = `${score}%`;
-  comparePreviewScore.textContent = `점수: ${score}%`;
-};
-
-const populateCompareSelectOptions = () => {
-  const optionsHtml = npcList.map((npc) => `<option value="${npc.id}">${displayNpcName(npc)} · ${npc.race} · ${npc.age}세</option>`).join('');
-  compareNpcASelect.innerHTML = `<option value="">선택 안함</option>${optionsHtml}`;
-  compareNpcBSelect.innerHTML = `<option value="">선택 안함</option>${optionsHtml}`;
-};
-
-const syncCompareDialogSelection = () => {
-  compareNpcASelect.value = compareSelection.leftId ? String(compareSelection.leftId) : '';
-  compareNpcBSelect.value = compareSelection.rightId ? String(compareSelection.rightId) : '';
-  const left = findNpcById(compareSelection.leftId);
-  const right = findNpcById(compareSelection.rightId);
-  if (!left || !right) {
-    compareDialogBar.style.width = '0%';
-    compareDialogScore.textContent = '점수: 없음';
-    compareDialogMeta.textContent = '두 NPC를 선택하면 결과가 표시됩니다.';
-    return;
-  }
-  const score = calculateSeedCompatibilityPercent(left, right);
-  compareDialogBar.style.width = `${score}%`;
-  compareDialogScore.textContent = `점수: ${score}%`;
-  compareDialogMeta.textContent = `${displayNpcName(left)} ↔ ${displayNpcName(right)} · 시드 토러스 거리 기반`;
-};
-
-const buildSummary = () => {
-  const raceCount = npcList.reduce((acc, npc) => (acc.set(npc.race, (acc.get(npc.race) || 0) + 1), acc), new Map());
-  const linkedChildren = npcList.filter((npc) => npc.familyLinks.fatherId || npc.familyLinks.motherId).length;
-  const pills = Array.from(raceCount.entries()).map(([race, count]) => `<button class="chip" type="button" data-race="${race}">${race} ${count}명</button>`).join('');
-  npcSummaryElement.innerHTML = `
-    <p>총 <strong>${npcList.length}명</strong> 생성</p>
-    <p>부모 연결 완료: <strong>${linkedChildren}명</strong></p>
-    <div class="chips">${pills}</div>
-  `;
-  npcSummaryElement.querySelectorAll('[data-race]').forEach((button) => {
-    button.addEventListener('click', () => renderContextPanel(`종족: ${button.dataset.race}`, npcIndexes.byRace.get(button.dataset.race) || []));
-  });
-};
-
-const pointOnCircle = (cx, cy, radius, angle) => ({ x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius });
-
-const renderRadarChart = (stats) => {
-  radarChart.replaceChildren();
-  const centerX = 130; const centerY = 130; const maxRadius = 90; const levelCount = 5;
-  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const axisGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
-  for (let level = 1; level <= levelCount; level += 1) {
-    const r = (maxRadius / levelCount) * level;
-    const points = STAT_KEYS.map((_, index) => {
-      const p = pointOnCircle(centerX, centerY, r, (-Math.PI / 2) + (Math.PI * 2 * index) / STAT_KEYS.length);
-      return `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
-    }).join(' ');
-    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    polygon.setAttribute('points', points); polygon.setAttribute('class', 'npc-radar__grid'); gridGroup.appendChild(polygon);
-  }
-
-  STAT_KEYS.forEach((key, index) => {
-    const angle = (-Math.PI / 2) + (Math.PI * 2 * index) / STAT_KEYS.length;
-    const outer = pointOnCircle(centerX, centerY, maxRadius, angle);
-    const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    axis.setAttribute('x1', String(centerX)); axis.setAttribute('y1', String(centerY)); axis.setAttribute('x2', String(outer.x)); axis.setAttribute('y2', String(outer.y)); axis.setAttribute('class', 'npc-radar__axis');
-    axisGroup.appendChild(axis);
-
-    const labelP = pointOnCircle(centerX, centerY, maxRadius + 18, angle);
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', labelP.x.toFixed(2)); label.setAttribute('y', labelP.y.toFixed(2)); label.setAttribute('text-anchor', 'middle'); label.setAttribute('dominant-baseline', 'middle'); label.setAttribute('class', 'npc-radar__label');
-    label.textContent = `${key} ${stats[key]}`;
-    labelGroup.appendChild(label);
-  });
-
-  const statPoints = STAT_KEYS.map((key, index) => {
-    const angle = (-Math.PI / 2) + (Math.PI * 2 * index) / STAT_KEYS.length;
-    const p = pointOnCircle(centerX, centerY, maxRadius * (Math.min(20, Math.max(0, stats[key])) / 20), angle);
-    return `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
-  }).join(' ');
-
-  const statPolygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  statPolygon.setAttribute('points', statPoints);
-  statPolygon.setAttribute('class', 'npc-radar__value');
-  radarChart.append(gridGroup, axisGroup, statPolygon, labelGroup);
-  radarChart.classList.remove('npc-radar--animate');
-  requestAnimationFrame(() => radarChart.classList.add('npc-radar--animate'));
+const activateProfileTab = (tabKey) => {
+  profileTab = tabKey;
+  profileTabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.profileTab === tabKey));
 };
 
 const openTraitDialog = (traitId) => {
   const trait = TRAIT_BY_ID.get(traitId);
   if (!trait) return;
-  // 요청사항: 목록에는 이름만 노출하고, 상세/메타는 팝업에서만 제공한다.
-  traitDialogTitle.textContent = `특성: ${trait.name}`;
-  traitDialogBody.innerHTML = `
-    <article class="row"><dt>설명</dt><dd>${trait.description}</dd></article>
-    <article class="row"><dt>메타 한줄평</dt><dd>${traitMetaReviewOf(traitId)}</dd></article>
-    <article class="row"><dt>메타 정보</dt><dd>${trait.type} · ${trait.rarity} · ID ${trait.id}</dd></article>
+
+  // 요청사항 유지: 목록은 이름만, 설명/메타 정보는 팝업에서 제공.
+  traitTitle.textContent = `특성: ${trait.name}`;
+  traitBody.innerHTML = `
+    <article class="info-row"><dt>설명</dt><dd>${trait.description}</dd></article>
+    <article class="info-row"><dt>메타 한줄평</dt><dd>${traitMetaReviewOf(traitId)}</dd></article>
+    <article class="info-row"><dt>메타 정보</dt><dd>${trait.type} · ${trait.rarity} · ID ${trait.id}</dd></article>
   `;
-  if (!traitDetailDialog.open) traitDetailDialog.showModal();
+  if (!traitDialog.open) traitDialog.showModal();
 };
 
-const buildFamilyTreeNode = (npcId, depth, visited, maxDepth) => {
-  const li = document.createElement('li');
+const createNpcButton = (npcId) => {
   const npc = findNpcById(npcId);
+  if (!npc) return document.createTextNode('없음');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = `${displayNpcName(npc)} (#${npcId})`;
+  button.addEventListener('click', () => openNpcProfile(npc));
+  return button;
+};
+
+const createInfoRow = (label, valueNodeOrText) => {
+  const row = document.createElement('dl');
+  row.className = 'info-row';
+  const dt = document.createElement('dt');
+  dt.textContent = label;
+  const dd = document.createElement('dd');
+  if (typeof valueNodeOrText === 'string') dd.textContent = valueNodeOrText;
+  else dd.append(valueNodeOrText);
+  row.append(dt, dd);
+  return row;
+};
+
+const renderStatsRows = (npc) => {
+  const frag = document.createDocumentFragment();
+  STAT_KEYS.forEach((key) => frag.append(createInfoRow(key, String(npc.stats[key]))));
+  return frag;
+};
+
+const openNpcProfile = (npc) => {
+  profileName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
+  profileMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
+
+  const panel = document.createDocumentFragment();
+  if (profileTab === 'identity') {
+    panel.append(
+      createInfoRow('고유 시드', npc.uniqueSeed),
+      createInfoRow('배우 ID', npc.actorId),
+      createInfoRow('가문', getFamilyName(npc)),
+      createInfoRow('속궁합(배우자 기준)', (() => {
+        const spouse = findNpcById(npc.familyLinks.spouseId);
+        const score = calculateSeedCompatibilityPercent(npc, spouse);
+        return score == null ? '없음' : `${score}%`;
+      })())
+    );
+  }
+
+  if (profileTab === 'relations') {
+    panel.append(
+      createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcButton(npc.familyLinks.spouseId) : '없음'),
+      createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcButton(npc.familyLinks.fatherId) : '없음'),
+      createInfoRow('어머니', npc.familyLinks.motherId ? createNpcButton(npc.familyLinks.motherId) : '없음'),
+      createInfoRow('자녀', (() => {
+        const wrap = document.createElement('div');
+        const children = npc.familyLinks.childrenIds || [];
+        if (children.length === 0) return document.createTextNode('없음');
+        children.forEach((id) => wrap.append(createNpcButton(id), document.createTextNode(' ')));
+        return wrap;
+      })()),
+      createInfoRow('연문 관계', (() => {
+        const wrap = document.createElement('div');
+        const affairs = npc.familyLinks.affairPartnerIds || [];
+        if (affairs.length === 0) return document.createTextNode('없음');
+        affairs.forEach((id) => wrap.append(createNpcButton(id), document.createTextNode(' ')));
+        return wrap;
+      })())
+    );
+  }
+
+  if (profileTab === 'traits') {
+    const wrap = document.createElement('div');
+    (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = traitNameOf(traitId);
+      btn.addEventListener('click', () => openTraitDialog(traitId));
+      wrap.append(btn, document.createTextNode(' '));
+    });
+    panel.append(createInfoRow('후천 특성', wrap));
+  }
+
+  if (profileTab === 'stats') panel.append(renderStatsRows(npc));
+
+  profilePanel.replaceChildren(panel);
+  if (!npcProfileDialog.open) npcProfileDialog.showModal();
+};
+
+const buildTree = (npcId, direction, depth = 0, visited = new Set(), maxDepth = 4) => {
+  const npc = findNpcById(npcId);
+  const li = document.createElement('li');
   if (!npc) { li.textContent = `알 수 없는 구성원 #${npcId}`; return li; }
 
-  const node = createObjectButton(`${displayNpcName(npc)} · ${npc.age}세`, () => openNpcDialog(npc), `family-node ${depth === 0 ? 'root' : ''}`);
-  li.append(node);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = `${displayNpcName(npc)} · ${npc.age}세`;
+  button.addEventListener('click', () => openNpcProfile(npc));
+  li.append(button);
+
   if (depth >= maxDepth || visited.has(npcId)) return li;
 
-  const relatives = [npc.familyLinks.fatherId, npc.familyLinks.motherId, ...(npc.familyLinks.childrenIds || [])].filter(Boolean);
-  if (relatives.length) {
+  // 사용자가 원한 방향형 패밀리 트리: ancestor는 위(조상), descendant는 아래(자식) 계열.
+  const relatives = direction === 'ancestor'
+    ? [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean)
+    : [...(npc.familyLinks.childrenIds || [])].filter(Boolean);
+
+  if (relatives.length > 0) {
     visited.add(npcId);
     const ul = document.createElement('ul');
-    relatives.forEach((id) => ul.append(buildFamilyTreeNode(id, depth + 1, new Set(visited), maxDepth)));
+    relatives.forEach((id) => ul.append(buildTree(id, direction, depth + 1, new Set(visited), maxDepth)));
     li.append(ul);
   }
+
   return li;
 };
 
-const openFamilyTreeDialog = (rootNpc) => {
-  familyTreeTitle.textContent = `가문 패밀리 트리: ${getFamilyName(rootNpc)}`;
-  familyTreeRoot.replaceChildren();
-  const wrapper = document.createElement('ul');
-  wrapper.append(buildFamilyTreeNode(rootNpc.id, 0, new Set(), 4));
-  familyTreeRoot.append(wrapper);
+const openFamilyTree = (rootNpc) => {
+  familyTreeTitle.textContent = `패밀리 트리: ${displayNpcName(rootNpc)} · ${getFamilyName(rootNpc)}`;
+  lineageRootBadge.textContent = `${displayNpcName(rootNpc)} · ${rootNpc.age}세`;
+  lineageRootBadge.onclick = () => openNpcProfile(rootNpc);
+
+  const upTree = document.createElement('ul');
+  const downTree = document.createElement('ul');
+  // 요청 반영: 좌/우 절반 분할이 아니라, 중심 인물 기준으로 위=조상 / 아래=후손 흐름을 표현한다.
+  upTree.append(buildTree(rootNpc.id, 'ancestor'));
+  downTree.append(buildTree(rootNpc.id, 'descendant'));
+
+  ancestorTree.replaceChildren(upTree);
+  descendantTree.replaceChildren(downTree);
   if (!familyTreeDialog.open) familyTreeDialog.showModal();
 };
 
-const createRelativeListFragment = (ids) => {
-  const fragment = document.createDocumentFragment();
-  if (!ids || ids.length === 0) return document.createTextNode('없음');
-  ids.forEach((id, index) => {
-    const npc = findNpcById(id);
-    fragment.append(createObjectButton(npc ? `${displayNpcName(npc)} (#${id})` : `ID ${id}`, () => npc && openNpcDialog(npc)));
-    if (index < ids.length - 1) fragment.append(document.createTextNode(' '));
-  });
-  return fragment;
-};
+const renderTopCompatibilityPairs = () => {
+  // O(n^2) 비용이므로 UX를 위해 상위 몇 개만 계산/표시.
+  const pairs = [];
+  for (let i = 0; i < npcList.length; i += 1) {
+    for (let j = i + 1; j < npcList.length; j += 1) {
+      if (pairs.length > 7000) break;
+      const score = calculateSeedCompatibilityPercent(npcList[i], npcList[j]);
+      pairs.push({ left: npcList[i], right: npcList[j], score });
+    }
+    if (pairs.length > 7000) break;
+  }
 
-const openNpcDialog = (npc) => {
-  dialogNpcName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
-  dialogNpcMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
-  renderRadarChart(npc.stats);
-
-  const rows = [
-    ['고유 시드', `${npc.uniqueSeed}${isSeedChecksumValid(npc.uniqueSeed) ? '' : ' (체크섬 경고)'}`],
-    ['배우 ID', npc.actorId],
-    ['종족', createObjectButton(npc.race, () => renderContextPanel(`종족: ${npc.race}`, npcIndexes.byRace.get(npc.race) || []))],
-    ['가문', (() => {
-      const f = document.createDocumentFragment();
-      f.append(createObjectButton(getFamilyName(npc), () => renderContextPanel(`가문: ${getFamilyName(npc)}`, npcIndexes.byFamily.get(npc.familyId) || [])));
-      f.append(document.createTextNode(' '));
-      f.append(createObjectButton('패밀리 트리', () => openFamilyTreeDialog(npc)));
-      return f;
-    })()],
-    ['배우자', npc.familyLinks.spouseId ? createRelativeListFragment([npc.familyLinks.spouseId]) : '없음'],
-    ['속궁합(시드 기반)', (() => {
-      const spouse = npc.familyLinks.spouseId ? findNpcById(npc.familyLinks.spouseId) : null;
-      const score = calculateSeedCompatibilityPercent(npc, spouse);
-      return score == null ? '없음' : `${score}%`;
-    })()],
-    ['연문 관계', createRelativeListFragment(npc.familyLinks.affairPartnerIds || [])],
-    ['아버지', npc.familyLinks.fatherId ? createRelativeListFragment([npc.familyLinks.fatherId]) : '없음'],
-    ['어머니', npc.familyLinks.motherId ? createRelativeListFragment([npc.familyLinks.motherId]) : '없음'],
-    ['자녀', createRelativeListFragment(npc.familyLinks.childrenIds || [])],
-    ['후천 특성', (() => {
-      const f = document.createDocumentFragment();
-      (npc.traits.acquiredTraitIds || []).forEach((traitId, i) => {
-        f.append(createObjectButton(traitNameOf(traitId), () => openTraitDialog(traitId)));
-        f.append(document.createTextNode(' '));
-        f.append(createObjectButton('관련 NPC', () => renderContextPanel(`특성: ${traitNameOf(traitId)}`, npcIndexes.byTrait.get(traitId) || [])));
-        if (i < (npc.traits.acquiredTraitIds.length - 1)) f.append(document.createTextNode(' '));
-      });
-      return f;
-    })()]
-  ];
-
-  const visibleRowsByTab = {
-    overview: ['고유 시드', '배우 ID', '종족', '가문', '속궁합(시드 기반)'],
-    relation: ['배우자', '연문 관계', '아버지', '어머니', '자녀'],
-    traits: ['후천 특성']
-  };
-  const visibleSet = new Set(visibleRowsByTab[activeDetailTab] || visibleRowsByTab.overview);
-
-  dialogNpcDetail.replaceChildren(...rows.filter(([label]) => visibleSet.has(label)).map(([label, value]) => {
-    const row = document.createElement('div'); row.className = 'row';
-    const dt = document.createElement('dt'); dt.textContent = label;
-    const dd = document.createElement('dd');
-    if (typeof value === 'string') dd.textContent = value; else dd.append(value);
-    row.append(dt, dd); return row;
+  pairs.sort((a, b) => b.score - a.score);
+  topPairs.replaceChildren(...pairs.slice(0, 14).map((pair) => {
+    const li = document.createElement('li');
+    li.textContent = `${displayNpcName(pair.left)} ↔ ${displayNpcName(pair.right)} : ${pair.score}%`;
+    li.addEventListener('click', () => {
+      selectedA = pair.left.id;
+      selectedB = pair.right.id;
+      compareNpcA.value = String(selectedA);
+      compareNpcB.value = String(selectedB);
+      syncCompatibilityPanel();
+    });
+    return li;
   }));
-
-  if (!npcDetailDialog.open) npcDetailDialog.showModal();
 };
 
-const renderNpcList = () => {
-  npcListElement.replaceChildren(...npcList.map((npc) => {
-    const card = document.createElement('li');
-    card.className = 'card'; card.tabIndex = 0; card.role = 'button';
+const syncCompatibilityPanel = () => {
+  const a = findNpcById(selectedA);
+  const b = findNpcById(selectedB);
+  if (!a || !b) {
+    compatBar.style.width = '0%';
+    compatLabel.textContent = '점수: 없음';
+    compatMeta.textContent = '두 NPC를 선택하면 결과가 표시됩니다.';
+    return;
+  }
+  const score = calculateSeedCompatibilityPercent(a, b);
+  compatBar.style.width = `${score}%`;
+  compatLabel.textContent = `점수: ${score}%`;
+  compatMeta.textContent = `${displayNpcName(a)} ↔ ${displayNpcName(b)} (시드 토러스 거리 기반)`;
+};
 
-    const nameBtn = document.createElement('button');
-    nameBtn.type = 'button'; nameBtn.className = 'card__name'; nameBtn.textContent = displayNpcName(npc);
-    nameBtn.addEventListener('click', (event) => { event.stopPropagation(); openNpcDialog(npc); });
+const matchesFilter = (npc) => {
+  if (currentRaceFilter && npc.race !== currentRaceFilter) return false;
+  if (!currentSearch) return true;
+  const q = currentSearch.toLowerCase();
+  return [displayNpcName(npc), npc.race, getFamilyName(npc), npc.gender].some((token) => String(token).toLowerCase().includes(q));
+};
 
+const renderNpcGalaxy = () => {
+  npcGalaxy.replaceChildren(...npcList.filter(matchesFilter).map((npc) => {
+    const card = document.createElement('article');
+    card.className = 'npc-star-card';
+
+    const title = document.createElement('h3');
+    title.textContent = displayNpcName(npc);
     const meta = document.createElement('p');
-    meta.className = 'card__meta'; meta.textContent = `#${npc.id} · ${npc.race} · ${npc.age}세`;
-
+    meta.textContent = `#${npc.id} · ${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
     const relation = document.createElement('p');
-    relation.className = 'card__sub';
-    relation.textContent = `배우자 ${npc.familyLinks.spouseId ? 1 : 0} / 연문 ${(npc.familyLinks.affairPartnerIds || []).length} / 자녀 ${npc.familyLinks.childrenIds.length}`;
+    relation.textContent = `배우자 ${npc.familyLinks.spouseId ? 1 : 0} / 연문 ${(npc.familyLinks.affairPartnerIds || []).length} / 자녀 ${(npc.familyLinks.childrenIds || []).length}`;
 
-    // 요청사항: 특성은 이름만 카드에 보여주고 상세 설명은 팝업으로 분리.
-    const chips = document.createElement('div'); chips.className = 'chips';
+    const row = document.createElement('div');
+    row.className = 'inline-actions';
+
+    const detailBtn = document.createElement('button');
+    detailBtn.type = 'button';
+    detailBtn.textContent = '상세';
+    detailBtn.addEventListener('click', () => openNpcProfile(npc));
+
+    const compareABtn = document.createElement('button');
+    compareABtn.type = 'button';
+    compareABtn.textContent = '비교A';
+    compareABtn.addEventListener('click', () => {
+      selectedA = npc.id;
+      compareNpcA.value = String(npc.id);
+      activateScreen('chemistry');
+      syncCompatibilityPanel();
+    });
+
+    const compareBBtn = document.createElement('button');
+    compareBBtn.type = 'button';
+    compareBBtn.textContent = '비교B';
+    compareBBtn.addEventListener('click', () => {
+      selectedB = npc.id;
+      compareNpcB.value = String(npc.id);
+      activateScreen('chemistry');
+      syncCompatibilityPanel();
+    });
+
+    const treeBtn = document.createElement('button');
+    treeBtn.type = 'button';
+    treeBtn.textContent = '가문트리';
+    treeBtn.addEventListener('click', () => openFamilyTree(npc));
+
+    row.append(detailBtn, compareABtn, compareBBtn, treeBtn);
+
+    // 요청사항: 특성은 이름만 노출.
     (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-      const chip = document.createElement('button');
-      chip.type = 'button'; chip.className = 'chip'; chip.textContent = traitNameOf(traitId);
-      chip.addEventListener('click', (event) => { event.stopPropagation(); openTraitDialog(traitId); });
-      chips.append(chip);
+      const traitBtn = document.createElement('button');
+      traitBtn.type = 'button';
+      traitBtn.className = 'trait-chip';
+      traitBtn.textContent = traitNameOf(traitId);
+      traitBtn.addEventListener('click', () => openTraitDialog(traitId));
+      row.append(traitBtn);
     });
 
-    const actionRow = document.createElement('div'); actionRow.className = 'card__actions';
-    const left = createObjectButton('비교 A', () => { compareSelection.leftId = npc.id; renderComparePreview(); syncCompareDialogSelection(); activateTab('compat'); }, 'card__mini');
-    const right = createObjectButton('비교 B', () => { compareSelection.rightId = npc.id; renderComparePreview(); syncCompareDialogSelection(); activateTab('compat'); }, 'card__mini');
-    const family = createObjectButton('가문 트리', () => openFamilyTreeDialog(npc), 'card__mini');
-    actionRow.append(left, right, family);
-
-    card.append(nameBtn, meta, relation, chips, actionRow);
-    card.addEventListener('click', () => openNpcDialog(npc));
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openNpcDialog(npc); }
-    });
+    card.append(title, meta, relation, row);
     return card;
   }));
 };
 
-const initActionDeck = () => {
-  const cardApi = window.NewtheriaCardTemplates;
-  if (!cardApi || !npcActionDeck) return;
-  const cards = cardApi.renderCardFanCards(npcActionDeck, [
-    { route: 'reroll', icon: '🎲', label: '월드 리롤', desc: 'NPC 월드를 새로 생성' },
-    { route: 'sort_age', icon: '📈', label: '나이순 정렬', desc: '최고령부터 정렬' },
-    { route: 'sort_name', icon: '🔤', label: '이름순 정렬', desc: '한글 로케일 정렬' },
-    { route: 'compare', icon: '💞', label: '속궁합 팝업', desc: '두 캐릭터 궁합 계산' }
-  ]);
-  actionDeckBehavior?.destroy?.();
-  actionDeckBehavior = cardApi.createCardFanBehavior({ menu: npcActionDeck, cards });
-  actionDeckBehavior.layoutCards();
-  actionDeckBehavior.bindInteractions({
-    onCardSelected: (card) => {
-      const route = card?.dataset?.route;
-      if (route === 'reroll') regenerateNpcList();
-      if (route === 'sort_age') { npcList.sort((a, b) => b.age - a.age); renderNpcList(); }
-      if (route === 'sort_name') { npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR')); renderNpcList(); }
-      if (route === 'compare') { syncCompareDialogSelection(); if (!npcCompareDialog.open) npcCompareDialog.showModal(); }
-      cardApi.setActiveCard(cards, card);
-    }
-  });
+const renderFamilyBoard = () => {
+  const familyEntries = Array.from(npcIndexes.byFamily.entries()).sort((a, b) => b[1].length - a[1].length);
+  familyBoard.replaceChildren(...familyEntries.map(([familyId, npcIds]) => {
+    const tile = document.createElement('article');
+    tile.className = 'family-tile';
+
+    const name = document.createElement('h3');
+    name.textContent = FAMILY_NAME_BY_ID.get(familyId) || familyId;
+
+    const info = document.createElement('p');
+    info.className = 'muted';
+    info.textContent = `구성원 ${npcIds.length}명`;
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = '대표 인물 트리 보기';
+    open.addEventListener('click', () => {
+      const head = findNpcById(npcIds[0]);
+      if (head) openFamilyTree(head);
+    });
+
+    tile.append(name, info, open);
+    return tile;
+  }));
+};
+
+const populateFilters = () => {
+  const races = Array.from(new Set(npcList.map((npc) => npc.race)));
+  raceFilter.innerHTML = `<option value="">전체 종족</option>${races.map((race) => `<option value="${race}">${race}</option>`).join('')}`;
+
+  const options = npcList.map((npc) => `<option value="${npc.id}">${displayNpcName(npc)} · ${npc.race} · ${npc.age}세</option>`).join('');
+  compareNpcA.innerHTML = `<option value="">선택 안함</option>${options}`;
+  compareNpcB.innerHTML = `<option value="">선택 안함</option>${options}`;
 };
 
 const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
   npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1, createSeed));
+
   assignFamilyLinks(npcList);
   assignSpouseLinks(npcList);
   assignAffairLinks(npcList);
   rebuildIndexes();
-  buildSummary();
-  renderNpcList();
-  populateCompareSelectOptions();
-  syncCompareDialogSelection();
-  renderComparePreview();
+
+  populateFilters();
+  renderNpcGalaxy();
+  renderFamilyBoard();
+  renderTopCompatibilityPairs();
+  syncCompatibilityPanel();
+};
+
+const initMainActionDeck = () => {
+  const api = window.NewtheriaCardTemplates;
+  if (!api || !mainActionDeck) return;
+
+  const cards = api.renderCardFanCards(mainActionDeck, [
+    { route: 'reroll', icon: '🎲', label: '월드 리롤', desc: 'NPC 월드 재생성' },
+    { route: 'age', icon: '📈', label: '나이순', desc: '최고령부터 정렬' },
+    { route: 'name', icon: '🔤', label: '이름순', desc: '한글 로케일 정렬' },
+    { route: 'chem', icon: '💞', label: '속궁합 탭', desc: '비교 화면으로 이동' }
+  ]);
+
+  actionDeckBehavior?.destroy?.();
+  actionDeckBehavior = api.createCardFanBehavior({ menu: mainActionDeck, cards });
+  actionDeckBehavior.layoutCards();
+  actionDeckBehavior.bindInteractions({
+    onCardSelected: (card) => {
+      const route = card?.dataset?.route;
+      if (route === 'reroll') regenerateNpcList();
+      if (route === 'age') { npcList.sort((a, b) => b.age - a.age); renderNpcGalaxy(); }
+      if (route === 'name') { npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR')); renderNpcGalaxy(); }
+      if (route === 'chem') activateScreen('chemistry');
+      api.setActiveCard(cards, card);
+    }
+  });
 };
 
 const isValidRaceNamePool = (pool) => pool && Array.isArray(pool.male) && pool.male.length > 0 && Array.isArray(pool.female) && pool.female.length > 0 && Array.isArray(pool.surnames) && pool.surnames.length > 0;
@@ -612,36 +636,53 @@ const loadNamePools = async () => {
     const response = await fetch(NAME_POOL_PATH, { cache: 'no-store' });
     if (!response.ok) throw new Error('이름 풀 로드 실패');
     const parsed = await response.json();
-    const hasEveryRacePool = RACE_POOL.every((raceInfo) => isValidRaceNamePool(parsed[raceInfo.key]));
-    if (hasEveryRacePool) namePools = parsed;
+    const valid = RACE_POOL.every((raceInfo) => isValidRaceNamePool(parsed[raceInfo.key]));
+    if (valid) namePools = parsed;
   } catch (error) {
     console.warn('[npc_test] 이름 풀 로드 실패, fallback 사용.', error);
   }
 };
 
 const bindEvents = () => {
-  generateButton.addEventListener('click', regenerateNpcList);
-  sortByAgeButton.addEventListener('click', () => { npcList.sort((a, b) => b.age - a.age); renderNpcList(); });
-  sortByNameButton.addEventListener('click', () => { npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR')); renderNpcList(); });
-  openCompareDialogButton.addEventListener('click', () => { syncCompareDialogSelection(); if (!npcCompareDialog.open) npcCompareDialog.showModal(); });
+  navTabs.forEach((tab) => tab.addEventListener('click', () => activateScreen(tab.dataset.screen)));
 
-  tabButtons.forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.tabTarget)));
-  detailTabs.forEach((button) => button.addEventListener('click', () => {
-    activateDetailTab(button.dataset.detailTab);
-    const currentNpcId = Number((dialogNpcName.textContent.match(/#(\d+)\)/) || [])[1]);
-    if (currentNpcId) { const npc = findNpcById(currentNpcId); if (npc) openNpcDialog(npc); }
-  }));
+  npcSearchInput.addEventListener('input', () => {
+    currentSearch = npcSearchInput.value.trim();
+    renderNpcGalaxy();
+  });
 
-  compareNpcASelect.addEventListener('change', () => { compareSelection.leftId = compareNpcASelect.value ? Number(compareNpcASelect.value) : null; syncCompareDialogSelection(); renderComparePreview(); });
-  compareNpcBSelect.addEventListener('change', () => { compareSelection.rightId = compareNpcBSelect.value ? Number(compareNpcBSelect.value) : null; syncCompareDialogSelection(); renderComparePreview(); });
+  raceFilter.addEventListener('change', () => {
+    currentRaceFilter = raceFilter.value;
+    renderNpcGalaxy();
+  });
+
+  compareNpcA.addEventListener('change', () => {
+    selectedA = compareNpcA.value ? Number(compareNpcA.value) : null;
+    syncCompatibilityPanel();
+  });
+
+  compareNpcB.addEventListener('change', () => {
+    selectedB = compareNpcB.value ? Number(compareNpcB.value) : null;
+    syncCompatibilityPanel();
+  });
+
+  profileTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      activateProfileTab(tab.dataset.profileTab);
+      const idMatch = profileName.textContent.match(/#(\d+)\)/);
+      if (!idMatch) return;
+      const npc = findNpcById(Number(idMatch[1]));
+      if (npc) openNpcProfile(npc);
+    });
+  });
 };
 
 const bootstrap = async () => {
   await loadNamePools();
-  initActionDeck();
-  regenerateNpcList();
+  initMainActionDeck();
   bindEvents();
-  activateTab('summary');
+  regenerateNpcList();
+  activateScreen('observatory');
 };
 
 bootstrap();

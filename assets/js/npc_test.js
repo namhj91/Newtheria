@@ -1,4 +1,4 @@
-const NPC_COUNT = 100;
+const NPC_COUNT = 300;
 const NAME_POOL_PATH = './assets/data/npc_name_pools.json';
 const ADULT_AGE = 18;
 const SPOUSE_MAX_AGE_GAP = 24;

@@ -98,6 +98,7 @@ const compareDialogMeta = document.getElementById('compareDialogMeta');
 const traitDetailDialog = document.getElementById('traitDetailDialog');
 const traitDialogTitle = document.getElementById('traitDialogTitle');
 const traitDialogBody = document.getElementById('traitDialogBody');
+const npcActionDeck = document.getElementById('npcActionDeck');
 const familyTreeDialog = document.getElementById('familyTreeDialog');
 const familyTreeTitle = document.getElementById('familyTreeTitle');
 const familyTreeRoot = document.getElementById('familyTreeRoot');
@@ -131,6 +132,7 @@ let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
 let compareSelection = { leftId: null, rightId: null };
 let activeDetailTab = 'overview';
+let actionDeckBehavior = null;
 let npcIndexes = {
   byId: new Map(),
   byRace: new Map(),
@@ -497,6 +499,42 @@ const activateTab = (tabKey) => {
   });
   tabPanels.forEach((panel) => {
     panel.classList.toggle('npc-tabpanel--active', panel.dataset.tabPanel === tabKey);
+  });
+};
+
+// 공용 카드 템플릿(card_templates.js)을 이용해 NPC 테스트 전용 액션 덱을 구성한다.
+const initActionDeck = () => {
+  const cardApi = window.NewtheriaCardTemplates;
+  if (!npcActionDeck || !cardApi) return;
+
+  const cards = cardApi.renderCardFanCards(npcActionDeck, [
+    { route: 'reroll', icon: '🎲', label: '월드 리롤', desc: 'NPC 100명을 새 시드로 재구성' },
+    { route: 'sort_age', icon: '📈', label: '나이순 정렬', desc: '최고령부터 빠르게 정렬' },
+    { route: 'sort_name', icon: '🔤', label: '이름순 정렬', desc: '한글 로케일 기준 정렬' },
+    { route: 'compare', icon: '💞', label: '속궁합 팝업', desc: '두 캐릭터의 시드 궁합 비교' }
+  ]);
+
+  actionDeckBehavior?.destroy?.();
+  actionDeckBehavior = cardApi.createCardFanBehavior({ menu: npcActionDeck, cards });
+  actionDeckBehavior.layoutCards();
+  actionDeckBehavior.bindInteractions({
+    onCardSelected: (card) => {
+      const route = card?.dataset?.route;
+      if (route === 'reroll') regenerateNpcList();
+      if (route === 'sort_age') {
+        npcList.sort((a, b) => b.age - a.age);
+        renderNpcList();
+      }
+      if (route === 'sort_name') {
+        npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR'));
+        renderNpcList();
+      }
+      if (route === 'compare') {
+        syncCompareDialogSelection();
+        if (!npcCompareDialog.open) npcCompareDialog.showModal();
+      }
+      cardApi.setActiveCard(cards, card);
+    }
   });
 };
 
@@ -1031,6 +1069,7 @@ const loadNamePools = async () => {
 
 const bootstrap = async () => {
   await loadNamePools();
+  initActionDeck();
   regenerateNpcList();
   bindEvents();
   activateTab('summary');

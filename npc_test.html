@@ -62,6 +62,18 @@
     </section>
   </dialog>
 
+  <!-- NPC 상세 정보 팝업 -->
+  <dialog id="npcDetailDialog" class="npc-dialog" aria-label="NPC 상세 정보">
+    <form method="dialog" class="npc-dialog__backdrop-action">
+      <button class="npc-dialog__close" aria-label="닫기">×</button>
+    </form>
+    <section class="npc-dialog__content">
+      <h3 id="dialogNpcName">NPC 이름</h3>
+      <p id="dialogNpcMeta" class="npc-dialog__meta"></p>
+      <div id="dialogNpcDetail" class="npc-dialog__grid"></div>
+    </section>
+  </dialog>
+
   <script type="module" src="./assets/js/npc_test.js"></script>
 </body>
 </html>

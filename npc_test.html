@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NPC 템플릿 테스트</title>
+  <title>NPC 관계망 테스트</title>
   <link rel="stylesheet" href="./assets/css/npc_test.css" />
 </head>
 <body>
@@ -12,49 +12,44 @@
 
   <main class="npc-test">
     <header class="npc-test__header">
-      <h1>NPC 템플릿 테스트</h1>
-      <p>NPC 데이터 구조를 빠르게 검증하고 미리보기 UI를 점검하는 임시 페이지입니다.</p>
+      <p class="npc-test__version" id="npcVersion">ver.0.2.65(260424-npc랜덤생성가족관계팝업UI)</p>
+      <h1>NPC 랜덤 생성 & 관계망 테스트</h1>
+      <p>100명의 NPC를 즉시 생성하고, 리스트 클릭으로 상세 정보를 팝업에서 확인할 수 있습니다.</p>
     </header>
 
-    <section class="npc-test__grid" aria-label="NPC 테스트 패널">
-      <article class="npc-test__panel">
-        <h2>입력/로드</h2>
-        <p class="npc-test__hint">`docs/13_NPC_PC_정보템플릿.md` 필드 구조를 기준으로 JSON을 넣어 테스트하세요.</p>
+    <section class="npc-dashboard" aria-label="NPC 랜덤 테스트 패널">
+      <article class="npc-panel npc-panel--control">
+        <h2>제어 패널</h2>
+        <p class="npc-panel__hint">버튼을 누르면 나이/종족 기반으로 부모-자식 관계가 자동 구성됩니다.</p>
 
-        <div class="npc-test__actions">
-          <button id="loadNpcFromSlot" type="button">slot1의 NPC 불러오기</button>
-          <button id="resetNpcTemplate" type="button">기본 템플릿 복원</button>
+        <div class="npc-panel__actions">
+          <button id="generateNpcList" type="button">🎲 NPC 100명 다시 생성</button>
+          <button id="sortByAge" type="button">나이순 정렬</button>
+          <button id="sortByName" type="button">이름순 정렬</button>
         </div>
 
-        <label for="npcJsonInput">NPC JSON</label>
-        <textarea id="npcJsonInput" spellcheck="false" aria-label="NPC JSON 입력"></textarea>
-
-        <div class="npc-test__actions npc-test__actions--footer">
-          <button id="renderNpc" type="button">미리보기 반영</button>
-          <span id="npcStatus" role="status" aria-live="polite">준비됨</span>
-        </div>
+        <section class="npc-summary" id="npcSummary" aria-live="polite"></section>
       </article>
 
-      <article class="npc-test__panel">
-        <h2>렌더 결과</h2>
-        <section class="npc-card" id="npcCard" aria-live="polite">
-          <h3 id="npcName">이름 없음</h3>
-          <p id="npcMeta">역할/종족 정보 없음</p>
-          <ul id="npcCoreInfo"></ul>
-
-          <h4>스탯</h4>
-          <ul id="npcStats"></ul>
-
-          <h4>특성</h4>
-          <p id="npcTraits">특성 정보 없음</p>
-
-          <h4>소지품</h4>
-          <p id="npcInventory">인벤토리 정보 없음</p>
-        </section>
+      <article class="npc-panel npc-panel--list">
+        <h2>NPC 리스트</h2>
+        <p class="npc-panel__hint">카드를 누르면 상세 팝업이 열립니다.</p>
+        <ul id="npcList" class="npc-list" aria-label="NPC 카드 리스트"></ul>
       </article>
     </section>
-
   </main>
+
+  <!-- NPC 상세 정보 팝업 -->
+  <dialog id="npcDetailDialog" class="npc-dialog" aria-label="NPC 상세 정보">
+    <form method="dialog" class="npc-dialog__backdrop-action">
+      <button class="npc-dialog__close" aria-label="닫기">×</button>
+    </form>
+    <section class="npc-dialog__content">
+      <h3 id="dialogNpcName">NPC 이름</h3>
+      <p id="dialogNpcMeta" class="npc-dialog__meta"></p>
+      <div id="dialogNpcDetail" class="npc-dialog__grid"></div>
+    </section>
+  </dialog>
 
   <script type="module" src="./assets/js/npc_test.js"></script>
 </body>

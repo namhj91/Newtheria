@@ -1,5 +1,28 @@
 const NPC_COUNT = 100;
 const NAME_POOL_PATH = './assets/data/npc_name_pools.json';
+const ADULT_AGE = 18;
+const SPOUSE_MAX_AGE_GAP = 24;
+const SPOUSE_MATCH_CHANCE = 0.58;
+const AFFAIR_TRIGGER_CHANCE = 0.08;
+const AFFAIR_MULTI_CHANCE = 0.22;
+const MAX_AFFAIRS_DEFAULT = 1;
+
+// 숫자 id 하드코딩을 줄이기 위한 특성 상수.
+const TRAIT_ID = {
+  CASANOVA: 311,
+  FEMME_FATALE: 312,
+  INCEST_INCLINATION: 313,
+  ANYTHING_GOES: 314
+};
+
+// 시드 기반 속궁합 계산 설정:
+// - payload 9자리(3자리 x,y,z) + checksum 1자리
+// - 토러스 거리 기반 점수 분포를 평균 50 근처로 맞추기 위해 p=1.2 사용
+const SEED_COMPATIBILITY = {
+  axisSize: 1000,
+  axisMid: 500,
+  scorePower: 1.2
+};
 
 const RACE_POOL = [
   { name: '인간', key: 'human', adultAge: 18, elderAge: 60, maxAge: 85 },
@@ -24,14 +47,35 @@ const TRAIT_CATALOG = [
   { id: 309, name: '화염 저항', type: '신체', rarity: '희귀', description: '화염 피해 저항과 내열 적응력을 높인다.' },
   { id: 310, name: '지형 파악', type: '기타', rarity: '일반', description: '지형 기반 이동/매복 판단을 강화한다.' },
   { id: 311, name: '카사노바', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (남성 전용 예외)' },
-  { id: 312, name: '팜므파탈', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (여성 전용 예외)' }
+  { id: 312, name: '팜므파탈', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (여성 전용 예외)' },
+  // 혼인 예외를 여는 성향 특성은 페티시 분류로 묶어서 관리한다.
+  { id: 313, name: '근친 성향', type: '페티시', rarity: '전설', description: '형제(이복 포함) 간 혼인 제한을 무시한다.' },
+  { id: 314, name: '가능충', type: '페티시', rarity: '전설', description: '이종 간 혼인 제한을 무시한다. (단, 이종 배우자끼리는 자녀 불가)' }
 ];
 const TRAIT_BY_ID = new Map(TRAIT_CATALOG.map((trait) => [trait.id, trait]));
+// 특성의 기능(description)과 별도로, 분위기/평판을 빠르게 읽는 메타 한줄평 데이터.
+const TRAIT_META_REVIEW_BY_ID = new Map([
+  [301, '판을 읽는 지휘형 인재'],
+  [302, '어디서든 분위기를 푸는 친화형'],
+  [303, '밤 전장에서 빛나는 정찰형'],
+  [304, '감각으로 먹고사는 야생형'],
+  [305, '고장 나면 가장 먼저 찾는 해결사'],
+  [306, '약초창고의 살아있는 도감'],
+  [307, '소모품을 자산으로 바꾸는 생활형'],
+  [308, '말 한마디로 전황을 바꾸는 선동형'],
+  [309, '불길 속에서도 버티는 내열형'],
+  [310, '지도를 머릿속에 넣고 다니는 탐지형'],
+  [311, '관계 확장을 멈추지 않는 연애 과열형'],
+  [312, '치명적 매력으로 관계를 설계하는 유혹형'],
+  [313, '금기선마저 넘는 집착형 페티시'],
+  [314, '종족 경계도 무시하는 초개방형 페티시']
+]);
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
 const generateButton = document.getElementById('generateNpcList');
 const sortByAgeButton = document.getElementById('sortByAge');
 const sortByNameButton = document.getElementById('sortByName');
+const openCompareDialogButton = document.getElementById('openCompareDialog');
 const npcListElement = document.getElementById('npcList');
 const npcSummaryElement = document.getElementById('npcSummary');
 const npcDetailDialog = document.getElementById('npcDetailDialog');
@@ -40,6 +84,17 @@ const dialogNpcMeta = document.getElementById('dialogNpcMeta');
 const dialogNpcDetail = document.getElementById('dialogNpcDetail');
 const radarChart = document.getElementById('npcRadarChart');
 const npcContextList = document.getElementById('npcContextList');
+const tabButtons = Array.from(document.querySelectorAll('.npc-tab'));
+const tabPanels = Array.from(document.querySelectorAll('.npc-tabpanel'));
+const comparePreviewPair = document.getElementById('comparePreviewPair');
+const comparePreviewBar = document.getElementById('comparePreviewBar');
+const comparePreviewScore = document.getElementById('comparePreviewScore');
+const npcCompareDialog = document.getElementById('npcCompareDialog');
+const compareNpcASelect = document.getElementById('compareNpcA');
+const compareNpcBSelect = document.getElementById('compareNpcB');
+const compareDialogBar = document.getElementById('compareDialogBar');
+const compareDialogScore = document.getElementById('compareDialogScore');
+const compareDialogMeta = document.getElementById('compareDialogMeta');
 
 // 외부 파일을 못 읽는 환경을 대비한 최소 fallback 데이터.
 const DEFAULT_NAME_POOLS = {
@@ -67,6 +122,7 @@ const DEFAULT_NAME_POOLS = {
 
 let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
+let compareSelection = { leftId: null, rightId: null };
 let npcIndexes = {
   byId: new Map(),
   byRace: new Map(),
@@ -78,14 +134,31 @@ let npcIndexes = {
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
 const traitNameOf = (traitId) => TRAIT_BY_ID.get(traitId)?.name || `미정특성#${traitId}`;
+const traitMetaReviewOf = (traitId) => TRAIT_META_REVIEW_BY_ID.get(traitId) || '특성 메타 한줄평 미정';
+const isAdult = (npc) => (npc?.age || 0) >= ADULT_AGE;
+
+const computeSeedChecksum = (payload) => (
+  payload
+    .split('')
+    .reduce((acc, digit) => acc + Number(digit), 0) % 10
+);
+
+const attachSeedChecksum = (payload) => `${payload}${computeSeedChecksum(payload)}`;
+const isSeedChecksumValid = (seed) => {
+  if (!/^\d{10}$/.test(String(seed || ''))) return false;
+  const payload = String(seed).slice(0, 9);
+  const checksum = Number(String(seed).slice(9));
+  return computeSeedChecksum(payload) === checksum;
+};
 
 const createUniqueSeedGenerator = () => {
   const usedSeeds = new Set();
 
   return () => {
-    // 10자리 숫자 문자열을 랜덤 생성하고 중복을 방지한다.
+    // 9자리 payload를 만들고 마지막 1자리를 checksum으로 붙여 10자리 시드를 생성한다.
     while (true) {
-      const seed = String(randomInt(1_000_000_000, 9_999_999_999));
+      const payload = String(randomInt(100_000_000, 999_999_999));
+      const seed = attachSeedChecksum(payload);
       if (!usedSeeds.has(seed)) {
         usedSeeds.add(seed);
         return seed;
@@ -111,6 +184,35 @@ const createStats = () => ({
   WIS: randomInt(6, 20),
   CHA: randomInt(6, 20)
 });
+
+const seedToTorusPoint = (seed) => {
+  const digits = String(seed || '').replace(/\D/g, '');
+  // 체크섬이 맞지 않더라도 payload 9자리는 최대한 활용해 좌표를 복원한다.
+  const payload = digits.slice(0, 9).padEnd(9, '0');
+  return [
+    Number(payload.slice(0, 3)),
+    Number(payload.slice(3, 6)),
+    Number(payload.slice(6, 9))
+  ];
+};
+
+const torusAxisDistance = (a, b, size) => {
+  const raw = Math.abs(a - b);
+  return Math.min(raw, size - raw);
+};
+
+const calculateSeedCompatibilityPercent = (left, right) => {
+  if (!left || !right) return null;
+  const leftPoint = seedToTorusPoint(left.uniqueSeed);
+  const rightPoint = seedToTorusPoint(right.uniqueSeed);
+  const size = SEED_COMPATIBILITY.axisSize;
+  const axisDistances = leftPoint.map((coord, index) => torusAxisDistance(coord, rightPoint[index], size));
+  const distance = Math.hypot(...axisDistances);
+  const maxDistance = Math.sqrt(3 * (SEED_COMPATIBILITY.axisMid ** 2));
+  const normalized = Math.min(distance / maxDistance, 1);
+  const score = 100 * (1 - (normalized ** SEED_COMPATIBILITY.scorePower));
+  return Math.round(Math.max(0, Math.min(100, score)));
+};
 
 const pickRaceNameParts = (raceInfo, gender) => {
   const raceNames = namePools[raceInfo.key] || DEFAULT_NAME_POOLS[raceInfo.key];
@@ -177,46 +279,61 @@ const createNpcBase = (id, createSeed) => {
 };
 
 const canBeParent = (npc, child, minParentAgeGap) => npc.race === child.race && npc.age - child.age >= minParentAgeGap;
+const hasAcquiredTrait = (npc, traitId) => (npc?.traits?.acquiredTraitIds || []).includes(traitId);
+
+// 형제(이복 포함) 여부 판정:
+// - 아버지 또는 어머니 id가 하나라도 같으면 형제로 본다.
+const areSiblings = (left, right) => {
+  if (!left || !right) return false;
+  const leftLinks = left.familyLinks || {};
+  const rightLinks = right.familyLinks || {};
+  const shareFather = Boolean(leftLinks.fatherId && leftLinks.fatherId === rightLinks.fatherId);
+  const shareMother = Boolean(leftLinks.motherId && leftLinks.motherId === rightLinks.motherId);
+  return shareFather || shareMother;
+};
+
+const canBypassSiblingMarriageRestriction = (left, right) => (
+  hasAcquiredTrait(left, TRAIT_ID.INCEST_INCLINATION) || hasAcquiredTrait(right, TRAIT_ID.INCEST_INCLINATION)
+);
+const canBypassInterRaceMarriageRestriction = (left, right) => (
+  hasAcquiredTrait(left, TRAIT_ID.ANYTHING_GOES) || hasAcquiredTrait(right, TRAIT_ID.ANYTHING_GOES)
+);
 
 const canBeSpousePair = (left, right) => {
-  // 성인/동일 종족/서로 미혼/적당한 나이 차 조건을 기본으로 한다.
+  // 성인/서로 미혼/적당한 나이 차를 기본으로 하고, 일부 제약은 특성으로 예외 허용한다.
   if (!left || !right || left.id === right.id) return false;
-  if (left.race !== right.race) return false;
+  // 이종 혼인은 기본 금지지만, '가능충' 특성이 있으면 허용한다.
+  if (left.race !== right.race && !canBypassInterRaceMarriageRestriction(left, right)) return false;
   if (left.gender === right.gender) return false;
-  if (left.age < 18 || right.age < 18) return false;
+  if (!isAdult(left) || !isAdult(right)) return false;
   if (left.familyLinks.spouseId || right.familyLinks.spouseId) return false;
-  return Math.abs(left.age - right.age) <= 24;
+  // 형제(이복 포함) 혼인은 기본 금지지만, '근친 성향' 특성이 있으면 허용한다.
+  if (areSiblings(left, right) && !canBypassSiblingMarriageRestriction(left, right)) return false;
+  return Math.abs(left.age - right.age) <= SPOUSE_MAX_AGE_GAP;
 };
 
 const assignSpouseLinks = (list) => {
-  const byRace = new Map();
-  list.forEach((npc) => {
-    if (!byRace.has(npc.race)) byRace.set(npc.race, []);
-    byRace.get(npc.race).push(npc);
-  });
+  // 기본은 동성 매칭(남/여)이고, 인종 제약은 canBeSpousePair에서 특성 예외까지 함께 처리한다.
+  const males = list
+    .filter((npc) => npc.gender === '남성' && isAdult(npc))
+    .sort(() => Math.random() - 0.5);
+  const females = list
+    .filter((npc) => npc.gender === '여성' && isAdult(npc))
+    .sort(() => Math.random() - 0.5);
+  const availableFemaleIds = new Set(females.map((female) => female.id));
 
-  byRace.forEach((raceMembers) => {
-    const males = raceMembers
-      .filter((npc) => npc.gender === '남성' && npc.age >= 18)
-      .sort(() => Math.random() - 0.5);
-    const females = raceMembers
-      .filter((npc) => npc.gender === '여성' && npc.age >= 18)
-      .sort(() => Math.random() - 0.5);
-    const availableFemaleIds = new Set(females.map((female) => female.id));
-
-    males.forEach((male) => {
-      if (male.familyLinks.spouseId) return;
-      const partner = females.find((female) => availableFemaleIds.has(female.id) && canBeSpousePair(male, female));
-      if (!partner) return;
-      // 전체가 커플로 묶이지 않도록 확률 조건을 둔다.
-      if (Math.random() >= 0.58) return;
-      male.familyLinks.spouseId = partner.id;
-      partner.familyLinks.spouseId = male.id;
-      // 1:1 혼인 관계를 보장하기 위해 매칭된 여성은 후보군에서 제거한다.
-      availableFemaleIds.delete(partner.id);
-      // 예외 규칙: 여성은 결혼 후 배우자(남성)의 가문으로만 편입한다. (성씨는 유지)
-      partner.familyId = male.familyId;
-    });
+  males.forEach((male) => {
+    if (male.familyLinks.spouseId) return;
+    const partner = females.find((female) => availableFemaleIds.has(female.id) && canBeSpousePair(male, female));
+    if (!partner) return;
+    // 전체가 커플로 묶이지 않도록 확률 조건을 둔다.
+    if (Math.random() >= SPOUSE_MATCH_CHANCE) return;
+    male.familyLinks.spouseId = partner.id;
+    partner.familyLinks.spouseId = male.id;
+    // 1:1 혼인 관계를 보장하기 위해 매칭된 여성은 후보군에서 제거한다.
+    availableFemaleIds.delete(partner.id);
+    // 예외 규칙: 여성은 결혼 후 배우자(남성)의 가문으로만 편입한다. (성씨는 유지)
+    partner.familyId = male.familyId;
   });
 
   // 안전망: 데이터가 오염되더라도 spouseId는 반드시 상호 1:1 참조만 남긴다.
@@ -225,7 +342,9 @@ const assignSpouseLinks = (list) => {
     const spouseId = npc.familyLinks.spouseId;
     if (!spouseId) return;
     const spouse = byId.get(spouseId);
-    if (!spouse || spouse.familyLinks.spouseId !== npc.id) {
+    const blockedSiblingMarriage = areSiblings(npc, spouse) && !canBypassSiblingMarriageRestriction(npc, spouse);
+    const blockedInterRaceMarriage = spouse && npc.race !== spouse.race && !canBypassInterRaceMarriageRestriction(npc, spouse);
+    if (!spouse || spouse.familyLinks.spouseId !== npc.id || blockedSiblingMarriage || blockedInterRaceMarriage) {
       npc.familyLinks.spouseId = null;
     }
   });
@@ -233,7 +352,7 @@ const assignSpouseLinks = (list) => {
 
 const canBeAffairPair = (left, right) => {
   if (!left || !right || left.id === right.id) return false;
-  if (left.age < 18 || right.age < 18) return false;
+  if (!isAdult(left) || !isAdult(right)) return false;
   if (left.familyLinks.spouseId === right.id) return false;
   if ((left.familyLinks.affairPartnerIds || []).includes(right.id)) return false;
   if ((right.familyLinks.affairPartnerIds || []).includes(left.id)) return false;
@@ -242,8 +361,8 @@ const canBeAffairPair = (left, right) => {
 
 const hasAffairLimitBypassTrait = (npc) => {
   const acquiredTraitIds = npc?.traits?.acquiredTraitIds || [];
-  if (npc?.gender === '남성') return acquiredTraitIds.includes(311);
-  if (npc?.gender === '여성') return acquiredTraitIds.includes(312);
+  if (npc?.gender === '남성') return acquiredTraitIds.includes(TRAIT_ID.CASANOVA);
+  if (npc?.gender === '여성') return acquiredTraitIds.includes(TRAIT_ID.FEMME_FATALE);
   return false;
 };
 
@@ -251,18 +370,18 @@ const canAcceptMoreAffairs = (npc) => {
   const current = (npc?.familyLinks?.affairPartnerIds || []).length;
   // 카사노바/팜므파탈 보유자는 연문 인원 제한을 적용하지 않는다.
   if (hasAffairLimitBypassTrait(npc)) return true;
-  return current < 1;
+  return current < MAX_AFFAIRS_DEFAULT;
 };
 
 const assignAffairLinks = (list) => {
   // 기본은 낮은 확률/최대 1명, 특성 예외(카사노바/팜므파탈)만 다중 연문을 허용한다.
-  const adults = list.filter((npc) => npc.age >= 18);
+  const adults = list.filter((npc) => isAdult(npc));
   const byId = new Map(adults.map((npc) => [npc.id, npc]));
 
   adults.forEach((npc) => {
     const married = Boolean(npc.familyLinks.spouseId);
     if (!married || !canAcceptMoreAffairs(npc)) return;
-    if (Math.random() >= 0.08) return;
+    if (Math.random() >= AFFAIR_TRIGGER_CHANCE) return;
 
     const candidates = adults.filter((other) => canBeAffairPair(npc, other) && canAcceptMoreAffairs(other));
     if (candidates.length === 0) return;
@@ -272,7 +391,7 @@ const assignAffairLinks = (list) => {
     if (hasAffairLimitBypassTrait(npc)) {
       candidates.forEach((partner) => {
         if (!canAcceptMoreAffairs(partner) || !canBeAffairPair(npc, partner)) return;
-        if (Math.random() >= 0.22) return;
+        if (Math.random() >= AFFAIR_MULTI_CHANCE) return;
         npc.familyLinks.affairPartnerIds.push(partner.id);
         const partnerState = byId.get(partner.id);
         partnerState.familyLinks.affairPartnerIds.push(npc.id);
@@ -290,6 +409,7 @@ const assignAffairLinks = (list) => {
 
 const assignFamilyLinks = (list) => {
   const byRace = new Map();
+  const byId = new Map(list.map((npc) => [npc.id, npc]));
   list.forEach((npc) => {
     if (!byRace.has(npc.race)) byRace.set(npc.race, []);
     byRace.get(npc.race).push(npc);
@@ -316,6 +436,15 @@ const assignFamilyLinks = (list) => {
 
       // 부계 성씨/가문 우선 규칙:
       // 아버지 정보가 없으면 어머니 성씨로 강제 변경하지 않는다.
+      //
+      // 이종 혼인은 허용되더라도 자녀는 불가:
+      // - 현재 부모 후보를 child와 동일 종족으로만 뽑아서 자연스럽게 보장되지만,
+      //   안전하게 한 번 더 차단해 미래 규칙 변경에도 의도를 유지한다.
+      const father = byId.get(child.familyLinks.fatherId);
+      if (father && father.familyLinks.spouseId === mother.id && father.race !== mother.race) {
+        child.familyLinks.motherId = null;
+        mother.familyLinks.childrenIds = mother.familyLinks.childrenIds.filter((id) => id !== child.id);
+      }
     }
   });
 };
@@ -353,6 +482,66 @@ const rebuildIndexes = () => {
 };
 
 const findNpcById = (id) => npcIndexes.byId.get(id);
+
+const activateTab = (tabKey) => {
+  tabButtons.forEach((button) => {
+    button.classList.toggle('npc-tab--active', button.dataset.tabTarget === tabKey);
+  });
+  tabPanels.forEach((panel) => {
+    panel.classList.toggle('npc-tabpanel--active', panel.dataset.tabPanel === tabKey);
+  });
+};
+
+const setCompareSlot = (slot, npcId) => {
+  if (slot === 'left') compareSelection.leftId = npcId;
+  if (slot === 'right') compareSelection.rightId = npcId;
+  renderComparePreview();
+  syncCompareDialogSelection();
+};
+
+const getComparePair = () => {
+  const left = findNpcById(compareSelection.leftId);
+  const right = findNpcById(compareSelection.rightId);
+  return { left, right };
+};
+
+const renderComparePreview = () => {
+  const { left, right } = getComparePair();
+  if (!left || !right) {
+    comparePreviewPair.textContent = '선택된 비교 대상이 없습니다.';
+    comparePreviewBar.style.width = '0%';
+    comparePreviewScore.textContent = '점수: 없음';
+    return;
+  }
+  const score = calculateSeedCompatibilityPercent(left, right);
+  comparePreviewPair.textContent = `${displayNpcName(left)} ↔ ${displayNpcName(right)}`;
+  comparePreviewBar.style.width = `${score}%`;
+  comparePreviewScore.textContent = `점수: ${score}%`;
+};
+
+const populateCompareSelectOptions = () => {
+  const optionsHtml = npcList
+    .map((npc) => `<option value="${npc.id}">${displayNpcName(npc)} · ${npc.race} · ${npc.age}세</option>`)
+    .join('');
+  compareNpcASelect.innerHTML = `<option value="">선택 안함</option>${optionsHtml}`;
+  compareNpcBSelect.innerHTML = `<option value="">선택 안함</option>${optionsHtml}`;
+};
+
+const syncCompareDialogSelection = () => {
+  compareNpcASelect.value = compareSelection.leftId ? String(compareSelection.leftId) : '';
+  compareNpcBSelect.value = compareSelection.rightId ? String(compareSelection.rightId) : '';
+  const { left, right } = getComparePair();
+  if (!left || !right) {
+    compareDialogBar.style.width = '0%';
+    compareDialogScore.textContent = '점수: 없음';
+    compareDialogMeta.textContent = '두 NPC를 선택하면 속궁합 비교 결과가 표시됩니다.';
+    return;
+  }
+  const score = calculateSeedCompatibilityPercent(left, right);
+  compareDialogBar.style.width = `${score}%`;
+  compareDialogScore.textContent = `점수: ${score}%`;
+  compareDialogMeta.textContent = `${displayNpcName(left)} ↔ ${displayNpcName(right)} · 시드 토러스 거리 기반`;
+};
 
 const createContextItem = (npcId) => {
   const npc = findNpcById(npcId);
@@ -523,11 +712,16 @@ const openNpcDialog = (npc) => {
   renderRadarChart(npc.stats);
 
   const detailRows = [
-    ['고유 시드', npc.uniqueSeed],
+    ['고유 시드', `${npc.uniqueSeed}${isSeedChecksumValid(npc.uniqueSeed) ? '' : ' (체크섬 경고)'}`],
     ['배우 ID', npc.actorId],
     ['종족', createObjectButton(npc.race, () => renderContextPanel(`종족: ${npc.race}`, npcIndexes.byRace.get(npc.race) || []))],
     ['가문', createObjectButton(familyName, () => renderContextPanel(`가문: ${familyName}`, npcIndexes.byFamily.get(npc.familyId) || []))],
     ['배우자', npc.familyLinks.spouseId ? createRelativeListFragment([npc.familyLinks.spouseId]) : '없음'],
+    ['속궁합(시드 기반)', (() => {
+      const spouse = npc.familyLinks.spouseId ? findNpcById(npc.familyLinks.spouseId) : null;
+      const percent = calculateSeedCompatibilityPercent(npc, spouse);
+      return percent == null ? '없음' : `${percent}%`;
+    })()],
     ['연문 관계', createRelativeListFragment(npc.familyLinks.affairPartnerIds || [])],
     ['아버지', npc.familyLinks.fatherId ? createRelativeListFragment([npc.familyLinks.fatherId]) : '없음'],
     ['어머니', npc.familyLinks.motherId ? createRelativeListFragment([npc.familyLinks.motherId]) : '없음'],
@@ -537,7 +731,8 @@ const openNpcDialog = (npc) => {
       const acquiredTraitIds = npc.traits.acquiredTraitIds || [];
       acquiredTraitIds.forEach((traitId, index) => {
         const traitName = traitNameOf(traitId);
-        frag.append(createObjectButton(traitName, () => renderContextPanel(`특성: ${traitName}`, npcIndexes.byTrait.get(traitId) || [])));
+        const traitMetaReview = traitMetaReviewOf(traitId);
+        frag.append(createObjectButton(`${traitName} · ${traitMetaReview}`, () => renderContextPanel(`특성: ${traitName}`, npcIndexes.byTrait.get(traitId) || [])));
         if (index < acquiredTraitIds.length - 1) frag.append(document.createTextNode(' '));
       });
       return frag;
@@ -594,7 +789,32 @@ const renderNpcList = () => {
       const affairs = (npc.familyLinks.affairPartnerIds || []).length;
       relation.textContent = `배우자 ${spouse} / 연문 ${affairs} / 부모 연결 ${parents} / 자녀 ${children}`;
 
-      card.append(nameButton, meta, relation);
+      const actionRow = document.createElement('div');
+      actionRow.className = 'npc-item__actions';
+
+      const compareLeft = document.createElement('button');
+      compareLeft.type = 'button';
+      compareLeft.className = 'npc-item__mini';
+      compareLeft.textContent = '비교 A 지정';
+      compareLeft.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setCompareSlot('left', npc.id);
+        activateTab('compare');
+      });
+
+      const compareRight = document.createElement('button');
+      compareRight.type = 'button';
+      compareRight.className = 'npc-item__mini';
+      compareRight.textContent = '비교 B 지정';
+      compareRight.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setCompareSlot('right', npc.id);
+        activateTab('compare');
+      });
+
+      actionRow.append(compareLeft, compareRight);
+
+      card.append(nameButton, meta, relation, actionRow);
       card.addEventListener('click', () => openNpcDialog(npc));
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -611,12 +831,16 @@ const renderNpcList = () => {
 const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
   npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1, createSeed));
+  // 가족(부모/자녀) 링크를 먼저 구성한 뒤 배우자 매칭을 해야 형제 혼인을 예방할 수 있다.
+  assignFamilyLinks(npcList);
   assignSpouseLinks(npcList);
   assignAffairLinks(npcList);
-  assignFamilyLinks(npcList);
   rebuildIndexes();
   buildSummary();
   renderNpcList();
+  populateCompareSelectOptions();
+  syncCompareDialogSelection();
+  renderComparePreview();
 };
 
 const bindEvents = () => {
@@ -630,6 +854,27 @@ const bindEvents = () => {
   sortByNameButton.addEventListener('click', () => {
     npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR'));
     renderNpcList();
+  });
+
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => activateTab(button.dataset.tabTarget));
+  });
+
+  openCompareDialogButton.addEventListener('click', () => {
+    syncCompareDialogSelection();
+    if (!npcCompareDialog.open) npcCompareDialog.showModal();
+  });
+
+  compareNpcASelect.addEventListener('change', () => {
+    compareSelection.leftId = compareNpcASelect.value ? Number(compareNpcASelect.value) : null;
+    syncCompareDialogSelection();
+    renderComparePreview();
+  });
+
+  compareNpcBSelect.addEventListener('change', () => {
+    compareSelection.rightId = compareNpcBSelect.value ? Number(compareNpcBSelect.value) : null;
+    syncCompareDialogSelection();
+    renderComparePreview();
   });
 };
 
@@ -657,6 +902,7 @@ const bootstrap = async () => {
   await loadNamePools();
   regenerateNpcList();
   bindEvents();
+  activateTab('summary');
 };
 
 bootstrap();

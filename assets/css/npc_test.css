@@ -101,6 +101,34 @@ body {
   gap: 10px;
 }
 
+.npc-tabbar {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.npc-tab {
+  min-height: 36px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  background: rgba(37, 52, 96, 0.65);
+}
+
+.npc-tab--active {
+  border-color: rgba(174, 226, 255, 0.95);
+  background: linear-gradient(135deg, rgba(52, 89, 176, 0.95), rgba(37, 65, 132, 0.95));
+}
+
+.npc-tabpanel {
+  display: none;
+  animation: npcPanelFade 220ms ease;
+}
+
+.npc-tabpanel--active {
+  display: block;
+}
+
 button {
   border-radius: 12px;
   border: 1px solid rgba(156, 185, 255, 0.5);
@@ -194,6 +222,53 @@ button:hover {
   opacity: 0.8;
 }
 
+.npc-compare-preview {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(17, 31, 67, 0.48);
+  border: 1px solid rgba(146, 170, 240, 0.28);
+}
+
+.npc-compare-preview h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.npc-compare-preview__pair {
+  margin: 10px 0 8px;
+  font-size: 0.86rem;
+  color: rgba(224, 237, 255, 0.94);
+}
+
+.npc-compare-preview__meter {
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(151, 173, 245, 0.55);
+  background: rgba(26, 38, 77, 0.78);
+  overflow: hidden;
+}
+
+.npc-compare-preview__meter--large {
+  margin-top: 14px;
+  height: 16px;
+}
+
+.npc-compare-preview__bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #42b7ff, #46ffe0);
+  box-shadow: 0 0 14px rgba(92, 239, 255, 0.52);
+  transition: width 260ms ease;
+}
+
+.npc-compare-preview__score {
+  margin: 8px 0 0;
+  font-weight: 700;
+  color: rgba(187, 255, 243, 0.95);
+}
+
 .npc-list {
   margin: 14px 0 0;
   padding: 0;
@@ -256,6 +331,19 @@ button:hover {
   margin-top: 8px;
   font-size: 0.79rem;
   color: rgba(167, 251, 255, 0.88);
+}
+
+.npc-item__actions {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.npc-item__mini {
+  min-height: 30px;
+  font-size: 0.72rem;
+  border-radius: 9px;
 }
 
 .npc-dialog {
@@ -359,6 +447,28 @@ button:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.npc-compare-dialog__inputs {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.npc-compare-dialog__inputs label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.npc-compare-dialog__inputs select {
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(149, 182, 255, 0.4);
+  background: rgba(21, 34, 69, 0.8);
+  color: #eaf2ff;
+  padding: 0 10px;
+}
+
 .npc-dialog__row {
   margin: 0;
   padding: 10px;
@@ -417,6 +527,17 @@ button:hover {
   }
 }
 
+@keyframes npcPanelFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 980px) {
   .npc-dashboard {
     grid-template-columns: 1fr;
@@ -428,6 +549,10 @@ button:hover {
   }
 
   .npc-dialog__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .npc-compare-dialog__inputs {
     grid-template-columns: 1fr;
   }
 }

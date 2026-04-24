@@ -12,9 +12,9 @@
 
   <main class="npc-test">
     <header class="npc-test__header">
-      <p class="npc-test__version" id="npcVersion">ver.0.2.69(260424-객체클릭컨텍스트패널확장)</p>
+      <p class="npc-test__version" id="npcVersion">ver.0.2.83(260424-npc테스트ui전면리뉴얼)</p>
       <h1>NPC 랜덤 생성 & 관계망 테스트</h1>
-      <p>100명의 NPC를 즉시 생성하고, 리스트 클릭으로 상세 정보를 팝업에서 확인할 수 있습니다.</p>
+      <p>탭/팝업 기반의 리뉴얼 UI에서 NPC 전체 정보를 탐색하고, 캐릭터 간 속궁합 비교까지 바로 확인할 수 있습니다.</p>
     </header>
 
     <section class="npc-dashboard" aria-label="NPC 랜덤 테스트 패널">
@@ -26,20 +26,43 @@
           <button id="generateNpcList" type="button">🎲 NPC 100명 다시 생성</button>
           <button id="sortByAge" type="button">나이순 정렬</button>
           <button id="sortByName" type="button">이름순 정렬</button>
+          <button id="openCompareDialog" type="button">🧪 속궁합 비교 팝업</button>
         </div>
 
-        <section class="npc-summary" id="npcSummary" aria-live="polite"></section>
+        <nav class="npc-tabbar" aria-label="사이드 패널 탭">
+          <button type="button" class="npc-tab npc-tab--active" data-tab-target="summary">요약</button>
+          <button type="button" class="npc-tab" data-tab-target="context">컨텍스트</button>
+          <button type="button" class="npc-tab" data-tab-target="compare">비교 프리뷰</button>
+        </nav>
 
-        <section class="npc-context" id="npcObjectContext" aria-live="polite">
-          <h3>객체 컨텍스트</h3>
-          <p class="npc-context__hint">이름/종족/가문/특성을 누르면 관련 NPC가 여기에 표시됩니다.</p>
-          <ul id="npcContextList" class="npc-context__list"></ul>
+        <section class="npc-tabpanel npc-tabpanel--active" data-tab-panel="summary">
+          <section class="npc-summary" id="npcSummary" aria-live="polite"></section>
+        </section>
+
+        <section class="npc-tabpanel" data-tab-panel="context">
+          <section class="npc-context" id="npcObjectContext" aria-live="polite">
+            <h3>객체 컨텍스트</h3>
+            <p class="npc-context__hint">이름/종족/가문/특성을 누르면 관련 NPC가 여기에 표시됩니다.</p>
+            <ul id="npcContextList" class="npc-context__list"></ul>
+          </section>
+        </section>
+
+        <section class="npc-tabpanel" data-tab-panel="compare">
+          <section class="npc-compare-preview">
+            <h3>속궁합 비교 프리뷰</h3>
+            <p class="npc-context__hint">NPC 카드의 “비교 A/B 지정” 또는 비교 팝업에서 대상을 선택하세요.</p>
+            <p id="comparePreviewPair" class="npc-compare-preview__pair">선택된 비교 대상이 없습니다.</p>
+            <div class="npc-compare-preview__meter">
+              <div id="comparePreviewBar" class="npc-compare-preview__bar"></div>
+            </div>
+            <p id="comparePreviewScore" class="npc-compare-preview__score">점수: 없음</p>
+          </section>
         </section>
       </article>
 
       <article class="npc-panel npc-panel--list">
         <h2>NPC 리스트</h2>
-        <p class="npc-panel__hint">카드를 누르면 상세 팝업이 열립니다.</p>
+        <p class="npc-panel__hint">카드를 누르면 상세 팝업, 비교 버튼으로 A/B 슬롯 지정이 가능합니다.</p>
         <ul id="npcList" class="npc-list" aria-label="NPC 카드 리스트"></ul>
       </article>
     </section>
@@ -62,15 +85,29 @@
     </section>
   </dialog>
 
-  <!-- NPC 상세 정보 팝업 -->
-  <dialog id="npcDetailDialog" class="npc-dialog" aria-label="NPC 상세 정보">
+  <!-- 속궁합 비교 팝업 -->
+  <dialog id="npcCompareDialog" class="npc-dialog npc-dialog--compare" aria-label="NPC 속궁합 비교">
     <form method="dialog" class="npc-dialog__backdrop-action">
       <button class="npc-dialog__close" aria-label="닫기">×</button>
     </form>
     <section class="npc-dialog__content">
-      <h3 id="dialogNpcName">NPC 이름</h3>
-      <p id="dialogNpcMeta" class="npc-dialog__meta"></p>
-      <div id="dialogNpcDetail" class="npc-dialog__grid"></div>
+      <h3>NPC 속궁합 비교</h3>
+      <p class="npc-dialog__meta">두 NPC를 고르면 시드 토러스 거리 기반 속궁합 점수를 계산합니다.</p>
+
+      <div class="npc-compare-dialog__inputs">
+        <label>비교 A
+          <select id="compareNpcA"></select>
+        </label>
+        <label>비교 B
+          <select id="compareNpcB"></select>
+        </label>
+      </div>
+
+      <div class="npc-compare-preview__meter npc-compare-preview__meter--large">
+        <div id="compareDialogBar" class="npc-compare-preview__bar"></div>
+      </div>
+      <p id="compareDialogScore" class="npc-compare-preview__score">점수: 없음</p>
+      <p id="compareDialogMeta" class="npc-context__hint"></p>
     </section>
   </dialog>
 

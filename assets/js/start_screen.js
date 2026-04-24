@@ -62,14 +62,15 @@ const bootstrapPersistentStorage = () => {
 
   // 샘플 캐릭터 빌더
   // - 고정 규칙: ID 0=아스테리아, ID 1=플레이어(순례자)
-  // - family가 없는 캐릭터는 family=null, surname=''를 사용한다.
-  // - 혈연 관계는 parent/children id 참조로 저장한다.
+  // - family가 없는 캐릭터는 familyId/family=null, surname=''를 사용한다.
+  // - 가족 관계는 parent/spouse/children id 참조로 저장한다.
   const buildSampleCharacters = () => ({
     pilgrim_pc: {
       id: 1,
       actorId: 'pilgrim_pc',
       uniqueSeed: '1000000001',
       role: 'pc',
+      familyId: null,
       family: null,
       givenName: '순례자',
       surname: '',
@@ -79,11 +80,11 @@ const bootstrapPersistentStorage = () => {
       heightCm: 175,
       weightKg: 68,
       race: '인간',
-      raceInheritanceRule: '부모 종족 계승',
       familyLinks: {
         // 부모가 미확정일 때는 null
         fatherId: null,
         motherId: null,
+        spouseId: null,
         // 자식은 캐릭터 id 배열로 관리
         childrenIds: []
       },
@@ -129,6 +130,7 @@ const bootstrapPersistentStorage = () => {
       actorId: 'asteria_npc',
       uniqueSeed: '1000000000',
       role: 'npc',
+      familyId: null,
       family: null,
       givenName: '아스테리아',
       surname: '',
@@ -138,10 +140,10 @@ const bootstrapPersistentStorage = () => {
       heightCm: 178,
       weightKg: 0,
       race: '신성체',
-      raceInheritanceRule: '부모 종족 계승',
       familyLinks: {
         fatherId: null,
         motherId: null,
+        spouseId: null,
         childrenIds: []
       },
       traits: {

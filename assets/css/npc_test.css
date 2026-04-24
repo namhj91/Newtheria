@@ -66,14 +66,10 @@ body {
 }
 
 .nexus-shell { width: min(1420px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 30px; }
-.nexus-header { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; padding: 18px; }
+.nexus-header { padding: 18px; }
 .headline h1 { margin: 8px 0 6px; }
 .headline p { margin: 0; color: #d4e2ff; }
 .version-tag { margin: 0; font-size: 0.82rem; color: #bae8ff; }
-
-.header-deck { min-height: 176px; }
-.header-deck.card-fan { --fan-gap: 86; --fan-tilt: 10; }
-.header-deck .card-fan-card { left: 50%; margin-left: calc(var(--card-w) / -2); }
 
 .layout-grid { display: grid; grid-template-columns: 150px 1fr; gap: 12px; margin-top: 14px; }
 .left-panel { display: grid; gap: 10px; align-content: start; padding: 12px; }
@@ -121,25 +117,33 @@ body {
   margin-top: 12px;
   border-radius: 20px;
   min-height: 70vh;
-  overflow: hidden;
-  position: relative;
+  overflow: auto;
+  position: static;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
   background: radial-gradient(circle at 50% 130%, rgba(54, 88, 166, .62), rgba(8, 13, 31, .48));
-  touch-action: auto;
-  cursor: grab;
 }
-.npc-gallery.is-spinning .npc-wheel { animation: orbitSpin .85s ease; }
-.npc-gallery.is-dragging { cursor: grabbing; }
-.npc-wheel {
-  position: absolute;
-  width: min(130vmin, 1280px);
-  height: min(130vmin, 1280px);
-  left: 50%;
-  top: 118%;
-  transform: translate(-50%, -50%);
+.npc-list-card {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: left;
+  color: var(--text);
+  background: rgba(22, 35, 72, .88);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
 }
-.npc-gallery .card-fan-card { --card-w: clamp(136px, 14vw, 178px); --card-ratio: 1/1.45; left: 50%; top: 50%; }
-.npc-gallery .card-fan-card .card-fan-card-face { border: 0; background: rgba(22, 35, 72, .9); backdrop-filter: blur(10px); }
-.npc-gallery .card-fan-card .card-fan-card-inner::after { display: none; }
+.npc-list-card:hover { background: rgba(38, 58, 108, .9); }
+.npc-list-card b { font-size: 1rem; }
+.npc-list-card span,
+.npc-list-card small { color: #cbdaf8; }
+.npc-empty {
+  margin: 8px 4px;
+  grid-column: 1 / -1;
+}
 
 .chemistry-grid { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .chem-card { border-radius: 14px; padding: 12px; background: rgba(24, 38, 73, 0.66); }
@@ -249,10 +253,8 @@ body {
 @keyframes skyDrift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-52px, -34px, 0); } }
 @keyframes twinkle { 0%, 100% { opacity: .48; } 50% { opacity: .84; } }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes orbitSpin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 
 @media (max-width: 1080px) {
-  .nexus-header { grid-template-columns: 1fr; }
   .layout-grid { grid-template-columns: 1fr; }
   .left-panel { grid-template-columns: repeat(3, 1fr); }
   .chemistry-grid { grid-template-columns: 1fr; }

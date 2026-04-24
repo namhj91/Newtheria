@@ -11,7 +11,6 @@ const MAX_AFFAIRS_DEFAULT = 1;
 const TRAIT_ID = { CASANOVA: 311, FEMME_FATALE: 312, INCEST_INCLINATION: 313, ANYTHING_GOES: 314 };
 const SEED_COMPATIBILITY = { axisSize: 1000, axisMid: 500, scorePower: 1.2 };
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
-const NPC_VISIBLE_MAX = 10;
 
 const RACE_POOL = [
   { name: '인간', key: 'human', adultAge: 18, elderAge: 60, maxAge: 85 },
@@ -66,7 +65,6 @@ const compatLabel = $('compatLabel');
 const compatMeta = $('compatMeta');
 const topPairs = $('topPairs');
 const familyBoard = $('familyBoard');
-const mainActionDeck = $('mainActionDeck');
 const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
@@ -90,17 +88,9 @@ let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
 let profileTab = 'identity';
-let actionDeckBehavior = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
-let galaxyDialCursor = 0;
-let galaxyDialVelocity = 0;
-let galaxyInertiaFrame = null;
-let galaxyCardBehavior = null;
-let galleryRenderState = { wheel: null, cards: [], filtered: [], visible: [], baseIndex: -1, cardApi: null };
-let isGalaxyDragging = false;
-let galaxyDragLastX = 0;
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
@@ -109,7 +99,6 @@ const traitNameOf = (traitId) => TRAIT_BY_ID.get(traitId)?.name || `미정특성
 const traitMetaReviewOf = (traitId) => TRAIT_META_REVIEW_BY_ID.get(traitId) || '특성 메타 한줄평 미정';
 const isAdult = (npc) => (npc?.age || 0) >= ADULT_AGE;
 const hasAcquiredTrait = (npc, traitId) => (npc?.traits?.acquiredTraitIds || []).includes(traitId);
-const normalizeLoopIndex = (value, length) => ((value % length) + length) % length;
 
 const computeSeedChecksum = (payload) => payload.split('').reduce((acc, digit) => acc + Number(digit), 0) % 10;
 const attachSeedChecksum = (payload) => `${payload}${computeSeedChecksum(payload)}`;
@@ -491,97 +480,29 @@ const renderOverviewMetrics = () => {
 };
 
 const renderNpcGalaxy = () => {
-  const cardApi = window.NewtheriaCardTemplates;
-  if (!cardApi) return;
-
   const filtered = npcList.filter(matchesFilter);
-  const wheel = document.createElement('div');
-  wheel.className = 'npc-wheel';
-  npcGalaxy.replaceChildren(wheel);
-  galaxyDialCursor = filtered.length > 0 ? normalizeLoopIndex(galaxyDialCursor, filtered.length) : 0;
-  galaxyDialVelocity = 0;
-  galaxyCardBehavior?.destroy?.();
-  galaxyCardBehavior = null;
-  galleryRenderState = { wheel, cards: [], filtered, visible: [], baseIndex: -1, cardApi };
-  layoutNpcGalaxyArc();
-};
-
-const layoutNpcGalaxyArc = () => {
-  const { wheel, filtered, cardApi } = galleryRenderState;
-  if (!wheel || !cardApi || filtered.length === 0) {
-    if (wheel) wheel.replaceChildren();
+  // 사용자 요청 반영: NPC 관측 카드도 팬카드 템플릿 대신 일반 목록 카드로 렌더링.
+  if (filtered.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'muted npc-empty';
+    empty.textContent = '검색 조건에 맞는 NPC가 없습니다.';
+    npcGalaxy.replaceChildren(empty);
     return;
   }
 
-  // 요청사항 반영: 다이얼을 돌려도 10장을 유지하며, 계속 다음 카드로 순환한다.
-  const cursor = normalizeLoopIndex(galaxyDialCursor, filtered.length);
-  const baseIndex = Math.floor(cursor);
-  const fraction = cursor - baseIndex;
-  const visibleCount = Math.min(NPC_VISIBLE_MAX, filtered.length);
-  const needRerender = baseIndex !== galleryRenderState.baseIndex || galleryRenderState.cards.length !== visibleCount;
-
-  if (needRerender) {
-    const visible = Array.from({ length: visibleCount }, (_, slot) => filtered[(baseIndex + slot) % filtered.length]);
-    const cards = cardApi.renderCardFanCards(
-      wheel,
-      visible.map((npc) => ({
-        route: String(npc.id),
-        icon: npc.gender === '남성' ? '♂' : '♀',
-        label: displayNpcName(npc),
-        desc: `${npc.race} · ${npc.age}세 · ${getFamilyName(npc)}\n특성 ${(npc.traits.acquiredTraitIds || []).length}개`
-      }))
-    );
-
-    // 카드 상호작용은 템플릿 기본 동작(꾹클릭/드래그/호버)을 그대로 상속한다.
-    galaxyCardBehavior?.destroy?.();
-    galaxyCardBehavior = cardApi.createCardFanBehavior({ menu: wheel, cards });
-    galaxyCardBehavior.bindInteractions({
-      onCardSelected: (card) => {
-        const npc = findNpcById(Number(card.dataset.route));
-        if (npc) openNpcProfile(npc);
-      }
-    });
-
-    galleryRenderState.cards = cards;
-    galleryRenderState.visible = visible;
-    galleryRenderState.baseIndex = baseIndex;
-  }
-
-  const cards = galleryRenderState.cards;
-  const total = Math.max(cards.length, 1);
-  const startDeg = 210;
-  const endDeg = 330;
-  const slotDeg = total > 1 ? (endDeg - startDeg) / (total - 1) : 0;
-  const fractionShiftDeg = fraction * slotDeg;
-  const radius = Math.min(wheel.clientWidth, wheel.clientHeight) * 0.42;
-  cards.forEach((card, index) => {
-    const t = total === 1 ? 0.5 : index / (total - 1);
-    const deg = startDeg + ((endDeg - startDeg) * t) - fractionShiftDeg;
-    const rad = (deg * Math.PI) / 180;
-    const tx = Math.cos(rad) * radius;
-    const ty = Math.sin(rad) * radius;
-    card.style.setProperty('--tx', `${tx}px`);
-    card.style.setProperty('--ty', `${ty}px`);
-    card.style.setProperty('--rot', `${deg + 90}deg`);
-    card.dataset.baseTransform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
-    card.style.transform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
-    card.style.zIndex = String(200 + index);
+  const cards = filtered.map((npc) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'npc-list-card';
+    card.innerHTML = `
+      <b>${displayNpcName(npc)}</b>
+      <span>${npc.race} · ${npc.age}세 · ${npc.gender}</span>
+      <small>${getFamilyName(npc)} · 특성 ${(npc.traits.acquiredTraitIds || []).length}개</small>
+    `;
+    card.addEventListener('click', () => openNpcProfile(npc));
+    return card;
   });
-};
-
-const runGalaxyInertia = () => {
-  if (galaxyInertiaFrame) return;
-  const tick = () => {
-    galaxyDialCursor += galaxyDialVelocity;
-    galaxyDialVelocity *= 0.94;
-    layoutNpcGalaxyArc();
-    if (Math.abs(galaxyDialVelocity) < 0.00012 || npcList.length === 0) {
-      galaxyInertiaFrame = null;
-      return;
-    }
-    galaxyInertiaFrame = window.requestAnimationFrame(tick);
-  };
-  galaxyInertiaFrame = window.requestAnimationFrame(tick);
+  npcGalaxy.replaceChildren(...cards);
 };
 
 const renderTopCompatibilityPairs = () => {
@@ -671,32 +592,6 @@ const regenerateNpcList = () => {
   syncCompatibilityPanel();
 };
 
-const initMainActionDeck = () => {
-  const api = window.NewtheriaCardTemplates;
-  if (!api || !mainActionDeck) return;
-
-  const cards = api.renderCardFanCards(mainActionDeck, [
-    { route: 'reroll', icon: '🎲', label: '월드 리롤', desc: 'NPC 월드 재생성' },
-    { route: 'age', icon: '📈', label: '나이순', desc: '최고령 우선 정렬' },
-    { route: 'name', icon: '🔤', label: '이름순', desc: '한글 로케일 정렬' },
-    { route: 'chem', icon: '💞', label: '속궁합 이동', desc: '매트릭스 탭 열기' }
-  ]);
-
-  actionDeckBehavior?.destroy?.();
-  actionDeckBehavior = api.createCardFanBehavior({ menu: mainActionDeck, cards });
-  actionDeckBehavior.layoutCards();
-  actionDeckBehavior.bindInteractions({
-    onCardSelected: (card) => {
-      const route = card?.dataset?.route;
-      if (route === 'reroll') regenerateNpcList();
-      if (route === 'age') { npcList.sort((a, b) => b.age - a.age); renderNpcGalaxy(); }
-      if (route === 'name') { npcList.sort((a, b) => displayNpcName(a).localeCompare(displayNpcName(b), 'ko-KR')); renderNpcGalaxy(); }
-      if (route === 'chem') activateScreen('chemistry');
-      api.setActiveCard(cards, card);
-    }
-  });
-};
-
 const isValidRaceNamePool = (pool) => pool && Array.isArray(pool.male) && pool.male.length > 0 && Array.isArray(pool.female) && pool.female.length > 0 && Array.isArray(pool.surnames) && pool.surnames.length > 0;
 const loadNamePools = async () => {
   try {
@@ -724,11 +619,8 @@ const bindEvents = () => {
     if (!query) return;
     const match = npcList.find((npc) => displayNpcName(npc).toLowerCase().includes(query));
     if (!match) return;
-    npcGalaxy.classList.add('is-spinning');
-    setTimeout(() => {
-      npcGalaxy.classList.remove('is-spinning');
-      openNpcProfile(match);
-    }, 820);
+    // 사용자 요청 반영: 팬카드 회전 연출 없이 즉시 상세를 연다.
+    openNpcProfile(match);
   });
 
   raceFilter.addEventListener('change', () => {
@@ -762,58 +654,12 @@ const bindEvents = () => {
     });
   });
 
-  // 사용자 요청 반영: 호 카드를 다이얼처럼 드래그/휠로 회전.
-  npcGalaxy.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    galaxyDialVelocity += event.deltaY * 0.00024;
-    galaxyDialCursor += event.deltaY * 0.0024;
-    layoutNpcGalaxyArc();
-    runGalaxyInertia();
-  }, { passive: false });
-
-  npcGalaxy.addEventListener('pointerdown', (event) => {
-    // 카드 자체의 기본 드래그/꾹클릭은 템플릿 이벤트로 처리되도록 방해하지 않는다.
-    if (event.target.closest('.card-fan-card')) return;
-    if (galaxyInertiaFrame) {
-      window.cancelAnimationFrame(galaxyInertiaFrame);
-      galaxyInertiaFrame = null;
-    }
-    isGalaxyDragging = true;
-    galaxyDragLastX = event.clientX;
-    galaxyDialVelocity = 0;
-    npcGalaxy.classList.add('is-dragging');
-    npcGalaxy.setPointerCapture(event.pointerId);
-  });
-
-  npcGalaxy.addEventListener('pointermove', (event) => {
-    if (!isGalaxyDragging) return;
-    const dx = event.clientX - galaxyDragLastX;
-    galaxyDragLastX = event.clientX;
-    const cursorDelta = dx * -0.018;
-    galaxyDialCursor += cursorDelta;
-    galaxyDialVelocity = cursorDelta;
-    layoutNpcGalaxyArc();
-  });
-
-  npcGalaxy.addEventListener('pointerup', (event) => {
-    if (!isGalaxyDragging) return;
-    isGalaxyDragging = false;
-    npcGalaxy.classList.remove('is-dragging');
-    npcGalaxy.releasePointerCapture(event.pointerId);
-    runGalaxyInertia();
-  });
-
-  npcGalaxy.addEventListener('pointercancel', () => {
-    isGalaxyDragging = false;
-    npcGalaxy.classList.remove('is-dragging');
-  });
-
-  window.addEventListener('resize', () => layoutNpcGalaxyArc());
+  // 사용자 요청 반영: 팬카드 회전 인터랙션은 제거되어 별도 포인터/휠 이벤트를 바인딩하지 않는다.
 };
 
 const bootstrap = async () => {
   await loadNamePools();
-  initMainActionDeck();
+  // 사용자 요청 반영: 상단 NPC 팬카드 UI를 제거하고 핵심 기능만 유지.
   bindEvents();
   regenerateNpcList();
   activateScreen('observatory');

@@ -11,6 +11,7 @@ const MAX_AFFAIRS_DEFAULT = 1;
 const TRAIT_ID = { CASANOVA: 311, FEMME_FATALE: 312, INCEST_INCLINATION: 313, ANYTHING_GOES: 314 };
 const SEED_COMPATIBILITY = { axisSize: 1000, axisMid: 500, scorePower: 1.2 };
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
+const NPC_FAN_VISIBLE_MAX = 42;
 
 const RACE_POOL = [
   { name: '인간', key: 'human', adultAge: 18, elderAge: 60, maxAge: 85 },
@@ -530,91 +531,44 @@ const matchesFilter = (npc) => {
 };
 
 const renderNpcGalaxy = () => {
+  const cardApi = window.NewtheriaCardTemplates;
+  if (!cardApi) return;
+
   const filtered = npcList.filter(matchesFilter);
-  const orbit = document.createElement('div');
-  orbit.className = 'npc-orbit';
+  const displayList = filtered.slice(0, NPC_FAN_VISIBLE_MAX);
+  const fan = document.createElement('div');
+  fan.className = 'npc-observatory-fan';
+  npcGalaxy.replaceChildren(fan);
 
-  const center = { x: 0, y: 0 };
-  const orbitRadius = Math.max(210, 250 + (filtered.length * 0.45));
+  // 카드 템플릿을 그대로 사용해 관측소 인물 카드를 구성한다.
+  const cards = cardApi.renderCardFanCards(
+    fan,
+    displayList.map((npc) => ({
+      route: String(npc.id),
+      icon: npc.gender === '남성' ? '♂' : '♀',
+      label: displayNpcName(npc),
+      desc: `${npc.race} · ${npc.age}세 · ${getFamilyName(npc)}\n자녀 ${(npc.familyLinks.childrenIds || []).length}`
+    }))
+  );
 
-  orbit.replaceChildren(...filtered.map((npc, index) => {
-    const card = document.createElement('article');
-    card.className = 'npc-star-card';
-    card.tabIndex = 0;
-    card.role = 'button';
-
-    // 원형 팬 배치: 카드들을 큰 원 둘레에 배치한다.
-    const angle = ((Math.PI * 2) / Math.max(filtered.length, 1)) * index;
-    const x = center.x + Math.cos(angle) * orbitRadius;
-    const y = center.y + Math.sin(angle) * orbitRadius;
-    card.style.transform = `translate(${x}px, ${y}px)`;
-
-    const title = document.createElement('h3');
-    title.textContent = displayNpcName(npc);
-    const meta = document.createElement('p');
-    meta.textContent = `#${npc.id} · ${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
-    const relation = document.createElement('p');
-    relation.textContent = `배우자 ${npc.familyLinks.spouseId ? 1 : 0} / 연문 ${(npc.familyLinks.affairPartnerIds || []).length} / 자녀 ${(npc.familyLinks.childrenIds || []).length}`;
-
-    const row = document.createElement('div');
-    row.className = 'inline-actions';
-
-    const compareABtn = document.createElement('span');
-    compareABtn.className = 'inline-entity';
-    compareABtn.textContent = '비교A';
-    compareABtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      selectedA = npc.id;
-      compareNpcA.value = String(npc.id);
-      activateScreen('chemistry');
-      syncCompatibilityPanel();
-    });
-
-    const compareBBtn = document.createElement('span');
-    compareBBtn.className = 'inline-entity';
-    compareBBtn.textContent = '비교B';
-    compareBBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      selectedB = npc.id;
-      compareNpcB.value = String(npc.id);
-      activateScreen('chemistry');
-      syncCompatibilityPanel();
-    });
-
-    const treeBtn = document.createElement('span');
-    treeBtn.className = 'inline-entity';
-    treeBtn.textContent = '가문트리';
-    treeBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      openFamilyTree(npc);
-    });
-
-    row.append(compareABtn, compareBBtn, treeBtn);
-
-    // 요청사항: 특성은 이름만 노출.
-    (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-      const traitBtn = document.createElement('span');
-      traitBtn.className = 'inline-entity';
-      traitBtn.textContent = traitNameOf(traitId);
-      traitBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        openTraitDialog(traitId);
-      });
-      row.append(traitBtn);
-    });
-
-    card.append(title, meta, relation, row);
+  const total = Math.max(cards.length, 1);
+  const startDeg = 204;
+  const endDeg = 336;
+  const radius = Math.min(fan.clientWidth, fan.clientHeight) * 0.42;
+  cards.forEach((card, index) => {
+    const npc = displayList[index];
+    const t = total === 1 ? 0.5 : index / (total - 1);
+    const deg = startDeg + (endDeg - startDeg) * t;
+    const rad = (deg * Math.PI) / 180;
+    const tx = Math.cos(rad) * radius;
+    const ty = Math.sin(rad) * radius;
+    // 대형 원의 일부만 보이도록 하단 중심 외곽 호에 카드를 배치한다.
+    const baseTransform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
+    card.dataset.baseTransform = baseTransform;
+    card.style.transform = baseTransform;
+    card.style.zIndex = String(200 + index);
     card.addEventListener('click', () => openNpcProfile(npc));
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openNpcProfile(npc);
-      }
-    });
-    return card;
-  }));
-
-  npcGalaxy.replaceChildren(orbit);
+  });
 };
 
 const renderFamilyBoard = () => {

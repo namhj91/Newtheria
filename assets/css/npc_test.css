@@ -115,48 +115,40 @@ body {
   min-height: 72vh;
   border-radius: 20px;
   overflow: hidden;
-  background: radial-gradient(circle at center, rgba(24, 39, 78, .72), rgba(9, 14, 27, .42));
+  background: radial-gradient(circle at 50% 115%, rgba(43, 69, 126, .62), rgba(9, 14, 27, .46));
 }
-.npc-galaxy.is-spinning .npc-orbit {
+.npc-galaxy.is-spinning .npc-observatory-fan {
   animation: orbitSpin .9s ease-in-out;
 }
-.npc-orbit {
+.npc-observatory-fan {
   position: absolute;
-  width: min(92vmin, 760px);
-  height: min(92vmin, 760px);
+  width: min(130vmin, 1300px);
+  height: min(130vmin, 1300px);
   left: 50%;
-  top: 50%;
+  top: 118%;
   transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
-.npc-star-card {
-  position: absolute;
+.npc-galaxy .card-fan-card {
+  --card-w: clamp(132px, 13.6vw, 176px);
+  --card-ratio: 1 / 1.45;
   left: 50%;
   top: 50%;
-  width: clamp(170px, 22vw, 230px);
-  border-radius: 18px;
-  padding: 12px;
-  background: rgba(29, 46, 86, .72);
-  backdrop-filter: blur(18px) saturate(1.12);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255, 255, 255, .18);
-  cursor: pointer;
-  transition: transform .24s ease, box-shadow .24s ease;
 }
-.npc-star-card::after {
-  content: '';
-  position: absolute;
-  inset: 2px 20% auto 12px;
-  height: 32%;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.2), transparent);
-  pointer-events: none;
+.npc-galaxy .card-fan-card .card-fan-card-inner::after {
+  display: none;
 }
-.npc-star-card:focus-visible,
-.npc-star-card:hover {
-  transform: scale(1.04);
-  box-shadow: 0 16px 30px rgba(43, 73, 153, .45);
+.npc-galaxy .card-fan-card .card-fan-card-face {
+  border: 0;
+  background: rgba(24, 38, 74, .9);
+  backdrop-filter: blur(10px);
 }
-.npc-star-card h3 { margin: 0; font-size: 1.03rem; }
-.npc-star-card p { margin: 6px 0 0; color: #d6e2f8; font-size: .84rem; }
+.npc-galaxy .card-fan-card .icon {
+  margin-inline: auto;
+}
+.npc-galaxy .card-fan-card .label { font-size: .95rem; }
+.npc-galaxy .card-fan-card .desc { font-size: .76rem; }
+
 .inline-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
 .inline-entity {
   display: inline-flex;

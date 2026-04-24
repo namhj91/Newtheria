@@ -3,120 +3,109 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NPC 프리즘 랩</title>
+  <title>NPC 테스트 리뉴얼</title>
   <link rel="stylesheet" href="./assets/css/card_templates.css" />
   <link rel="stylesheet" href="./assets/css/npc_test.css" />
 </head>
 <body>
-  <a class="hub-link" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
+  <a class="hub-link" href="./test_mode.html">← 테스트 허브</a>
 
-  <main class="prism">
+  <main class="npc-app">
     <header class="hero glass">
-      <p class="hero__version" id="npcVersion">ver.0.2.86(260424-npc테스트전면재구축)</p>
-      <h1>NPC Prism Lab</h1>
-      <p>완전히 재구축된 글라스 UI · 탭 · 팝업 플로우로 NPC의 모든 정보를 탐색하고 비교하세요.</p>
-      <div class="hero__actions">
-        <button id="generateNpcList" type="button">🎲 월드 리롤</button>
-        <button id="sortByAge" type="button">나이순</button>
-        <button id="sortByName" type="button">이름순</button>
-        <button id="openCompareDialog" type="button">속궁합 팝업</button>
+      <div>
+        <h1>NPC TEST LAB</h1>
+        <p>불투명 글라스 기반 · 탭/팝업 중심 · 패밀리 트리 & 속궁합 비교</p>
       </div>
+      <p class="hero__version" id="npcVersion">ver.0.2.88(260424-npc테스트창리뉴얼)</p>
     </header>
 
-    <section class="layout">
-      <aside class="left glass">
-        <section class="panel">
-          <h2>Action Deck</h2>
-          <p>카드 템플릿 기반 퀵 액션</p>
-          <div id="npcActionDeck" class="card-fan npc-action-deck" role="group" aria-label="NPC 액션 카드"></div>
-        </section>
+    <section class="toolbar glass" aria-label="컨트롤">
+      <button id="rerollBtn" type="button">🎲 월드 리롤</button>
+      <button id="compareOpenBtn" type="button">⚖️ 속궁합 비교</button>
+      <button id="familyOpenBtn" type="button">🌳 가문 트리</button>
+      <label class="search-wrap">
+        <span>검색</span>
+        <input id="searchInput" type="search" placeholder="이름 / 가문 / 종족" />
+      </label>
+      <select id="raceFilter" aria-label="종족 필터"></select>
+      <select id="familyFilter" aria-label="가문 필터"></select>
+    </section>
 
-        <nav class="main-tabs" aria-label="좌측 인사이트 탭">
-          <button class="main-tab is-active" data-tab-target="summary" type="button">요약</button>
-          <button class="main-tab" data-tab-target="context" type="button">컨텍스트</button>
-          <button class="main-tab" data-tab-target="compat" type="button">속궁합</button>
-        </nav>
-
-        <section class="tab-panel is-active" data-tab-panel="summary">
-          <article class="panel" id="npcSummary"></article>
-        </section>
-        <section class="tab-panel" data-tab-panel="context">
-          <article class="panel" id="npcObjectContext">
-            <h3>연결 객체 탐색</h3>
-            <p class="hint">종족/가문/특성/관계 버튼을 누르면 여기에 연동됩니다.</p>
-            <ul id="npcContextList" class="context-list"></ul>
-          </article>
-        </section>
-        <section class="tab-panel" data-tab-panel="compat">
-          <article class="panel">
-            <h3>라이브 속궁합</h3>
-            <p id="comparePreviewPair" class="compat-pair">선택된 비교 대상이 없습니다.</p>
-            <div class="meter"><div id="comparePreviewBar" class="meter__bar"></div></div>
-            <p id="comparePreviewScore" class="compat-score">점수: 없음</p>
-          </article>
-        </section>
+    <section class="content-grid">
+      <aside class="panel glass" aria-label="NPC 목록">
+        <div class="panel__head">
+          <h2>NPC 목록</h2>
+          <small id="npcCountMeta"></small>
+        </div>
+        <div id="npcList" class="npc-list" role="list"></div>
       </aside>
 
-      <section class="right glass">
-        <header class="grid-head">
-          <h2>NPC 갤러리</h2>
-          <p>카드 클릭: 상세 팝업 · 특성명 클릭: 특성 팝업 · 가문 버튼: 패밀리 트리</p>
-        </header>
-        <ul id="npcList" class="npc-grid" aria-label="NPC 리스트"></ul>
+      <section class="panel glass" aria-label="프리뷰">
+        <div class="tabs" role="tablist" aria-label="NPC 프리뷰 탭">
+          <button class="tab is-active" data-tab="summary" role="tab">요약</button>
+          <button class="tab" data-tab="cards" role="tab">카드 뷰</button>
+          <button class="tab" data-tab="timeline" role="tab">관계 타임라인</button>
+        </div>
+
+        <article class="tab-panel is-active" data-panel="summary">
+          <h3>선택된 NPC 요약</h3>
+          <div id="selectedSummary" class="summary-empty">왼쪽에서 NPC를 선택해 주세요.</div>
+        </article>
+
+        <article class="tab-panel" data-panel="cards">
+          <h3>카드 템플릿 프리뷰</h3>
+          <div id="cardPreview" class="card-preview"></div>
+        </article>
+
+        <article class="tab-panel" data-panel="timeline">
+          <h3>관계 타임라인</h3>
+          <ul id="timelineList" class="timeline-list"></ul>
+        </article>
       </section>
     </section>
   </main>
 
-  <dialog id="npcDetailDialog" class="dialog" aria-label="NPC 상세 정보">
-    <form method="dialog" class="dialog__top"><button class="dialog__close" aria-label="닫기">×</button></form>
-    <section class="dialog__body">
-      <h3 id="dialogNpcName">NPC 이름</h3>
-      <p id="dialogNpcMeta" class="hint"></p>
-      <nav class="detail-tabs" id="detailTabs">
-        <button class="detail-tab is-active" data-detail-tab="overview" type="button">개요</button>
-        <button class="detail-tab" data-detail-tab="relation" type="button">관계</button>
-        <button class="detail-tab" data-detail-tab="traits" type="button">특성</button>
-      </nav>
-      <section class="panel chart-wrap" aria-label="6대 스탯 차트">
-        <svg id="npcRadarChart" viewBox="0 0 260 260" role="img" aria-label="NPC 6대 스탯"></svg>
-      </section>
-      <div id="dialogNpcDetail" class="detail-grid"></div>
-    </section>
+  <dialog id="npcModal" class="modal glass">
+    <header>
+      <h3 id="npcModalTitle">NPC 상세</h3>
+      <button data-close="npcModal" type="button">닫기</button>
+    </header>
+    <div id="npcModalBody" class="modal-body"></div>
   </dialog>
 
-  <dialog id="npcCompareDialog" class="dialog dialog--sm" aria-label="NPC 속궁합 비교">
-    <form method="dialog" class="dialog__top"><button class="dialog__close" aria-label="닫기">×</button></form>
-    <section class="dialog__body">
-      <h3>속궁합 비교 팝업</h3>
-      <p class="hint">두 NPC를 선택하면 시드 토러스 거리 기반 궁합을 계산합니다.</p>
-      <div class="compare-inputs">
-        <label>비교 A<select id="compareNpcA"></select></label>
-        <label>비교 B<select id="compareNpcB"></select></label>
-      </div>
-      <div class="meter meter--lg"><div id="compareDialogBar" class="meter__bar"></div></div>
-      <p id="compareDialogScore" class="compat-score">점수: 없음</p>
-      <p id="compareDialogMeta" class="hint"></p>
-    </section>
+  <dialog id="traitModal" class="modal glass small">
+    <header>
+      <h3 id="traitModalTitle">특성 정보</h3>
+      <button data-close="traitModal" type="button">닫기</button>
+    </header>
+    <div id="traitModalBody" class="modal-body"></div>
   </dialog>
 
-  <dialog id="traitDetailDialog" class="dialog dialog--sm" aria-label="특성 상세 정보">
-    <form method="dialog" class="dialog__top"><button class="dialog__close" aria-label="닫기">×</button></form>
-    <section class="dialog__body">
-      <h3 id="traitDialogTitle">특성</h3>
-      <div id="traitDialogBody" class="stack"></div>
-    </section>
+  <dialog id="compareModal" class="modal glass">
+    <header>
+      <h3>속궁합 비교</h3>
+      <button data-close="compareModal" type="button">닫기</button>
+    </header>
+    <div class="compare-grid">
+      <select id="compareA"></select>
+      <select id="compareB"></select>
+      <div id="compareResult" class="compare-result">두 인물을 선택해 주세요.</div>
+    </div>
   </dialog>
 
-  <dialog id="familyTreeDialog" class="dialog" aria-label="가문 패밀리 트리">
-    <form method="dialog" class="dialog__top"><button class="dialog__close" aria-label="닫기">×</button></form>
-    <section class="dialog__body">
-      <h3 id="familyTreeTitle">가문 패밀리 트리</h3>
-      <p class="hint">부모/자녀 연결을 기반으로 최대 4세대 트리로 표시합니다.</p>
-      <div id="familyTreeRoot" class="family-tree"></div>
-    </section>
+  <dialog id="familyModal" class="modal glass wide">
+    <header>
+      <h3 id="familyTitle">가문 트리</h3>
+      <button data-close="familyModal" type="button">닫기</button>
+    </header>
+    <div class="family-controls">
+      <label>기준 인물 <select id="familyFocusSelect"></select></label>
+    </div>
+    <div id="familyTreeViewport" class="family-tree-viewport">
+      <div id="familyTree" class="family-tree"></div>
+    </div>
   </dialog>
 
-  <script src="./assets/js/card_templates.js"></script>
   <script type="module" src="./assets/js/npc_test.js"></script>
 </body>
 </html>

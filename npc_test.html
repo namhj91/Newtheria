@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NPC 관계망 테스트</title>
+  <link rel="stylesheet" href="./assets/css/card_templates.css" />
   <link rel="stylesheet" href="./assets/css/npc_test.css" />
 </head>
 <body>
@@ -11,7 +12,7 @@
 
   <main class="npc-lab">
     <header class="hero">
-      <p class="hero__version" id="npcVersion">ver.0.2.84(260424-npcux리뉴얼트리팝업탭확장)</p>
+      <p class="hero__version" id="npcVersion">ver.0.2.85(260424-npc테스트창글라스리뉴얼)</p>
       <h1>NPC Interaction Lab</h1>
       <p>완전히 새 UI로 NPC 전체 정보 탐색, 속궁합 비교, 가문 족보 트리를 한 화면 플로우에서 다룹니다.</p>
       <div class="hero__actions">
@@ -24,6 +25,12 @@
 
     <section class="workspace" aria-label="NPC 테스트 워크스페이스">
       <aside class="insight">
+        <section class="action-deck-shell" aria-label="다이나믹 액션 카드">
+          <h2>Action Deck</h2>
+          <p>카드를 클릭해 주요 기능을 빠르게 실행하세요. (리롤/정렬/비교 팝업)</p>
+          <div id="npcActionDeck" class="card-fan npc-action-deck" role="group" aria-label="NPC 액션 카드"></div>
+        </section>
+
         <nav class="npc-tabbar" aria-label="인사이트 탭">
           <button type="button" class="npc-tab npc-tab--active" data-tab-target="summary">요약</button>
           <button type="button" class="npc-tab" data-tab-target="context">컨텍스트</button>
@@ -109,6 +116,7 @@
     </section>
   </dialog>
 
+  <script src="./assets/js/card_templates.js"></script>
   <script type="module" src="./assets/js/npc_test.js"></script>
 </body>
 </html>

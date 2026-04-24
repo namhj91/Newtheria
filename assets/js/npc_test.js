@@ -11,6 +11,7 @@ const MAX_AFFAIRS_DEFAULT = 1;
 const TRAIT_ID = { CASANOVA: 311, FEMME_FATALE: 312, INCEST_INCLINATION: 313, ANYTHING_GOES: 314 };
 const SEED_COMPATIBILITY = { axisSize: 1000, axisMid: 500, scorePower: 1.2 };
 const STAT_KEYS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
+const NPC_FAN_VISIBLE_MAX = 42;
 
 const RACE_POOL = [
   { name: '인간', key: 'human', adultAge: 18, elderAge: 60, maxAge: 85 },
@@ -76,9 +77,7 @@ const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
 const familyTreeDialog = $('familyTreeDialog');
 const familyTreeTitle = $('familyTreeTitle');
-const ancestorTree = $('ancestorTree');
-const descendantTree = $('descendantTree');
-const lineageRootBadge = $('lineageRootBadge');
+const familyPedigreeBoard = $('familyPedigreeBoard');
 
 const navTabs = Array.from(document.querySelectorAll('.nav-tab'));
 const screens = Array.from(document.querySelectorAll('[data-screen-panel]'));
@@ -312,14 +311,23 @@ const openTraitDialog = (traitId) => {
   if (!traitDialog.open) traitDialog.showModal();
 };
 
-const createNpcButton = (npcId) => {
+const createNpcEntity = (npcId) => {
   const npc = findNpcById(npcId);
   if (!npc) return document.createTextNode('없음');
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = `${displayNpcName(npc)} (#${npcId})`;
-  button.addEventListener('click', () => openNpcProfile(npc));
-  return button;
+  const entity = document.createElement('span');
+  entity.className = 'inline-entity';
+  entity.tabIndex = 0;
+  entity.role = 'button';
+  entity.textContent = `${displayNpcName(npc)} (#${npcId})`;
+  const onOpen = () => openNpcProfile(npc);
+  entity.addEventListener('click', onOpen);
+  entity.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onOpen();
+    }
+  });
+  return entity;
 };
 
 const createInfoRow = (label, valueNodeOrText) => {
@@ -360,21 +368,21 @@ const openNpcProfile = (npc) => {
 
   if (profileTab === 'relations') {
     panel.append(
-      createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcButton(npc.familyLinks.spouseId) : '없음'),
-      createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcButton(npc.familyLinks.fatherId) : '없음'),
-      createInfoRow('어머니', npc.familyLinks.motherId ? createNpcButton(npc.familyLinks.motherId) : '없음'),
+      createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
+      createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
+      createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
       createInfoRow('자녀', (() => {
         const wrap = document.createElement('div');
         const children = npc.familyLinks.childrenIds || [];
         if (children.length === 0) return document.createTextNode('없음');
-        children.forEach((id) => wrap.append(createNpcButton(id), document.createTextNode(' ')));
+        children.forEach((id) => wrap.append(createNpcEntity(id), document.createTextNode(' ')));
         return wrap;
       })()),
       createInfoRow('연문 관계', (() => {
         const wrap = document.createElement('div');
         const affairs = npc.familyLinks.affairPartnerIds || [];
         if (affairs.length === 0) return document.createTextNode('없음');
-        affairs.forEach((id) => wrap.append(createNpcButton(id), document.createTextNode(' ')));
+        affairs.forEach((id) => wrap.append(createNpcEntity(id), document.createTextNode(' ')));
         return wrap;
       })())
     );
@@ -383,11 +391,20 @@ const openNpcProfile = (npc) => {
   if (profileTab === 'traits') {
     const wrap = document.createElement('div');
     (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = traitNameOf(traitId);
-      btn.addEventListener('click', () => openTraitDialog(traitId));
-      wrap.append(btn, document.createTextNode(' '));
+      const entity = document.createElement('span');
+      entity.className = 'inline-entity';
+      entity.textContent = traitNameOf(traitId);
+      entity.tabIndex = 0;
+      entity.role = 'button';
+      const onOpen = () => openTraitDialog(traitId);
+      entity.addEventListener('click', onOpen);
+      entity.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      });
+      wrap.append(entity, document.createTextNode(' '));
     });
     panel.append(createInfoRow('후천 특성', wrap));
   }
@@ -398,47 +415,69 @@ const openNpcProfile = (npc) => {
   if (!npcProfileDialog.open) npcProfileDialog.showModal();
 };
 
-const buildTree = (npcId, direction, depth = 0, visited = new Set(), maxDepth = 4) => {
-  const npc = findNpcById(npcId);
-  const li = document.createElement('li');
-  if (!npc) { li.textContent = `알 수 없는 구성원 #${npcId}`; return li; }
+const createPedigreeNode = (npc, isRoot = false) => {
+  const node = document.createElement('article');
+  node.className = `pedigree-node${isRoot ? ' pedigree-node--root' : ''}`;
+  node.innerHTML = `<strong>${displayNpcName(npc)}</strong><span>${npc.age}세</span>`;
+  node.addEventListener('click', () => openNpcProfile(npc));
+  return node;
+};
 
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = `${displayNpcName(npc)} · ${npc.age}세`;
-  button.addEventListener('click', () => openNpcProfile(npc));
-  li.append(button);
-
-  if (depth >= maxDepth || visited.has(npcId)) return li;
-
-  // 사용자가 원한 방향형 패밀리 트리: ancestor는 위(조상), descendant는 아래(자식) 계열.
-  const relatives = direction === 'ancestor'
-    ? [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean)
-    : [...(npc.familyLinks.childrenIds || [])].filter(Boolean);
-
-  if (relatives.length > 0) {
-    visited.add(npcId);
-    const ul = document.createElement('ul');
-    relatives.forEach((id) => ul.append(buildTree(id, direction, depth + 1, new Set(visited), maxDepth)));
-    li.append(ul);
+const collectLevels = (seedIds, nextGetter, maxDepth = 3) => {
+  const levels = [];
+  let current = [...seedIds];
+  let depth = 0;
+  const visited = new Set(seedIds);
+  while (current.length > 0 && depth < maxDepth) {
+    levels.push(current);
+    const next = [];
+    current.forEach((id) => {
+      const npc = findNpcById(id);
+      if (!npc) return;
+      nextGetter(npc).forEach((nextId) => {
+        if (!visited.has(nextId)) {
+          visited.add(nextId);
+          next.push(nextId);
+        }
+      });
+    });
+    current = next;
+    depth += 1;
   }
-
-  return li;
+  return levels;
 };
 
 const openFamilyTree = (rootNpc) => {
   familyTreeTitle.textContent = `패밀리 트리: ${displayNpcName(rootNpc)} · ${getFamilyName(rootNpc)}`;
-  lineageRootBadge.textContent = `${displayNpcName(rootNpc)} · ${rootNpc.age}세`;
-  lineageRootBadge.onclick = () => openNpcProfile(rootNpc);
 
-  const upTree = document.createElement('ul');
-  const downTree = document.createElement('ul');
-  // 요청 반영: 좌/우 절반 분할이 아니라, 중심 인물 기준으로 위=조상 / 아래=후손 흐름을 표현한다.
-  upTree.append(buildTree(rootNpc.id, 'ancestor'));
-  downTree.append(buildTree(rootNpc.id, 'descendant'));
+  const ancestorLevels = collectLevels(
+    [rootNpc.id],
+    (npc) => [npc.familyLinks.fatherId, npc.familyLinks.motherId].filter(Boolean),
+    4
+  ).slice(1).reverse();
+  const descendantLevels = collectLevels([rootNpc.id], (npc) => npc.familyLinks.childrenIds || [], 4).slice(1);
 
-  ancestorTree.replaceChildren(upTree);
-  descendantTree.replaceChildren(downTree);
+  const rows = [];
+  ancestorLevels.forEach((level) => {
+    const row = document.createElement('section');
+    row.className = 'pedigree-row';
+    level.map(findNpcById).filter(Boolean).forEach((npc) => row.append(createPedigreeNode(npc)));
+    rows.push(row);
+  });
+
+  const rootRow = document.createElement('section');
+  rootRow.className = 'pedigree-row';
+  rootRow.append(createPedigreeNode(rootNpc, true));
+  rows.push(rootRow);
+
+  descendantLevels.forEach((level) => {
+    const row = document.createElement('section');
+    row.className = 'pedigree-row';
+    level.map(findNpcById).filter(Boolean).forEach((npc) => row.append(createPedigreeNode(npc)));
+    rows.push(row);
+  });
+
+  familyPedigreeBoard.replaceChildren(...rows);
   if (!familyTreeDialog.open) familyTreeDialog.showModal();
 };
 
@@ -492,65 +531,44 @@ const matchesFilter = (npc) => {
 };
 
 const renderNpcGalaxy = () => {
-  npcGalaxy.replaceChildren(...npcList.filter(matchesFilter).map((npc) => {
-    const card = document.createElement('article');
-    card.className = 'npc-star-card';
+  const cardApi = window.NewtheriaCardTemplates;
+  if (!cardApi) return;
 
-    const title = document.createElement('h3');
-    title.textContent = displayNpcName(npc);
-    const meta = document.createElement('p');
-    meta.textContent = `#${npc.id} · ${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
-    const relation = document.createElement('p');
-    relation.textContent = `배우자 ${npc.familyLinks.spouseId ? 1 : 0} / 연문 ${(npc.familyLinks.affairPartnerIds || []).length} / 자녀 ${(npc.familyLinks.childrenIds || []).length}`;
+  const filtered = npcList.filter(matchesFilter);
+  const displayList = filtered.slice(0, NPC_FAN_VISIBLE_MAX);
+  const fan = document.createElement('div');
+  fan.className = 'npc-observatory-fan';
+  npcGalaxy.replaceChildren(fan);
 
-    const row = document.createElement('div');
-    row.className = 'inline-actions';
+  // 카드 템플릿을 그대로 사용해 관측소 인물 카드를 구성한다.
+  const cards = cardApi.renderCardFanCards(
+    fan,
+    displayList.map((npc) => ({
+      route: String(npc.id),
+      icon: npc.gender === '남성' ? '♂' : '♀',
+      label: displayNpcName(npc),
+      desc: `${npc.race} · ${npc.age}세 · ${getFamilyName(npc)}\n자녀 ${(npc.familyLinks.childrenIds || []).length}`
+    }))
+  );
 
-    const detailBtn = document.createElement('button');
-    detailBtn.type = 'button';
-    detailBtn.textContent = '상세';
-    detailBtn.addEventListener('click', () => openNpcProfile(npc));
-
-    const compareABtn = document.createElement('button');
-    compareABtn.type = 'button';
-    compareABtn.textContent = '비교A';
-    compareABtn.addEventListener('click', () => {
-      selectedA = npc.id;
-      compareNpcA.value = String(npc.id);
-      activateScreen('chemistry');
-      syncCompatibilityPanel();
-    });
-
-    const compareBBtn = document.createElement('button');
-    compareBBtn.type = 'button';
-    compareBBtn.textContent = '비교B';
-    compareBBtn.addEventListener('click', () => {
-      selectedB = npc.id;
-      compareNpcB.value = String(npc.id);
-      activateScreen('chemistry');
-      syncCompatibilityPanel();
-    });
-
-    const treeBtn = document.createElement('button');
-    treeBtn.type = 'button';
-    treeBtn.textContent = '가문트리';
-    treeBtn.addEventListener('click', () => openFamilyTree(npc));
-
-    row.append(detailBtn, compareABtn, compareBBtn, treeBtn);
-
-    // 요청사항: 특성은 이름만 노출.
-    (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-      const traitBtn = document.createElement('button');
-      traitBtn.type = 'button';
-      traitBtn.className = 'trait-chip';
-      traitBtn.textContent = traitNameOf(traitId);
-      traitBtn.addEventListener('click', () => openTraitDialog(traitId));
-      row.append(traitBtn);
-    });
-
-    card.append(title, meta, relation, row);
-    return card;
-  }));
+  const total = Math.max(cards.length, 1);
+  const startDeg = 204;
+  const endDeg = 336;
+  const radius = Math.min(fan.clientWidth, fan.clientHeight) * 0.42;
+  cards.forEach((card, index) => {
+    const npc = displayList[index];
+    const t = total === 1 ? 0.5 : index / (total - 1);
+    const deg = startDeg + (endDeg - startDeg) * t;
+    const rad = (deg * Math.PI) / 180;
+    const tx = Math.cos(rad) * radius;
+    const ty = Math.sin(rad) * radius;
+    // 대형 원의 일부만 보이도록 하단 중심 외곽 호에 카드를 배치한다.
+    const baseTransform = `translate(${tx}px, ${ty}px) rotate(${deg + 90}deg)`;
+    card.dataset.baseTransform = baseTransform;
+    card.style.transform = baseTransform;
+    card.style.zIndex = String(200 + index);
+    card.addEventListener('click', () => openNpcProfile(npc));
+  });
 };
 
 const renderFamilyBoard = () => {
@@ -649,6 +667,19 @@ const bindEvents = () => {
   npcSearchInput.addEventListener('input', () => {
     currentSearch = npcSearchInput.value.trim();
     renderNpcGalaxy();
+  });
+
+  npcSearchInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    const query = npcSearchInput.value.trim().toLowerCase();
+    if (!query) return;
+    const match = npcList.find((npc) => displayNpcName(npc).toLowerCase().includes(query));
+    if (!match) return;
+    npcGalaxy.classList.add('is-spinning');
+    setTimeout(() => {
+      npcGalaxy.classList.remove('is-spinning');
+      openNpcProfile(match);
+    }, 850);
   });
 
   raceFilter.addEventListener('change', () => {

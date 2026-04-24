@@ -19,7 +19,7 @@
   <main class="astral-shell">
     <header class="astral-header glass-void">
       <div>
-        <p class="version-tag" id="npcVersion">ver.0.5.0(260424-세로혈통트리개편)</p>
+        <p class="version-tag" id="npcVersion">ver.0.7.0(260424-관측소템플릿원형팬재정렬)</p>
         <h1>Astral NPC Archive</h1>
         <p>기존 UX를 전면 폐기하고, 별 테마 기반의 완전 신규 탐색 인터페이스로 구성한 NPC 실험실.</p>
       </div>
@@ -108,20 +108,8 @@
     <form method="dialog" class="modal-close-wrap"><button class="modal-close" aria-label="닫기">×</button></form>
     <section class="modal-body">
       <h3 id="familyTreeTitle">패밀리 트리</h3>
-      <div class="lineage-layout">
-        <section class="lineage-block lineage-block--up">
-          <h4>조상(위 방향)</h4>
-          <div id="ancestorTree" class="tree-wrap tree-wrap--up"></div>
-        </section>
-        <section class="lineage-root">
-          <p class="muted">기준 인물</p>
-          <button id="lineageRootBadge" type="button">-</button>
-        </section>
-        <section class="lineage-block lineage-block--down">
-          <h4>후손(아래 방향)</h4>
-          <div id="descendantTree" class="tree-wrap tree-wrap--down"></div>
-        </section>
-      </div>
+      <p class="muted">중심 인물을 기준으로 상단은 조상, 하단은 후손을 원형 노드로 배치합니다.</p>
+      <div id="familyPedigreeBoard" class="pedigree-board"></div>
     </section>
   </dialog>
 

@@ -247,6 +247,29 @@ body {
   overflow: auto;
 }
 
+/* 사용자 요청 반영: 모달 종속이 아닌 독립 드래그 프로필 카드 창 */
+.profile-float {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  border-radius: 18px;
+  background: rgba(16, 25, 51, 0.84);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: 0 24px 40px rgba(0, 0, 0, .44);
+  z-index: 30;
+}
+.profile-float__handle {
+  margin: 0;
+  padding: 8px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+}
+
 .profile-tabs { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .profile-tab { border: 0; min-height: 32px; border-radius: 10px; padding: 0 12px; color: var(--text); background: rgba(56, 81, 138, .74); cursor: pointer; }
 .profile-tab.is-active { background: rgba(101, 131, 209, .95); }

@@ -173,7 +173,79 @@ body {
 .modal-close-wrap { margin: 0; display: flex; justify-content: flex-end; padding: 8px 12px 0; }
 .modal-close { border: 0; width: 34px; height: 34px; border-radius: 50%; color: var(--text); background: rgba(255,255,255,.14); cursor: pointer; }
 .modal-body { padding: 0 16px 16px; }
-.profile-template-mount { margin-top: 10px; }
+
+/* 사용자 요청 반영: 모달 종속이 아닌 독립 드래그 프로필 카드 창 */
+.profile-float {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  border-radius: 18px;
+  background: rgba(16, 25, 51, 0.84);
+  backdrop-filter: blur(20px) saturate(1.12);
+  box-shadow: 0 24px 40px rgba(0, 0, 0, .44);
+  z-index: 30;
+}
+.profile-float__handle {
+  margin: 0;
+  padding: 8px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+}
+.profile-float__body {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
+}
+.profile-card-fan-wrap {
+  display: grid;
+  place-items: center;
+}
+.profile-card-fan {
+  width: min(520px, 100%);
+  height: min(72vh, 620px);
+  perspective: 1600px;
+  --card-w: min(76vw, 360px);
+  --fan-gap: 0px;
+  --fan-tilt: 0deg;
+}
+.profile-discard-zone {
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 149, 149, .55);
+  color: rgba(255, 211, 211, .92);
+  display: grid;
+  place-items: center;
+  font-size: .82rem;
+  background: rgba(56, 16, 24, .42);
+}
+.profile-discard-zone.is-hot {
+  background: rgba(125, 28, 45, .64);
+  border-style: solid;
+}
+.profile-back-panel { display: grid; gap: 8px; width: 100%; min-height: 0; }
+.profile-back-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.profile-back-tab {
+  border: 0;
+  min-height: 28px;
+  border-radius: 10px;
+  padding: 0 9px;
+  font-size: .77rem;
+  color: var(--text);
+  background: rgba(56, 81, 138, .74);
+  cursor: pointer;
+}
+.profile-back-tab.is-active { background: rgba(101, 131, 209, .95); }
+.profile-back-content {
+  display: grid;
+  gap: 8px;
+  max-height: 380px;
+  overflow: auto;
+}
 
 /* 사용자 요청 반영: 모달 종속이 아닌 독립 드래그 프로필 카드 창 */
 .profile-float {

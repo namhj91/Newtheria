@@ -71,8 +71,6 @@ const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
 const npcProfileDialog = $('npcProfileDialog');
-const profileName = $('profileName');
-const profileMeta = $('profileMeta');
 const profileTemplateMount = $('profileTemplateMount');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
@@ -428,8 +426,6 @@ const createProfileFrontNode = (npc) => {
 };
 
 const openNpcProfile = (npc) => {
-  profileName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
-  profileMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
   if (!profileCardTemplate) {
     profileCardTemplate = createCharacterProfileCardTemplate({ mount: profileTemplateMount });
   }
@@ -549,7 +545,10 @@ const openNpcProfile = (npc) => {
   }
   profileCardTemplate.setFrontContent(createProfileFrontNode(npc));
   profileCardTemplate.setTabs(tabs);
-  profileCardTemplate.close();
+  // 사용자 피드백 반영:
+  // "정보창 안에 카드만 덩그러니 보이는 상태"를 없애기 위해 상세 탭을 즉시 펼친다.
+  // 카드 형식은 유지하되, 클릭 직후 모든 정보를 같은 카드 컨텍스트에서 확인할 수 있다.
+  profileCardTemplate.open();
   if (!npcProfileDialog.open) npcProfileDialog.showModal();
 };
 

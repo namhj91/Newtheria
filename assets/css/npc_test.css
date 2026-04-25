@@ -173,7 +173,149 @@ body {
 .modal-close-wrap { margin: 0; display: flex; justify-content: flex-end; padding: 8px 12px 0; }
 .modal-close { border: 0; width: 34px; height: 34px; border-radius: 50%; color: var(--text); background: rgba(255,255,255,.14); cursor: pointer; }
 .modal-body { padding: 0 16px 16px; }
-.profile-template-mount { margin-top: 10px; }
+
+/* 사용자 요청 반영: 모달 종속이 아닌 독립 드래그 프로필 카드 창 */
+.profile-float {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  /* 클릭 간섭 방지:
+     전체 오버레이는 포인터 이벤트를 받지 않고, 카드/디스카드 존만 이벤트를 받게 한다. */
+  background: transparent;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: center;
+  justify-items: center;
+  pointer-events: none;
+}
+.profile-float__body {
+  width: min(760px, calc(100% - 24px));
+  display: grid;
+  place-items: center;
+  /* 1fr 행 전체를 차지하는 body가 상단 클릭을 가로채지 않도록 차단한다. */
+  pointer-events: none;
+}
+.profile-card-fan {
+  width: min(520px, 100%);
+  height: min(72vh, 620px);
+  perspective: 1600px;
+  --card-w: min(76vw, 360px);
+  --fan-gap: 0px;
+  --fan-tilt: 0deg;
+  /* 팬 컨테이너의 빈 영역이 상단 클릭을 막지 않도록 비활성화하고, 실제 카드만 활성화한다. */
+  pointer-events: none;
+}
+.profile-card-fan .card-fan-card { pointer-events: auto; }
+.profile-discard-zone {
+  width: min(440px, calc(100% - 24px));
+  min-height: 48px;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 149, 149, .55);
+  color: rgba(255, 211, 211, .92);
+  display: grid;
+  place-items: center;
+  font-size: .82rem;
+  background: rgba(56, 16, 24, .42);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .18s ease, transform .18s ease, background-color .2s ease, border-color .2s ease;
+  pointer-events: auto;
+}
+.profile-discard-zone.is-hot {
+  background: rgba(125, 28, 45, .64);
+  border-style: solid;
+}
+body.profile-discard-active #npcProfileFloat .profile-discard-zone {
+  opacity: .86;
+}
+body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-discard-zone {
+  opacity: 1;
+  transform: translateY(0);
+}
+.profile-back-panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 2px 0 0;
+}
+.profile-back-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(9, 17, 38, .95), rgba(9, 17, 38, .78));
+  padding: 2px 0 4px;
+}
+.profile-back-tab {
+  border: 0;
+  min-height: 28px;
+  border-radius: 10px;
+  padding: 0 9px;
+  font-size: .77rem;
+  color: var(--text);
+  background: rgba(56, 81, 138, .74);
+  cursor: pointer;
+}
+.profile-back-tab.is-active { background: rgba(101, 131, 209, .95); }
+.profile-back-content {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+.profile-front-summary {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  height: 100%;
+}
+.profile-front-summary__portrait {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(177, 211, 255, .38);
+  background: rgba(12, 20, 40, .7);
+}
+.profile-front-summary__main { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.profile-front-summary__name {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-front-summary__meta {
+  margin: 0;
+  color: #cddfff;
+  font-size: .78rem;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+.profile-mini-radar { width: 100%; max-width: 170px; }
+.profile-mini-radar svg { width: 100%; height: auto; display: block; }
+.profile-mini-radar text { fill: #d8e8ff; font-size: 8px; }
+.profile-mini-alignment { display: grid; gap: 4px; }
+.profile-mini-alignment article { display: grid; grid-template-columns: 52px 1fr; gap: 6px; align-items: center; font-size: .68rem; }
+.profile-mini-alignment .track { height: 7px; border-radius: 999px; background: rgba(9,17,41,.9); overflow: hidden; }
+.profile-mini-alignment .fill { display: block; height: 100%; }
+.fill--warm { background: linear-gradient(90deg, rgba(255, 106, 106, .92), rgba(255, 165, 111, .92)); }
+.fill--cool { background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
+
+/* 카드 뒷면 성향 바도 동일 규칙을 사용한다. */
+.alignment-bars .fill.fill--warm { background: linear-gradient(90deg, rgba(255, 106, 106, .92), rgba(255, 165, 111, .92)); }
+.alignment-bars .fill.fill--cool { background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
+.alignment-bars { overscroll-behavior: contain; }
 
 .profile-tabs { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .profile-tab { border: 0; min-height: 32px; border-radius: 10px; padding: 0 12px; color: var(--text); background: rgba(56, 81, 138, .74); cursor: pointer; }

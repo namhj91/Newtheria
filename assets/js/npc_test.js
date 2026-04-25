@@ -432,6 +432,13 @@ const openNpcProfile = (npc) => {
   if (!profileCardTemplate) {
     profileCardTemplate = createCharacterProfileCardTemplate({ mount: profileTemplateMount });
   }
+  if (!profileCardTemplate) {
+    // 원인 추적용 가드:
+    // 공용 카드 팩토리(window.NewtheriaCardTemplates) 로드 실패 시 템플릿 인스턴스가 생성되지 않는다.
+    // 이 경우 카드 창을 강제로 열지 않고 콘솔 경고로 원인을 남긴다.
+    console.warn('[npc_test] 프로필 카드 템플릿 생성 실패: card_templates.js 로드 여부를 확인하세요.');
+    return;
+  }
   const tabs = [
     {
       key: 'identity',

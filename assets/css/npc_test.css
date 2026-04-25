@@ -173,6 +173,7 @@ body {
 .modal-close-wrap { margin: 0; display: flex; justify-content: flex-end; padding: 8px 12px 0; }
 .modal-close { border: 0; width: 34px; height: 34px; border-radius: 50%; color: var(--text); background: rgba(255,255,255,.14); cursor: pointer; }
 .modal-body { padding: 0 16px 16px; }
+.profile-template-mount { margin-top: 10px; }
 
 .profile-tabs { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .profile-tab { border: 0; min-height: 32px; border-radius: 10px; padding: 0 12px; color: var(--text); background: rgba(56, 81, 138, .74); cursor: pointer; }

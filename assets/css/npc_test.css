@@ -202,8 +202,10 @@ body {
   --card-w: min(76vw, 360px);
   --fan-gap: 0px;
   --fan-tilt: 0deg;
-  pointer-events: auto;
+  /* 팬 컨테이너의 빈 영역이 상단 클릭을 막지 않도록 비활성화하고, 실제 카드만 활성화한다. */
+  pointer-events: none;
 }
+.profile-card-fan .card-fan-card { pointer-events: auto; }
 .profile-discard-zone {
   width: min(440px, calc(100% - 24px));
   min-height: 48px;

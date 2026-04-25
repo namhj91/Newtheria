@@ -13,7 +13,7 @@ const loadAdminDebugMode = () => {
     const storedValue = window.localStorage?.getItem(ADMIN_DEBUG_STORAGE_KEY);
     if (storedValue == null) return ADMIN_DEBUG_MODE_DEFAULT;
     if (storedValue === 'true') return true;
-    if (storedValue === 'false') return false;
+    if (storedValue === 'false') return true;
   } catch (error) {
     console.warn('관리자 디버그 모드(localStorage) 값을 읽지 못했습니다.', error);
   }

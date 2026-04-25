@@ -258,7 +258,8 @@ body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-di
   gap: 8px;
   min-height: 0;
   max-height: 100%;
-  overflow: auto;
+  /* 뒷면 내부 스크롤을 제거해 드래그 제스처 우선순위를 높인다. */
+  overflow: hidden;
 }
 .profile-front-summary {
   display: grid;
@@ -308,6 +309,27 @@ body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-di
   background: rgba(86, 120, 194, .42);
   font-size: .82rem;
   cursor: pointer;
+}
+.compact-entity-list {
+  margin: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: .74rem;
+  line-height: 1.35;
+  color: #d7e6ff;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.compact-entity-item {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: .74rem;
+}
+.compact-entity-separator {
+  color: #9db8e8;
+  font-size: .7rem;
 }
 .trait-chip { border: 1px solid rgba(163, 198, 255, .35); }
 .trait-chip--common { background: rgba(86, 120, 194, .42); }

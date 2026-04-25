@@ -202,7 +202,7 @@ const addOneToSeedLeadingDigit = (seed) => {
   return `${text.slice(0, firstDigitIndex)}${nextHead}${text.slice(firstDigitIndex + 1)}`;
 };
 
-const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed, layers = [] }) => ({
+const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed, layers = [], acquiredTraitIds = null }) => ({
   id,
   actorId,
   uniqueSeed,
@@ -217,7 +217,8 @@ const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed
   stats: createStats(),
   alignment: createAlignment(),
   familyLinks: { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] },
-  traits: { acquiredTraitIds: [pickTraitIdByGender(gender), pickTraitIdByGender(gender)] }
+  // 고정 캐릭터는 특성을 명시 전달하면 그대로 사용하고, 없으면 기본 성별 규칙으로 생성한다.
+  traits: { acquiredTraitIds: Array.isArray(acquiredTraitIds) ? acquiredTraitIds : [pickTraitIdByGender(gender), pickTraitIdByGender(gender)] }
 });
 
 const canBeParent = (npc, child, minGap) => npc.race === child.race && npc.age - child.age >= minGap;
@@ -346,12 +347,12 @@ const createInfoRow = (label, valueNodeOrText) => {
   return row;
 };
 
-const createNpcEntity = (npcId) => {
+const createNpcEntity = (npcId, { showId = true } = {}) => {
   const npc = findNpcById(npcId);
   if (!npc) return document.createTextNode('없음');
   const node = document.createElement('span');
   node.className = 'inline-entity';
-  node.textContent = `${displayNpcName(npc)} (#${npc.id})`;
+  node.textContent = showId ? `${displayNpcName(npc)} (#${npc.id})` : displayNpcName(npc);
   node.role = 'button';
   node.tabIndex = 0;
   const open = () => openNpcProfile(npc);
@@ -363,6 +364,28 @@ const createNpcEntity = (npcId) => {
     }
   });
   return node;
+};
+
+// 관계 탭에서 인원이 많아도 한 번에 보이도록, 이름만 보이는 객체형(클릭 가능) 라인을 만든다.
+const createNpcCompactEntityList = (npcIds = []) => {
+  const list = Array.isArray(npcIds) ? npcIds : [];
+  if (list.length === 0) return document.createTextNode('없음');
+  const wrap = document.createElement('div');
+  wrap.className = 'compact-entity-list';
+  list.forEach((id, index) => {
+    const entity = createNpcEntity(id, { showId: false });
+    if (entity instanceof Node) {
+      if (entity.nodeType === Node.ELEMENT_NODE) entity.classList.add('compact-entity-item');
+      wrap.append(entity);
+      if (index < list.length - 1) {
+        const separator = document.createElement('span');
+        separator.className = 'compact-entity-separator';
+        separator.textContent = '·';
+        wrap.append(separator);
+      }
+    }
+  });
+  return wrap;
 };
 
 const openTraitDialog = (traitId) => {
@@ -561,14 +584,8 @@ const openNpcProfile = (npc) => {
           createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
           createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
           createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
-          createInfoRow('자녀', (() => {
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-actions';
-            const children = npc.familyLinks.childrenIds || [];
-            if (children.length === 0) return document.createTextNode('없음');
-            children.forEach((id) => wrap.append(createNpcEntity(id)));
-            return wrap;
-          })())
+          // 자녀 이름도 객체형으로 유지해, 눌러서 바로 해당 캐릭터 정보를 열 수 있게 한다.
+          createInfoRow('자녀', createNpcCompactEntityList(npc.familyLinks.childrenIds || []))
         );
         return panel;
       }
@@ -901,10 +918,13 @@ const regenerateNpcList = () => {
     // 로어 기준: 에스테리아는 "별의 여신" 타이틀을 가진다.
     name: { surname: '별의 여신', given: '에스테리아' },
     gender: '여성',
-    race: '인간',
+    // 사용자 요청 반영: 여신의 종족은 일반 종족이 아닌 특수 종족 "여신"으로 고정한다.
+    race: '여신',
     age: 999,
     uniqueSeed: esteriaSeed,
-    layers: ['assets/img/goddess.png']
+    layers: ['assets/img/goddess.png'],
+    // 사용자 요청 반영: 여신 특성은 당분간 빈 목록으로 유지한다.
+    acquiredTraitIds: []
   });
   const player = createFixedNpc({
     id: 1,

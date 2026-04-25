@@ -69,9 +69,8 @@ const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
 const npcProfileFloat = $('npcProfileFloat');
-const npcProfileFloatHandle = $('npcProfileFloatHandle');
-const npcProfileFloatClose = $('npcProfileFloatClose');
 const profileCardFan = $('profileCardFan');
+const profileDiscardZone = $('profileDiscardZone');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
@@ -87,7 +86,7 @@ let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
 let profileCardBehavior = null;
-let profileFloatDragState = null;
+let profileDiscardController = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
@@ -471,6 +470,8 @@ const createProfileFrontMarkup = (npc) => {
 const destroyProfileCardBehavior = () => {
   profileCardBehavior?.destroy?.();
   profileCardBehavior = null;
+  profileDiscardController?.reset?.();
+  profileDiscardController = null;
 };
 
 const openNpcProfile = (npc) => {
@@ -481,24 +482,6 @@ const openNpcProfile = (npc) => {
   }
   destroyProfileCardBehavior();
   const tabs = [
-    {
-      key: 'identity',
-      label: '정체성',
-      render: () => {
-        const panel = document.createDocumentFragment();
-        panel.append(
-          createInfoRow('배우 ID', npc.actorId),
-          createInfoRow('역할', npc.role),
-          createInfoRow('가문', getFamilyName(npc)),
-          createInfoRow('현재 배우자 궁합', (() => {
-            const spouse = findNpcById(npc.familyLinks.spouseId);
-            const score = calculateSeedCompatibilityPercent(npc, spouse);
-            return score == null ? '없음' : `${score}%`;
-          })())
-        );
-        return panel;
-      }
-    },
     {
       key: 'relations',
       label: '관계',
@@ -642,12 +625,17 @@ const openNpcProfile = (npc) => {
   };
   renderProfileTabs();
 
+  profileDiscardController = templates.createDiscardZoneController({ zone: profileDiscardZone });
   profileCardBehavior = templates.createCardFanBehavior({ menu: profileCardFan, cards, ui: { cardVerticalStep: 0, hoverLiftY: -8 } });
   // 클릭은 선택만 처리하고, 뒤집기는 템플릿 기본의 롱프레스 동작으로 유지한다.
   profileCardBehavior.bindInteractions({
     onCardSelected: (selectedCard) => {
       templates.setActiveCard(cards, selectedCard);
-    }
+    },
+    shouldDiscardDrop: profileDiscardController.shouldDiscardDrop,
+    onCardDiscarded: () => closeNpcProfileFloat(),
+    onDragStateChange: (isDragging, payload) => profileDiscardController.onDragStateChange(isDragging, payload),
+    onDragMove: (payload) => profileDiscardController.onDragMove(payload)
   });
   profileCardBehavior.layoutCards();
   if (npcProfileFloat) npcProfileFloat.hidden = false;
@@ -658,40 +646,6 @@ const closeNpcProfileFloat = () => {
   npcProfileFloat.hidden = true;
   destroyProfileCardBehavior();
   if (profileCardFan) profileCardFan.replaceChildren();
-};
-
-const applyProfileFloatPosition = (left, top) => {
-  if (!npcProfileFloat) return;
-  npcProfileFloat.style.left = `${left}px`;
-  npcProfileFloat.style.top = `${top}px`;
-  npcProfileFloat.style.transform = 'none';
-};
-
-const startProfileFloatDrag = (event) => {
-  if (!npcProfileFloat || !npcProfileFloatHandle || npcProfileFloat.hidden) return;
-  if (event.target.closest('.modal-close')) return;
-  const rect = npcProfileFloat.getBoundingClientRect();
-  // 카드 창 자체를 이동시키기 위해 포인터와 창 좌측/상단의 차이를 저장한다.
-  profileFloatDragState = {
-    offsetX: event.clientX - rect.left,
-    offsetY: event.clientY - rect.top
-  };
-  npcProfileFloatHandle.setPointerCapture(event.pointerId);
-};
-
-const moveProfileFloatDrag = (event) => {
-  if (!profileFloatDragState || !npcProfileFloat) return;
-  const nextLeft = Math.max(8, Math.min(window.innerWidth - npcProfileFloat.offsetWidth - 8, event.clientX - profileFloatDragState.offsetX));
-  const nextTop = Math.max(8, Math.min(window.innerHeight - npcProfileFloat.offsetHeight - 8, event.clientY - profileFloatDragState.offsetY));
-  applyProfileFloatPosition(nextLeft, nextTop);
-};
-
-const endProfileFloatDrag = (event) => {
-  if (!profileFloatDragState || !npcProfileFloatHandle) return;
-  profileFloatDragState = null;
-  if (npcProfileFloatHandle.hasPointerCapture(event.pointerId)) {
-    npcProfileFloatHandle.releasePointerCapture(event.pointerId);
-  }
 };
 
 const buildFamilyTreeDom = (rootNpc, maxDepth = 3) => {
@@ -922,17 +876,6 @@ const bindEvents = () => {
     const id = Number(compareNpcA.value || 0);
     const npc = findNpcById(id);
     if (npc) openNpcProfile(npc);
-  });
-
-  if (npcProfileFloatClose) npcProfileFloatClose.addEventListener('click', closeNpcProfileFloat);
-  if (npcProfileFloatHandle) {
-    npcProfileFloatHandle.addEventListener('pointerdown', startProfileFloatDrag);
-    npcProfileFloatHandle.addEventListener('pointermove', moveProfileFloatDrag);
-    npcProfileFloatHandle.addEventListener('pointerup', endProfileFloatDrag);
-    npcProfileFloatHandle.addEventListener('pointercancel', endProfileFloatDrag);
-  }
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeNpcProfileFloat();
   });
 
   // 사용자 요청 반영: 팬카드 회전 인터랙션은 제거되어 별도 포인터/휠 이벤트를 바인딩하지 않는다.

@@ -202,16 +202,18 @@ const addOneToSeedLeadingDigit = (seed) => {
   return `${text.slice(0, firstDigitIndex)}${nextHead}${text.slice(firstDigitIndex + 1)}`;
 };
 
-const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed }) => ({
+const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed, layers = [] }) => ({
   id,
   actorId,
   uniqueSeed,
   role,
   familyId: ensureFamilyBySurname(name.surname),
-  name: { ...name, full: `${name.surname} ${name.given}` },
+  // 성/이름 중 하나가 비어도 자연스럽게 표시되도록 trim 처리한다.
+  name: { ...name, full: `${name.surname || ''} ${name.given || ''}`.trim() },
   gender,
   age,
   race,
+  layers,
   stats: createStats(),
   alignment: createAlignment(),
   familyLinks: { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] },
@@ -889,23 +891,28 @@ const regenerateNpcList = () => {
   const esteriaSeed = addOneToSeedLeadingDigit(playerSeed);
   const esteria = createFixedNpc({
     id: 0,
-    actorId: 'esteria',
-    role: 'npc',
-    name: { surname: '아스트랄', given: '에스테리아' },
+    // 시작화면 대표 캐릭터와 동일한 ID/이미지 키를 맞춘다.
+    actorId: 'goddess',
+    role: 'goddess',
+    // 로어 기준: 에스테리아는 "별의 여신" 타이틀을 가진다.
+    name: { surname: '별의 여신', given: '에스테리아' },
     gender: '여성',
     race: '인간',
-    age: 24,
-    uniqueSeed: esteriaSeed
+    age: 999,
+    uniqueSeed: esteriaSeed,
+    layers: ['assets/img/goddess.png']
   });
   const player = createFixedNpc({
     id: 1,
-    actorId: 'player',
+    actorId: 'pilgrim',
     role: 'pc',
-    name: { surname: '플레이어', given: '주인공' },
-    gender: '남성',
+    // 시작화면 임시 대표 캐릭터 이름과 동일하게 순례자를 사용한다.
+    name: { surname: '', given: '순례자' },
+    gender: '미정',
     race: '인간',
     age: 24,
-    uniqueSeed: playerSeed
+    uniqueSeed: playerSeed,
+    layers: ['assets/img/player.png']
   });
   const randomCount = Math.max(0, NPC_COUNT - 2);
   const randomNpcs = Array.from({ length: randomCount }, (_, index) => createNpcBase(index + 2, createSeed));

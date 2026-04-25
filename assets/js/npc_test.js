@@ -1,3 +1,5 @@
+import { createCharacterProfileCardTemplate } from './character_profile_card_template.js';
+
 const NPC_COUNT = 300;
 const NAME_POOL_PATH = './assets/data/npc_name_pools.json';
 
@@ -71,7 +73,7 @@ const openFocusNpc = $('openFocusNpc');
 const npcProfileDialog = $('npcProfileDialog');
 const profileName = $('profileName');
 const profileMeta = $('profileMeta');
-const profilePanel = $('profilePanel');
+const profileTemplateMount = $('profileTemplateMount');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
@@ -81,13 +83,12 @@ const familyPedigreeBoard = $('familyPedigreeBoard');
 
 const mainTabs = Array.from(document.querySelectorAll('.main-tab'));
 const screens = Array.from(document.querySelectorAll('[data-screen-panel]'));
-const profileTabs = Array.from(document.querySelectorAll('.profile-tab'));
 
 let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
-let profileTab = 'identity';
+let profileCardTemplate = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
@@ -146,6 +147,12 @@ const createAgeForRace = (raceInfo) => {
 };
 
 const createStats = () => ({ STR: randomInt(6, 20), DEX: randomInt(6, 20), CON: randomInt(6, 20), INT: randomInt(6, 20), WIS: randomInt(6, 20), CHA: randomInt(6, 20) });
+// 성향(3축)은 -100 ~ 100 범위를 사용한다.
+const createAlignment = () => ({
+  aggressionVsModeration: randomInt(-100, 100),
+  settlementVsWandering: randomInt(-100, 100),
+  honorVsPragmatism: randomInt(-100, 100)
+});
 
 const createNpcBase = (id, createSeed) => {
   const raceInfo = pickOne(RACE_POOL);
@@ -165,6 +172,7 @@ const createNpcBase = (id, createSeed) => {
     age: createAgeForRace(raceInfo),
     race: raceInfo.name,
     stats: createStats(),
+    alignment: createAlignment(),
     familyLinks: { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] },
     traits: { acquiredTraitIds: [pickOne(TRAIT_CATALOG).id, pickOne(TRAIT_CATALOG).id] }
   };
@@ -321,96 +329,227 @@ const activateScreen = (screenKey) => {
   screens.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.screenPanel === screenKey));
 };
 
-const activateProfileTab = (tabKey) => {
-  profileTab = tabKey;
-  profileTabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.profileTab === tabKey));
+const isDebugMode = () => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('debug') === '1' || localStorage.getItem('newtheria.debugMode') === '1';
+};
+
+const toStatPercent = (value) => Math.max(0, Math.min(100, Math.round((value / 20) * 100)));
+
+const createRadarChartNode = (npc) => {
+  const size = 280;
+  const center = size / 2;
+  const radius = 92;
+  const angleStep = (Math.PI * 2) / STAT_KEYS.length;
+  const polygonPoints = STAT_KEYS.map((key, index) => {
+    const ratio = (npc.stats[key] || 0) / 20;
+    const angle = -Math.PI / 2 + index * angleStep;
+    const x = center + Math.cos(angle) * radius * ratio;
+    const y = center + Math.sin(angle) * radius * ratio;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+
+  const gridPolygons = [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const points = STAT_KEYS.map((_, index) => {
+      const angle = -Math.PI / 2 + index * angleStep;
+      const x = center + Math.cos(angle) * radius * ratio;
+      const y = center + Math.sin(angle) * radius * ratio;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+    return `<polygon points="${points}" fill="none" stroke="rgba(167, 205, 255, .18)" />`;
+  }).join('');
+
+  const labels = STAT_KEYS.map((key, index) => {
+    const angle = -Math.PI / 2 + index * angleStep;
+    const x = center + Math.cos(angle) * (radius + 24);
+    const y = center + Math.sin(angle) * (radius + 24);
+    return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" text-anchor="middle" dominant-baseline="middle">${key}</text>`;
+  }).join('');
+
+  const box = document.createElement('article');
+  box.className = 'character-radar';
+  box.innerHTML = `
+    <svg viewBox="0 0 ${size} ${size}" role="img" aria-label="6대 스텟 레이더 차트">
+      ${gridPolygons}
+      <polygon points="${polygonPoints}" fill="rgba(132, 209, 255, .32)" stroke="rgba(148, 223, 255, .9)" stroke-width="2"></polygon>
+      ${labels}
+    </svg>
+  `;
+  return box;
+};
+
+const createAlignmentBarsNode = (npc) => {
+  const alignment = npc.alignment || {
+    aggressionVsModeration: 0,
+    settlementVsWandering: 0,
+    honorVsPragmatism: 0
+  };
+  const axis = [
+    { key: 'aggressionVsModeration', left: '호전', right: '온건' },
+    { key: 'settlementVsWandering', left: '정착', right: '방랑' },
+    { key: 'honorVsPragmatism', left: '명예', right: '실리' }
+  ];
+  const wrap = document.createElement('section');
+  wrap.className = 'alignment-bars';
+  axis.forEach((item) => {
+    const value = Number(alignment[item.key] || 0);
+    const widthPercent = Math.max(0, Math.min(100, 50 + (value / 2)));
+    const label = value >= 0 ? item.left : item.right;
+    const row = document.createElement('article');
+    row.innerHTML = `
+      <strong>${item.left} ↔ ${item.right}</strong>
+      <span class="muted">현재: ${label} (${value})</span>
+      <span class="track"><i class="fill" style="left: 0; width: ${widthPercent}%"></i></span>
+    `;
+    wrap.append(row);
+  });
+  return wrap;
+};
+
+const createProfileFrontNode = (npc) => {
+  const node = document.createElement('article');
+  const statBars = STAT_KEYS.slice(0, 3).map((key) => `
+    <span class="character-profile-front__bar">
+      <span>${key}</span>
+      <i><b style="width:${toStatPercent(npc.stats[key])}%"></b></i>
+    </span>
+  `).join('');
+
+  node.innerHTML = `
+    <h4 class="character-profile-front__name">${displayNpcName(npc)} (#${npc.id})</h4>
+    <p class="character-profile-front__meta">${npc.race} · ${npc.gender} · ${npc.age}세</p>
+    <div class="character-profile-front__chips">
+      <span class="character-profile-front__chip">${getFamilyName(npc)}</span>
+      <span class="character-profile-front__chip">특성 ${(npc.traits?.acquiredTraitIds || []).length}개</span>
+    </div>
+    <div class="character-profile-front__bars">${statBars}</div>
+  `;
+  return node;
 };
 
 const openNpcProfile = (npc) => {
   profileName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
   profileMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
-  const panel = document.createDocumentFragment();
-
-  if (profileTab === 'identity') {
-    panel.append(
-      createInfoRow('배우 ID', npc.actorId),
-      createInfoRow('역할', npc.role),
-      createInfoRow('가문', getFamilyName(npc)),
-      createInfoRow('현재 배우자 궁합', (() => {
-        const spouse = findNpcById(npc.familyLinks.spouseId);
-        const score = calculateSeedCompatibilityPercent(npc, spouse);
-        return score == null ? '없음' : `${score}%`;
-      })())
-    );
+  if (!profileCardTemplate) {
+    profileCardTemplate = createCharacterProfileCardTemplate({ mount: profileTemplateMount });
   }
-
-  if (profileTab === 'relations') {
-    panel.append(
-      createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
-      createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
-      createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
-      createInfoRow('자녀', (() => {
+  const tabs = [
+    {
+      key: 'identity',
+      label: '정체성',
+      render: () => {
+        const panel = document.createDocumentFragment();
+        panel.append(
+          createInfoRow('배우 ID', npc.actorId),
+          createInfoRow('역할', npc.role),
+          createInfoRow('가문', getFamilyName(npc)),
+          createInfoRow('현재 배우자 궁합', (() => {
+            const spouse = findNpcById(npc.familyLinks.spouseId);
+            const score = calculateSeedCompatibilityPercent(npc, spouse);
+            return score == null ? '없음' : `${score}%`;
+          })())
+        );
+        return panel;
+      }
+    },
+    {
+      key: 'relations',
+      label: '관계',
+      render: () => {
+        const panel = document.createDocumentFragment();
+        panel.append(
+          createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
+          createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
+          createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
+          createInfoRow('자녀', (() => {
+            const wrap = document.createElement('div');
+            wrap.className = 'inline-actions';
+            const children = npc.familyLinks.childrenIds || [];
+            if (children.length === 0) return document.createTextNode('없음');
+            children.forEach((id) => wrap.append(createNpcEntity(id)));
+            return wrap;
+          })()),
+          createInfoRow('연문 관계', (() => {
+            const wrap = document.createElement('div');
+            wrap.className = 'inline-actions';
+            const affairs = npc.familyLinks.affairPartnerIds || [];
+            if (affairs.length === 0) return document.createTextNode('없음');
+            affairs.forEach((id) => wrap.append(createNpcEntity(id)));
+            return wrap;
+          })())
+        );
+        return panel;
+      }
+    },
+    {
+      key: 'traits',
+      label: '특성',
+      render: () => {
+        const panel = document.createDocumentFragment();
         const wrap = document.createElement('div');
         wrap.className = 'inline-actions';
-        const children = npc.familyLinks.childrenIds || [];
-        if (children.length === 0) return document.createTextNode('없음');
-        children.forEach((id) => wrap.append(createNpcEntity(id)));
-        return wrap;
-      })()),
-      createInfoRow('연문 관계', (() => {
-        const wrap = document.createElement('div');
-        wrap.className = 'inline-actions';
-        const affairs = npc.familyLinks.affairPartnerIds || [];
-        if (affairs.length === 0) return document.createTextNode('없음');
-        affairs.forEach((id) => wrap.append(createNpcEntity(id)));
-        return wrap;
-      })())
-    );
-  }
-
-  if (profileTab === 'traits') {
-    const wrap = document.createElement('div');
-    wrap.className = 'inline-actions';
-    (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-      const chip = document.createElement('span');
-      chip.className = 'inline-entity';
-      chip.textContent = traitNameOf(traitId);
-      chip.tabIndex = 0;
-      chip.role = 'button';
-      const open = () => openTraitDialog(traitId);
-      chip.addEventListener('click', open);
-      chip.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          open();
-        }
-      });
-      wrap.append(chip);
+        (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
+          const chip = document.createElement('span');
+          chip.className = 'inline-entity';
+          chip.textContent = traitNameOf(traitId);
+          chip.tabIndex = 0;
+          chip.role = 'button';
+          const open = () => openTraitDialog(traitId);
+          chip.addEventListener('click', open);
+          chip.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              open();
+            }
+          });
+          wrap.append(chip);
+        });
+        panel.append(createInfoRow('후천 특성', wrap));
+        return panel;
+      }
+    },
+    {
+      key: 'stats',
+      label: '스탯',
+      render: () => {
+        const panel = document.createDocumentFragment();
+        panel.append(createRadarChartNode(npc));
+        STAT_KEYS.forEach((key) => panel.append(createInfoRow(key, String(npc.stats[key]))));
+        return panel;
+      }
+    },
+    {
+      key: 'alignment',
+      label: '성향',
+      render: () => createAlignmentBarsNode(npc)
+    }
+  ];
+  if (isDebugMode()) {
+    tabs.push({
+      key: 'debug',
+      label: '디버그',
+      render: () => {
+        const point = seedToTorusPoint(npc.uniqueSeed);
+        const panel = document.createDocumentFragment();
+        panel.append(
+          createInfoRow('고유 시드', npc.uniqueSeed),
+          createInfoRow('토러스 좌표', `${point[0]} / ${point[1]} / ${point[2]}`),
+          createInfoRow('형제 수(이복 포함)', String((npcList.filter((x) => x.id !== npc.id && areSiblings(x, npc))).length)),
+          createInfoRow('패밀리 트리', (() => {
+            const button = document.createElement('button');
+            button.className = 'ghost-btn';
+            button.textContent = '트리 팝업 열기';
+            button.addEventListener('click', () => openFamilyTree(npc));
+            return button;
+          })())
+        );
+        return panel;
+      }
     });
-    panel.append(createInfoRow('후천 특성', wrap));
   }
-
-  if (profileTab === 'stats') {
-    STAT_KEYS.forEach((key) => panel.append(createInfoRow(key, String(npc.stats[key]))));
-  }
-
-  if (profileTab === 'seed') {
-    const point = seedToTorusPoint(npc.uniqueSeed);
-    panel.append(
-      createInfoRow('고유 시드', npc.uniqueSeed),
-      createInfoRow('토러스 좌표', `${point[0]} / ${point[1]} / ${point[2]}`),
-      createInfoRow('형제 수(이복 포함)', String((npcList.filter((x) => x.id !== npc.id && areSiblings(x, npc))).length)),
-      createInfoRow('패밀리 트리', (() => {
-        const button = document.createElement('button');
-        button.className = 'ghost-btn';
-        button.textContent = '트리 팝업 열기';
-        button.addEventListener('click', () => openFamilyTree(npc));
-        return button;
-      })())
-    );
-  }
-
-  profilePanel.replaceChildren(panel);
+  profileCardTemplate.setFrontContent(createProfileFrontNode(npc));
+  profileCardTemplate.setTabs(tabs);
+  profileCardTemplate.close();
   if (!npcProfileDialog.open) npcProfileDialog.showModal();
 };
 
@@ -644,14 +783,9 @@ const bindEvents = () => {
     if (npc) openNpcProfile(npc);
   });
 
-  profileTabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      activateProfileTab(tab.dataset.profileTab);
-      const idMatch = profileName.textContent.match(/#(\d+)\)/);
-      if (!idMatch) return;
-      const npc = findNpcById(Number(idMatch[1]));
-      if (npc) openNpcProfile(npc);
-    });
+  npcProfileDialog.addEventListener('close', () => {
+    // 다음 NPC를 열 때 앞면부터 다시 보이도록 상태를 리셋한다.
+    profileCardTemplate?.close();
   });
 
   // 사용자 요청 반영: 팬카드 회전 인터랙션은 제거되어 별도 포인터/휠 이벤트를 바인딩하지 않는다.

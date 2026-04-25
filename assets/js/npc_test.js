@@ -393,11 +393,12 @@ const createAlignmentBarsNode = (npc) => {
     const value = Number(alignment[item.key] || 0);
     const widthPercent = Math.max(0, Math.min(100, 50 + (value / 2)));
     const label = value >= 0 ? item.left : item.right;
+    const fillClass = value >= 0 ? 'fill fill--warm' : 'fill fill--cool';
     const row = document.createElement('article');
     row.innerHTML = `
       <strong>${item.left} ↔ ${item.right}</strong>
       <span class="muted">현재: ${label} (${value})</span>
-      <span class="track"><i class="fill" style="left: 0; width: ${widthPercent}%"></i></span>
+      <span class="track"><i class="${fillClass}" style="left: 0; width: ${widthPercent}%"></i></span>
     `;
     wrap.append(row);
   });
@@ -435,16 +436,16 @@ const createMiniRadarMarkup = (npc) => {
 const createMiniAlignmentMarkup = (npc) => {
   const alignment = npc.alignment || { aggressionVsModeration: 0, settlementVsWandering: 0, honorVsPragmatism: 0 };
   const rows = [
-    { label: '호전', value: alignment.aggressionVsModeration },
-    { label: '정착', value: alignment.settlementVsWandering },
-    { label: '명예', value: alignment.honorVsPragmatism }
+    { left: '호전', right: '온건', value: alignment.aggressionVsModeration },
+    { left: '정착', right: '방랑', value: alignment.settlementVsWandering },
+    { left: '명예', right: '실리', value: alignment.honorVsPragmatism }
   ];
   return `
     <div class="profile-mini-alignment">
       ${rows.map((row) => `
         <article>
-          <span>${row.label}</span>
-          <span class="track"><i class="fill" style="width:${Math.max(0, Math.min(100, 50 + (Number(row.value || 0) / 2)))}%"></i></span>
+          <span>${Number(row.value || 0) >= 0 ? row.left : row.right}</span>
+          <span class="track"><i class="fill ${Number(row.value || 0) >= 0 ? 'fill--warm' : 'fill--cool'}" style="width:${Math.max(0, Math.min(100, 50 + (Number(row.value || 0) / 2)))}%"></i></span>
         </article>
       `).join('')}
     </div>

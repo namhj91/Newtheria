@@ -283,7 +283,13 @@ body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-di
 .profile-mini-alignment { display: grid; gap: 4px; }
 .profile-mini-alignment article { display: grid; grid-template-columns: 42px 1fr; gap: 6px; align-items: center; font-size: .68rem; }
 .profile-mini-alignment .track { height: 7px; border-radius: 999px; background: rgba(9,17,41,.9); overflow: hidden; }
-.profile-mini-alignment .fill { display: block; height: 100%; background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
+.profile-mini-alignment .fill { display: block; height: 100%; }
+.fill--warm { background: linear-gradient(90deg, rgba(255, 106, 106, .92), rgba(255, 165, 111, .92)); }
+.fill--cool { background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
+
+/* 카드 뒷면 성향 바도 동일 규칙을 사용한다. */
+.alignment-bars .fill.fill--warm { background: linear-gradient(90deg, rgba(255, 106, 106, .92), rgba(255, 165, 111, .92)); }
+.alignment-bars .fill.fill--cool { background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
 
 .profile-tabs { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .profile-tab { border: 0; min-height: 32px; border-radius: 10px; padding: 0 12px; color: var(--text); background: rgba(56, 81, 138, .74); cursor: pointer; }

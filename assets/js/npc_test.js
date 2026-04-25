@@ -30,8 +30,8 @@ const TRAIT_CATALOG = [
   { id: 308, name: '연설 능력', type: '정신', rarity: '희귀', description: '다수 설득과 사기 고양에 보너스를 준다.' },
   { id: 309, name: '화염 저항', type: '신체', rarity: '희귀', description: '화염 피해 저항과 내열 적응력을 높인다.' },
   { id: 310, name: '지형 파악', type: '기타', rarity: '일반', description: '지형 기반 이동/매복 판단을 강화한다.' },
-  { id: 311, name: '카사노바', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (남성 전용 예외)' },
-  { id: 312, name: '팜므파탈', type: '기타', rarity: '영웅', description: '연문 관계 인원 제한을 적용받지 않는다. (여성 전용 예외)' },
+  { id: 311, name: '카사노바', type: '기타', rarity: '영웅', description: '불륜 관계 인원 제한을 적용받지 않는다. (남성 전용 예외)' },
+  { id: 312, name: '팜므파탈', type: '기타', rarity: '영웅', description: '불륜 관계 인원 제한을 적용받지 않는다. (여성 전용 예외)' },
   { id: 313, name: '근친 성향', type: '페티시', rarity: '전설', description: '형제(이복 포함) 간 혼인 제한을 무시한다.' },
   { id: 314, name: '가능충', type: '페티시', rarity: '전설', description: '이종 간 혼인 제한을 무시한다. (단, 이종 배우자끼리는 자녀 불가)' }
 ];
@@ -96,8 +96,23 @@ const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
 const displayNpcName = (npc) => npc?.name?.full || '이름 없음';
 const traitNameOf = (traitId) => TRAIT_BY_ID.get(traitId)?.name || `미정특성#${traitId}`;
 const traitMetaReviewOf = (traitId) => TRAIT_META_REVIEW_BY_ID.get(traitId) || '특성 메타 한줄평 미정';
+// 특성 희귀도에 따른 칩 색상 클래스를 매핑한다.
+const traitRarityClassOf = (traitId) => {
+  const rarity = TRAIT_BY_ID.get(traitId)?.rarity;
+  if (rarity === '희귀') return 'trait-chip--rare';
+  if (rarity === '영웅') return 'trait-chip--heroic';
+  if (rarity === '전설') return 'trait-chip--legendary';
+  return 'trait-chip--common';
+};
 const isAdult = (npc) => (npc?.age || 0) >= ADULT_AGE;
 const hasAcquiredTrait = (npc, traitId) => (npc?.traits?.acquiredTraitIds || []).includes(traitId);
+// 성별 제한 특성(카사노바/팜므파탈)을 반영한 후보 풀을 반환한다.
+const getTraitPoolByGender = (gender) => TRAIT_CATALOG.filter((trait) => {
+  if (trait.id === TRAIT_ID.CASANOVA) return gender === '남성';
+  if (trait.id === TRAIT_ID.FEMME_FATALE) return gender === '여성';
+  return true;
+});
+const pickTraitIdByGender = (gender) => pickOne(getTraitPoolByGender(gender)).id;
 
 const computeSeedChecksum = (payload) => payload.split('').reduce((acc, digit) => acc + Number(digit), 0) % 10;
 const attachSeedChecksum = (payload) => `${payload}${computeSeedChecksum(payload)}`;
@@ -172,9 +187,39 @@ const createNpcBase = (id, createSeed) => {
     stats: createStats(),
     alignment: createAlignment(),
     familyLinks: { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] },
-    traits: { acquiredTraitIds: [pickOne(TRAIT_CATALOG).id, pickOne(TRAIT_CATALOG).id] }
+    // 사용자 요청 반영: 카사노바(311)는 남성만, 팜므파탈(312)은 여성만 뽑히도록 제한한다.
+    traits: { acquiredTraitIds: [pickTraitIdByGender(gender), pickTraitIdByGender(gender)] }
   };
 };
+
+// 시드 문자열의 맨 앞자리만 +1 한다. (한 자리 유지가 필요하므로 9 다음은 0으로 순환)
+const addOneToSeedLeadingDigit = (seed) => {
+  const text = String(seed || '');
+  const firstDigitIndex = text.search(/\d/);
+  if (firstDigitIndex < 0) return text;
+  const head = Number(text[firstDigitIndex]);
+  const nextHead = (head + 1) % 10;
+  return `${text.slice(0, firstDigitIndex)}${nextHead}${text.slice(firstDigitIndex + 1)}`;
+};
+
+const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed, layers = [], acquiredTraitIds = null }) => ({
+  id,
+  actorId,
+  uniqueSeed,
+  role,
+  familyId: ensureFamilyBySurname(name.surname),
+  // 성/이름 중 하나가 비어도 자연스럽게 표시되도록 trim 처리한다.
+  name: { ...name, full: `${name.surname || ''} ${name.given || ''}`.trim() },
+  gender,
+  age,
+  race,
+  layers,
+  stats: createStats(),
+  alignment: createAlignment(),
+  familyLinks: { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] },
+  // 고정 캐릭터는 특성을 명시 전달하면 그대로 사용하고, 없으면 기본 성별 규칙으로 생성한다.
+  traits: { acquiredTraitIds: Array.isArray(acquiredTraitIds) ? acquiredTraitIds : [pickTraitIdByGender(gender), pickTraitIdByGender(gender)] }
+});
 
 const canBeParent = (npc, child, minGap) => npc.race === child.race && npc.age - child.age >= minGap;
 const areSiblings = (l, r) => Boolean((l?.familyLinks?.fatherId && l.familyLinks.fatherId === r?.familyLinks?.fatherId) || (l?.familyLinks?.motherId && l.familyLinks.motherId === r?.familyLinks?.motherId));
@@ -195,7 +240,9 @@ const assignFamilyLinks = (list) => {
   list.forEach((npc) => { if (!byRace.has(npc.race)) byRace.set(npc.race, []); byRace.get(npc.race).push(npc); });
 
   list.forEach((child) => {
-    const candidates = (byRace.get(child.race) || []).filter((npc) => npc.id !== child.id);
+    // 로어 고정 규칙: 별의 여신(0번)은 부모/자녀 관계 생성 대상에서 제외한다.
+    if (child.id === 0) return;
+    const candidates = (byRace.get(child.race) || []).filter((npc) => npc.id !== child.id && npc.id !== 0);
     const fatherCandidates = candidates.filter((npc) => npc.gender === '남성' && canBeParent(npc, child, 16));
     const motherCandidates = candidates.filter((npc) => npc.gender === '여성' && canBeParent(npc, child, 15));
 
@@ -221,8 +268,9 @@ const assignFamilyLinks = (list) => {
 };
 
 const assignSpouseLinks = (list) => {
-  const males = list.filter((npc) => npc.gender === '남성' && isAdult(npc)).sort(() => Math.random() - 0.5);
-  const females = list.filter((npc) => npc.gender === '여성' && isAdult(npc)).sort(() => Math.random() - 0.5);
+  // 로어 고정 규칙: 별의 여신(0번)은 배우자 매칭에서 제외한다.
+  const males = list.filter((npc) => npc.id !== 0 && npc.gender === '남성' && isAdult(npc)).sort(() => Math.random() - 0.5);
+  const females = list.filter((npc) => npc.id !== 0 && npc.gender === '여성' && isAdult(npc)).sort(() => Math.random() - 0.5);
   const availableFemaleIds = new Set(females.map((f) => f.id));
 
   males.forEach((male) => {
@@ -239,9 +287,16 @@ const assignSpouseLinks = (list) => {
 const hasAffairLimitBypassTrait = (npc) => (npc?.gender === '남성' ? hasAcquiredTrait(npc, TRAIT_ID.CASANOVA) : hasAcquiredTrait(npc, TRAIT_ID.FEMME_FATALE));
 const canAcceptMoreAffairs = (npc) => hasAffairLimitBypassTrait(npc) || (npc?.familyLinks?.affairPartnerIds || []).length < MAX_AFFAIRS_DEFAULT;
 const canBeAffairPair = (l, r) => l && r && l.id !== r.id && isAdult(l) && isAdult(r) && l.familyLinks.spouseId !== r.id && !(l.familyLinks.affairPartnerIds || []).includes(r.id) && !(r.familyLinks.affairPartnerIds || []).includes(l.id);
+// 카사노바/팜므파탈은 인원 제한은 없지만, 관계가 늘수록 다음 상대가 생길 확률은 점진적으로 낮춘다.
+const getDiminishedAffairChance = (currentAffairCount) => {
+  const safeCount = Math.max(0, Number(currentAffairCount || 0));
+  // 예) 0명: 0.22, 1명: 0.154, 2명: 0.108 ...
+  return AFFAIR_MULTI_CHANCE * (0.7 ** safeCount);
+};
 
 const assignAffairLinks = (list) => {
-  const adults = list.filter((npc) => isAdult(npc));
+  // 로어 고정 규칙: 별의 여신(0번)은 불륜 관계 생성에서 제외한다.
+  const adults = list.filter((npc) => npc.id !== 0 && isAdult(npc));
   const byId = new Map(adults.map((npc) => [npc.id, npc]));
   adults.forEach((npc) => {
     if (!npc.familyLinks.spouseId || !canAcceptMoreAffairs(npc) || Math.random() >= AFFAIR_TRIGGER_CHANCE) return;
@@ -249,7 +304,9 @@ const assignAffairLinks = (list) => {
     if (candidates.length === 0) return;
     if (hasAffairLimitBypassTrait(npc)) {
       candidates.forEach((partner) => {
-        if (!canAcceptMoreAffairs(partner) || !canBeAffairPair(npc, partner) || Math.random() >= AFFAIR_MULTI_CHANCE) return;
+        const currentCount = (npc.familyLinks.affairPartnerIds || []).length;
+        const diminishedChance = getDiminishedAffairChance(currentCount);
+        if (!canAcceptMoreAffairs(partner) || !canBeAffairPair(npc, partner) || Math.random() >= diminishedChance) return;
         npc.familyLinks.affairPartnerIds.push(partner.id);
         byId.get(partner.id).familyLinks.affairPartnerIds.push(npc.id);
       });
@@ -290,12 +347,12 @@ const createInfoRow = (label, valueNodeOrText) => {
   return row;
 };
 
-const createNpcEntity = (npcId) => {
+const createNpcEntity = (npcId, { showId = true } = {}) => {
   const npc = findNpcById(npcId);
   if (!npc) return document.createTextNode('없음');
   const node = document.createElement('span');
   node.className = 'inline-entity';
-  node.textContent = `${displayNpcName(npc)} (#${npc.id})`;
+  node.textContent = showId ? `${displayNpcName(npc)} (#${npc.id})` : displayNpcName(npc);
   node.role = 'button';
   node.tabIndex = 0;
   const open = () => openNpcProfile(npc);
@@ -307,6 +364,28 @@ const createNpcEntity = (npcId) => {
     }
   });
   return node;
+};
+
+// 관계 탭에서 인원이 많아도 한 번에 보이도록, 이름만 보이는 객체형(클릭 가능) 라인을 만든다.
+const createNpcCompactEntityList = (npcIds = []) => {
+  const list = Array.isArray(npcIds) ? npcIds : [];
+  if (list.length === 0) return document.createTextNode('없음');
+  const wrap = document.createElement('div');
+  wrap.className = 'compact-entity-list';
+  list.forEach((id, index) => {
+    const entity = createNpcEntity(id, { showId: false });
+    if (entity instanceof Node) {
+      if (entity.nodeType === Node.ELEMENT_NODE) entity.classList.add('compact-entity-item');
+      wrap.append(entity);
+      if (index < list.length - 1) {
+        const separator = document.createElement('span');
+        separator.className = 'compact-entity-separator';
+        separator.textContent = '·';
+        wrap.append(separator);
+      }
+    }
+  });
+  return wrap;
 };
 
 const openTraitDialog = (traitId) => {
@@ -335,7 +414,8 @@ const isDebugMode = () => {
 const toStatPercent = (value) => Math.max(0, Math.min(100, Math.round((value / 20) * 100)));
 
 const createRadarChartNode = (npc) => {
-  const size = 280;
+  // 카드 내부에서 스탯 숫자 영역이 한 화면에 보이도록 레이더 크기를 소폭 축소한다.
+  const size = 240;
   const center = size / 2;
   const radius = 92;
   const angleStep = (Math.PI * 2) / STAT_KEYS.length;
@@ -373,6 +453,18 @@ const createRadarChartNode = (npc) => {
       ${labels}
     </svg>
   `;
+  return box;
+};
+
+const createStatGridNode = (npc) => {
+  const box = document.createElement('article');
+  box.className = 'stat-chip-grid';
+  STAT_KEYS.forEach((key) => {
+    const cell = document.createElement('div');
+    cell.className = 'stat-chip';
+    cell.innerHTML = `<b>${key}</b><span>${npc.stats[key]}</span>`;
+    box.append(cell);
+  });
   return box;
 };
 
@@ -492,22 +584,8 @@ const openNpcProfile = (npc) => {
           createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
           createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
           createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
-          createInfoRow('자녀', (() => {
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-actions';
-            const children = npc.familyLinks.childrenIds || [];
-            if (children.length === 0) return document.createTextNode('없음');
-            children.forEach((id) => wrap.append(createNpcEntity(id)));
-            return wrap;
-          })()),
-          createInfoRow('연문 관계', (() => {
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-actions';
-            const affairs = npc.familyLinks.affairPartnerIds || [];
-            if (affairs.length === 0) return document.createTextNode('없음');
-            affairs.forEach((id) => wrap.append(createNpcEntity(id)));
-            return wrap;
-          })())
+          // 자녀 이름도 객체형으로 유지해, 눌러서 바로 해당 캐릭터 정보를 열 수 있게 한다.
+          createInfoRow('자녀', createNpcCompactEntityList(npc.familyLinks.childrenIds || []))
         );
         return panel;
       }
@@ -521,7 +599,8 @@ const openNpcProfile = (npc) => {
         wrap.className = 'inline-actions';
         (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
           const chip = document.createElement('span');
-          chip.className = 'inline-entity';
+          // 희귀도 색상을 함께 부여해 특성 가치가 즉시 구분되도록 한다.
+          chip.className = `inline-entity trait-chip ${traitRarityClassOf(traitId)}`;
           chip.textContent = traitNameOf(traitId);
           chip.tabIndex = 0;
           chip.role = 'button';
@@ -535,7 +614,7 @@ const openNpcProfile = (npc) => {
           });
           wrap.append(chip);
         });
-        panel.append(createInfoRow('후천 특성', wrap));
+        panel.append(createInfoRow('특성', wrap));
         return panel;
       }
     },
@@ -545,7 +624,8 @@ const openNpcProfile = (npc) => {
       render: () => {
         const panel = document.createDocumentFragment();
         panel.append(createRadarChartNode(npc));
-        STAT_KEYS.forEach((key) => panel.append(createInfoRow(key, String(npc.stats[key]))));
+        // 숫자 스탯은 2열 칩으로 고정 노출해 스크롤 없이 한 번에 볼 수 있게 한다.
+        panel.append(createStatGridNode(npc));
         return panel;
       }
     },
@@ -566,6 +646,14 @@ const openNpcProfile = (npc) => {
           createInfoRow('고유 시드', npc.uniqueSeed),
           createInfoRow('토러스 좌표', `${point[0]} / ${point[1]} / ${point[2]}`),
           createInfoRow('형제 수(이복 포함)', String((npcList.filter((x) => x.id !== npc.id && areSiblings(x, npc))).length)),
+          createInfoRow('불륜 관계', (() => {
+            const wrap = document.createElement('div');
+            wrap.className = 'inline-actions';
+            const affairs = npc.familyLinks.affairPartnerIds || [];
+            if (affairs.length === 0) return document.createTextNode('없음');
+            affairs.forEach((id) => wrap.append(createNpcEntity(id)));
+            return wrap;
+          })()),
           createInfoRow('패밀리 트리', (() => {
             const button = document.createElement('button');
             button.className = 'ghost-btn';
@@ -818,10 +906,46 @@ const populateFilters = () => {
 
 const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
-  npcList = Array.from({ length: NPC_COUNT }, (_, index) => createNpcBase(index + 1, createSeed));
+  // 사용자 요청 반영:
+  // 0번은 에스테리아, 1번은 플레이어로 고정하고 두 캐릭터는 같은 시드를 사용한다.
+  const playerSeed = createSeed();
+  const esteriaSeed = playerSeed;
+  const esteria = createFixedNpc({
+    id: 0,
+    // 시작화면 대표 캐릭터와 동일한 ID/이미지 키를 맞춘다.
+    actorId: 'goddess',
+    role: 'goddess',
+    // 로어 기준: 에스테리아는 "별의 여신" 타이틀을 가진다.
+    name: { surname: '별의 여신', given: '에스테리아' },
+    gender: '여성',
+    // 사용자 요청 반영: 여신의 종족은 일반 종족이 아닌 특수 종족 "여신"으로 고정한다.
+    race: '여신',
+    age: 999,
+    uniqueSeed: esteriaSeed,
+    layers: ['assets/img/goddess.png'],
+    // 사용자 요청 반영: 여신 특성은 당분간 빈 목록으로 유지한다.
+    acquiredTraitIds: []
+  });
+  const player = createFixedNpc({
+    id: 1,
+    actorId: 'pilgrim',
+    role: 'pc',
+    // 시작화면 임시 대표 캐릭터 이름과 동일하게 순례자를 사용한다.
+    name: { surname: '', given: '순례자' },
+    gender: '미정',
+    race: '인간',
+    age: 24,
+    uniqueSeed: playerSeed,
+    layers: ['assets/img/player.png']
+  });
+  const randomCount = Math.max(0, NPC_COUNT - 2);
+  const randomNpcs = Array.from({ length: randomCount }, (_, index) => createNpcBase(index + 2, createSeed));
+  npcList = [esteria, player, ...randomNpcs];
   assignFamilyLinks(npcList);
   assignSpouseLinks(npcList);
   assignAffairLinks(npcList);
+  // 안전망: 생성 후에도 여신의 가족/배우자/불륜/자녀 링크는 비어 있어야 한다.
+  esteria.familyLinks = { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] };
   rebuildIndexes();
   populateFilters();
   renderOverviewMetrics();

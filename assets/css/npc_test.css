@@ -179,16 +179,20 @@ body {
   position: fixed;
   inset: 0;
   z-index: 30;
-  background: rgba(2, 6, 18, .68);
+  /* 클릭 간섭 방지:
+     전체 오버레이는 포인터 이벤트를 받지 않고, 카드/디스카드 존만 이벤트를 받게 한다. */
+  background: transparent;
   display: grid;
   grid-template-rows: 1fr auto;
   align-items: center;
   justify-items: center;
+  pointer-events: none;
 }
 .profile-float__body {
   width: min(760px, calc(100% - 24px));
   display: grid;
   place-items: center;
+  pointer-events: auto;
 }
 .profile-card-fan {
   width: min(520px, 100%);
@@ -211,8 +215,8 @@ body {
   background: rgba(56, 16, 24, .42);
   opacity: 0;
   transform: translateY(10px);
-  pointer-events: none;
   transition: opacity .18s ease, transform .18s ease, background-color .2s ease, border-color .2s ease;
+  pointer-events: auto;
 }
 .profile-discard-zone.is-hot {
   background: rgba(125, 28, 45, .64);

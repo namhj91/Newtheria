@@ -209,10 +209,21 @@ body {
   place-items: center;
   font-size: .82rem;
   background: rgba(56, 16, 24, .42);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease, background-color .2s ease, border-color .2s ease;
 }
 .profile-discard-zone.is-hot {
   background: rgba(125, 28, 45, .64);
   border-style: solid;
+}
+body.profile-discard-active #npcProfileFloat .profile-discard-zone {
+  opacity: .86;
+}
+body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-discard-zone {
+  opacity: 1;
+  transform: translateY(0);
 }
 .profile-back-panel {
   display: grid;

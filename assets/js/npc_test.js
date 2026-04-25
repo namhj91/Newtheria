@@ -625,7 +625,11 @@ const openNpcProfile = (npc) => {
   };
   renderProfileTabs();
 
-  profileDiscardController = templates.createDiscardZoneController({ zone: profileDiscardZone });
+  profileDiscardController = templates.createDiscardZoneController({
+    zone: profileDiscardZone,
+    activeClassName: 'profile-discard-active',
+    visibleClassName: 'profile-discard-visible'
+  });
   profileCardBehavior = templates.createCardFanBehavior({ menu: profileCardFan, cards, ui: { cardVerticalStep: 0, hoverLiftY: -8 } });
   // 클릭은 선택만 처리하고, 뒤집기는 템플릿 기본의 롱프레스 동작으로 유지한다.
   profileCardBehavior.bindInteractions({

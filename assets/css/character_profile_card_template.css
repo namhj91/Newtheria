@@ -110,9 +110,11 @@
 .character-profile-card__back {
   transform: rotateY(180deg);
   display: grid;
-  place-content: center;
-  text-align: center;
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  text-align: left;
   gap: 8px;
+  padding: 14px;
   background:
     radial-gradient(circle at 28% 24%, rgba(77, 213, 255, .24), transparent 44%),
     radial-gradient(circle at 72% 76%, rgba(129, 140, 248, .26), transparent 42%),
@@ -125,29 +127,35 @@
   border: 1px solid rgba(148, 223, 255, .28);
 }
 .character-profile-card__back .sigil {
-  font-size: 2rem;
+  font-size: 1.2rem;
   text-shadow: 0 0 16px rgba(56, 189, 248, .45);
 }
-.character-profile-card__back .brand { font-size: .86rem; letter-spacing: .2em; }
-.character-profile-card__back .message { font-size: .8rem; color: rgba(220, 236, 255, .86); }
-
-.character-profile-details {
-  width: min(760px, 100%);
-  display: grid;
+.character-profile-card__back .brand { font-size: .82rem; letter-spacing: .06em; color: rgba(220, 236, 255, .9); }
+.character-profile-card__back-header {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 .character-profile-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .character-profile-tab {
   border: 0;
-  min-height: 32px;
+  min-height: 28px;
   border-radius: 10px;
-  padding: 0 12px;
+  padding: 0 9px;
+  font-size: .77rem;
   color: var(--text);
   background: rgba(56, 81, 138, .74);
   cursor: pointer;
 }
 .character-profile-tab.is-active { background: rgba(101, 131, 209, .95); }
-.character-profile-panel { display: grid; gap: 8px; }
+.character-profile-panel {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  padding-right: 2px;
+}
 
 /* 6대 스텟 레이더 차트 */
 .character-radar {

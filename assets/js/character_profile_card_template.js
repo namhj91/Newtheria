@@ -1,7 +1,7 @@
 /**
  * 캐릭터 정보 템플릿 카드.
  * - 카드 앞면: 요약 정보
- * - 롱프레스: 카드 뒤집기 + 확대 + 상세 탭 노출
+ * - 롱프레스/클릭: 카드 뒤집기 + 카드 뒷면 상세 탭 노출
  */
 export const createCharacterProfileCardTemplate = ({
   mount,
@@ -14,40 +14,45 @@ export const createCharacterProfileCardTemplate = ({
   const root = document.createElement('section');
   root.className = 'character-profile-template';
 
-  const cardButton = document.createElement('button');
-  cardButton.type = 'button';
-  cardButton.className = 'character-profile-card';
-  cardButton.innerHTML = `
-    <span class="character-profile-card__spin">
-      <span class="character-profile-card__inner">
-        <span class="character-profile-card__face character-profile-card__front">
-          <span class="character-profile-card__front-body" data-front-body></span>
-          <span class="character-profile-card__hint">꾹 눌러 상세 보기</span>
-        </span>
-        <span class="character-profile-card__face character-profile-card__back">
-          <span class="orbit"></span>
-          <span class="sigil">✦</span>
-          <span class="brand">Newtheria</span>
-          <span class="message">상세 분석 모드</span>
-        </span>
-      </span>
-    </span>
+  // 사용자 지침 반영(강제 규칙):
+  // "템플릿 사용"은 공용 카드 템플릿 생성기(NewtheriaCardTemplates.createCardFanCard) 상속 사용을 의미한다.
+  // => 수동 마크업 조립으로 공용 카드 구조를 재구현하지 않는다.
+  const cardFactory = window?.NewtheriaCardTemplates?.createCardFanCard;
+  if (typeof cardFactory !== 'function') return null;
+  const cardButton = cardFactory({
+    route: 'npc-profile',
+    icon: '🧾',
+    label: 'NPC 프로필',
+    desc: '카드 뒷면에서 상세 확인',
+    brand: 'Newtheria',
+    sigil: '✦'
+  });
+  cardButton.classList.add('character-profile-card');
+
+  const frontFace = cardButton.querySelector('.card-fan-front');
+  const backFace = cardButton.querySelector('.card-fan-back');
+  if (!frontFace || !backFace) return null;
+  frontFace.classList.add('character-profile-card__front');
+  backFace.classList.add('character-profile-card__back');
+  frontFace.innerHTML = `
+    <span class="character-profile-card__front-body" data-front-body></span>
+    <span class="character-profile-card__hint">꾹 눌러 상세 보기</span>
   `;
-
-  const details = document.createElement('section');
-  details.className = 'character-profile-details';
-  details.hidden = true;
-
-  const tabNav = document.createElement('nav');
-  tabNav.className = 'character-profile-tabs';
-  const tabPanel = document.createElement('div');
-  tabPanel.className = 'character-profile-panel';
-
-  details.append(tabNav, tabPanel);
-  root.append(cardButton, details);
+  backFace.innerHTML = `
+    <span class="orbit"></span>
+    <span class="character-profile-card__back-header">
+      <span class="sigil">✦</span>
+      <span class="brand">상세 분석 모드</span>
+    </span>
+    <nav class="character-profile-tabs" data-tab-nav></nav>
+    <div class="character-profile-panel" data-tab-panel></div>
+  `;
+  root.append(cardButton);
   mount.replaceChildren(root);
 
   const frontBody = cardButton.querySelector('[data-front-body]');
+  const tabNav = cardButton.querySelector('[data-tab-nav]');
+  const tabPanel = cardButton.querySelector('[data-tab-panel]');
 
   let activeTab = tabs[0]?.key || '';
   let longPressTimer = null;
@@ -58,11 +63,11 @@ export const createCharacterProfileCardTemplate = ({
     opened = value;
     root.classList.toggle('is-opened', value);
     cardButton.classList.toggle('is-flipped', value);
-    details.hidden = !value;
     if (value) onOpen();
   };
 
   const renderTabs = () => {
+    if (!tabNav || !tabPanel) return;
     tabNav.replaceChildren();
     const targetTab = tabs.find((tab) => tab.key === activeTab) || tabs[0];
     activeTab = targetTab?.key || '';
@@ -107,6 +112,8 @@ export const createCharacterProfileCardTemplate = ({
   };
 
   cardButton.addEventListener('click', () => {
+    // 사용자 요청 반영:
+    // 상세 정보는 별도 영역이 아니라 카드 "뒷면"에서 바로 보이도록 유지한다.
     if (opened) return;
     triggerOpen();
   });

@@ -70,9 +70,9 @@ const familyBoard = $('familyBoard');
 const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
-const npcProfileDialog = $('npcProfileDialog');
-const profileName = $('profileName');
-const profileMeta = $('profileMeta');
+const npcProfileFloat = $('npcProfileFloat');
+const npcProfileFloatHandle = $('npcProfileFloatHandle');
+const npcProfileFloatClose = $('npcProfileFloatClose');
 const profileTemplateMount = $('profileTemplateMount');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
@@ -89,6 +89,7 @@ let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
 let profileCardTemplate = null;
+let profileFloatDragState = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
@@ -428,10 +429,15 @@ const createProfileFrontNode = (npc) => {
 };
 
 const openNpcProfile = (npc) => {
-  profileName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
-  profileMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
   if (!profileCardTemplate) {
     profileCardTemplate = createCharacterProfileCardTemplate({ mount: profileTemplateMount });
+  }
+  if (!profileCardTemplate) {
+    // 원인 추적용 가드:
+    // 공용 카드 팩토리(window.NewtheriaCardTemplates) 로드 실패 시 템플릿 인스턴스가 생성되지 않는다.
+    // 이 경우 카드 창을 강제로 열지 않고 콘솔 경고로 원인을 남긴다.
+    console.warn('[npc_test] 프로필 카드 템플릿 생성 실패: card_templates.js 로드 여부를 확인하세요.');
+    return;
   }
   const tabs = [
     {
@@ -549,8 +555,52 @@ const openNpcProfile = (npc) => {
   }
   profileCardTemplate.setFrontContent(createProfileFrontNode(npc));
   profileCardTemplate.setTabs(tabs);
-  profileCardTemplate.close();
-  if (!npcProfileDialog.open) npcProfileDialog.showModal();
+  // 사용자 피드백 반영:
+  // "정보창 안에 카드만 덩그러니 보이는 상태"를 없애기 위해 상세 탭을 즉시 펼친다.
+  // 카드 형식은 유지하되, 클릭 직후 모든 정보를 같은 카드 컨텍스트에서 확인할 수 있다.
+  profileCardTemplate.open();
+  if (npcProfileFloat) npcProfileFloat.hidden = false;
+};
+
+const closeNpcProfileFloat = () => {
+  if (!npcProfileFloat) return;
+  npcProfileFloat.hidden = true;
+  // 다음 NPC를 열 때 앞면부터 다시 시작되도록 카드 상태를 닫아둔다.
+  profileCardTemplate?.close();
+};
+
+const applyProfileFloatPosition = (left, top) => {
+  if (!npcProfileFloat) return;
+  npcProfileFloat.style.left = `${left}px`;
+  npcProfileFloat.style.top = `${top}px`;
+  npcProfileFloat.style.transform = 'none';
+};
+
+const startProfileFloatDrag = (event) => {
+  if (!npcProfileFloat || !npcProfileFloatHandle || npcProfileFloat.hidden) return;
+  if (event.target.closest('.modal-close')) return;
+  const rect = npcProfileFloat.getBoundingClientRect();
+  // 카드 창 자체를 이동시키기 위해 포인터와 창 좌측/상단의 차이를 저장한다.
+  profileFloatDragState = {
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+  npcProfileFloatHandle.setPointerCapture(event.pointerId);
+};
+
+const moveProfileFloatDrag = (event) => {
+  if (!profileFloatDragState || !npcProfileFloat) return;
+  const nextLeft = Math.max(8, Math.min(window.innerWidth - npcProfileFloat.offsetWidth - 8, event.clientX - profileFloatDragState.offsetX));
+  const nextTop = Math.max(8, Math.min(window.innerHeight - npcProfileFloat.offsetHeight - 8, event.clientY - profileFloatDragState.offsetY));
+  applyProfileFloatPosition(nextLeft, nextTop);
+};
+
+const endProfileFloatDrag = (event) => {
+  if (!profileFloatDragState || !npcProfileFloatHandle) return;
+  profileFloatDragState = null;
+  if (npcProfileFloatHandle.hasPointerCapture(event.pointerId)) {
+    npcProfileFloatHandle.releasePointerCapture(event.pointerId);
+  }
 };
 
 const buildFamilyTreeDom = (rootNpc, maxDepth = 3) => {
@@ -783,9 +833,15 @@ const bindEvents = () => {
     if (npc) openNpcProfile(npc);
   });
 
-  npcProfileDialog.addEventListener('close', () => {
-    // 다음 NPC를 열 때 앞면부터 다시 보이도록 상태를 리셋한다.
-    profileCardTemplate?.close();
+  if (npcProfileFloatClose) npcProfileFloatClose.addEventListener('click', closeNpcProfileFloat);
+  if (npcProfileFloatHandle) {
+    npcProfileFloatHandle.addEventListener('pointerdown', startProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointermove', moveProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointerup', endProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointercancel', endProfileFloatDrag);
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeNpcProfileFloat();
   });
 
   // 사용자 요청 반영: 팬카드 회전 인터랙션은 제거되어 별도 포인터/휠 이벤트를 바인딩하지 않는다.

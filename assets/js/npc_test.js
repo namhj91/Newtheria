@@ -239,7 +239,9 @@ const assignFamilyLinks = (list) => {
   list.forEach((npc) => { if (!byRace.has(npc.race)) byRace.set(npc.race, []); byRace.get(npc.race).push(npc); });
 
   list.forEach((child) => {
-    const candidates = (byRace.get(child.race) || []).filter((npc) => npc.id !== child.id);
+    // 로어 고정 규칙: 별의 여신(0번)은 부모/자녀 관계 생성 대상에서 제외한다.
+    if (child.id === 0) return;
+    const candidates = (byRace.get(child.race) || []).filter((npc) => npc.id !== child.id && npc.id !== 0);
     const fatherCandidates = candidates.filter((npc) => npc.gender === '남성' && canBeParent(npc, child, 16));
     const motherCandidates = candidates.filter((npc) => npc.gender === '여성' && canBeParent(npc, child, 15));
 
@@ -265,8 +267,9 @@ const assignFamilyLinks = (list) => {
 };
 
 const assignSpouseLinks = (list) => {
-  const males = list.filter((npc) => npc.gender === '남성' && isAdult(npc)).sort(() => Math.random() - 0.5);
-  const females = list.filter((npc) => npc.gender === '여성' && isAdult(npc)).sort(() => Math.random() - 0.5);
+  // 로어 고정 규칙: 별의 여신(0번)은 배우자 매칭에서 제외한다.
+  const males = list.filter((npc) => npc.id !== 0 && npc.gender === '남성' && isAdult(npc)).sort(() => Math.random() - 0.5);
+  const females = list.filter((npc) => npc.id !== 0 && npc.gender === '여성' && isAdult(npc)).sort(() => Math.random() - 0.5);
   const availableFemaleIds = new Set(females.map((f) => f.id));
 
   males.forEach((male) => {
@@ -291,7 +294,8 @@ const getDiminishedAffairChance = (currentAffairCount) => {
 };
 
 const assignAffairLinks = (list) => {
-  const adults = list.filter((npc) => isAdult(npc));
+  // 로어 고정 규칙: 별의 여신(0번)은 불륜 관계 생성에서 제외한다.
+  const adults = list.filter((npc) => npc.id !== 0 && isAdult(npc));
   const byId = new Map(adults.map((npc) => [npc.id, npc]));
   adults.forEach((npc) => {
     if (!npc.familyLinks.spouseId || !canAcceptMoreAffairs(npc) || Math.random() >= AFFAIR_TRIGGER_CHANCE) return;
@@ -886,9 +890,9 @@ const populateFilters = () => {
 const regenerateNpcList = () => {
   const createSeed = createUniqueSeedGenerator();
   // 사용자 요청 반영:
-  // 0번은 에스테리아, 1번은 플레이어로 고정하고 플레이어 시드를 먼저 생성한다.
+  // 0번은 에스테리아, 1번은 플레이어로 고정하고 두 캐릭터는 같은 시드를 사용한다.
   const playerSeed = createSeed();
-  const esteriaSeed = addOneToSeedLeadingDigit(playerSeed);
+  const esteriaSeed = playerSeed;
   const esteria = createFixedNpc({
     id: 0,
     // 시작화면 대표 캐릭터와 동일한 ID/이미지 키를 맞춘다.
@@ -920,6 +924,8 @@ const regenerateNpcList = () => {
   assignFamilyLinks(npcList);
   assignSpouseLinks(npcList);
   assignAffairLinks(npcList);
+  // 안전망: 생성 후에도 여신의 가족/배우자/불륜/자녀 링크는 비어 있어야 한다.
+  esteria.familyLinks = { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] };
   rebuildIndexes();
   populateFilters();
   renderOverviewMetrics();

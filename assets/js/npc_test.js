@@ -264,6 +264,23 @@ const assignFamilyLinks = (list) => {
         mother.familyLinks.childrenIds = mother.familyLinks.childrenIds.filter((id) => id !== child.id);
       }
     }
+    // 성씨 보정:
+    // - 아버지가 있으면 반드시 아버지 성으로 동기화한다.
+    // - 아버지가 비어 있고 어머니의 배우자가 유효하면 아버지 링크를 보강한 뒤 동일 규칙을 적용한다.
+    if (!child.familyLinks.fatherId && child.familyLinks.motherId) {
+      const mother = byId.get(child.familyLinks.motherId);
+      const motherSpouse = byId.get(mother?.familyLinks?.spouseId);
+      if (motherSpouse && motherSpouse.gender === '남성' && canBeParent(motherSpouse, child, 16)) {
+        child.familyLinks.fatherId = motherSpouse.id;
+        if (!motherSpouse.familyLinks.childrenIds.includes(child.id)) motherSpouse.familyLinks.childrenIds.push(child.id);
+      }
+    }
+    const father = byId.get(child.familyLinks.fatherId);
+    if (father) {
+      child.familyId = father.familyId;
+      child.name.surname = father.name.surname;
+      child.name.full = `${child.name.surname} ${child.name.given}`;
+    }
   });
 };
 
@@ -281,6 +298,36 @@ const assignSpouseLinks = (list) => {
     partner.familyLinks.spouseId = male.id;
     availableFemaleIds.delete(partner.id);
     partner.familyId = male.familyId;
+  });
+};
+
+// 데이터 안전망:
+// 배우자는 항상 1:1 상호 참조만 유지되도록 정규화한다.
+const enforceSpouseOneToOne = (list) => {
+  const byId = new Map(list.map((npc) => [npc.id, npc]));
+  const locked = new Set();
+  [...list].sort((a, b) => a.id - b.id).forEach((npc) => {
+    const spouseId = npc.familyLinks.spouseId;
+    if (!spouseId) return;
+    const partner = byId.get(spouseId);
+    if (!partner || partner.id === npc.id) {
+      npc.familyLinks.spouseId = null;
+      return;
+    }
+    // 이미 다른 매칭으로 잠긴 경우 현재 링크를 해제한다.
+    if (locked.has(npc.id) || locked.has(partner.id)) {
+      if (partner.familyLinks.spouseId === npc.id) partner.familyLinks.spouseId = null;
+      npc.familyLinks.spouseId = null;
+      return;
+    }
+    // 상호 참조가 아니면 현재 쌍을 기준으로 정렬한다.
+    const prevPartner = byId.get(partner.familyLinks.spouseId);
+    if (prevPartner && prevPartner.id !== npc.id && prevPartner.familyLinks.spouseId === partner.id) {
+      prevPartner.familyLinks.spouseId = null;
+    }
+    partner.familyLinks.spouseId = npc.id;
+    locked.add(npc.id);
+    locked.add(partner.id);
   });
 };
 
@@ -943,6 +990,7 @@ const regenerateNpcList = () => {
   npcList = [esteria, player, ...randomNpcs];
   assignFamilyLinks(npcList);
   assignSpouseLinks(npcList);
+  enforceSpouseOneToOne(npcList);
   assignAffairLinks(npcList);
   // 안전망: 생성 후에도 여신의 가족/배우자/불륜/자녀 링크는 비어 있어야 한다.
   esteria.familyLinks = { fatherId: null, motherId: null, spouseId: null, affairPartnerIds: [], childrenIds: [] };

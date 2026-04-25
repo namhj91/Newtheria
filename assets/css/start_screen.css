@@ -45,6 +45,9 @@ body {
   border-color: rgba(224, 235, 255, .74);
   transform: translateY(-1px);
 }
+.test-mode-entry[hidden] {
+  display: none !important;
+}
 .stars, .twinkle, .overlay { position: fixed; inset: 0; pointer-events: none; }
 .drag-discard-overlay,
 .discard-dropzone {

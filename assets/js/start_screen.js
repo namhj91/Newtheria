@@ -1,6 +1,34 @@
 const menu = document.getElementById('menu');
 let cards = [];
 let isMobileViewport = false;
+// [관리자 디버그 모드]
+// - 코드에서 기본값을 바꾸려면 ADMIN_DEBUG_MODE_DEFAULT 값을 수정한다.
+// - 런타임에서 즉시 켜고/끄려면 localStorage(newtheria.adminDebugMode)에 true/false를 저장한다.
+// - 우선 디버깅 지속이 필요하므로 기본값은 true다.
+const ADMIN_DEBUG_MODE_DEFAULT = true;
+const ADMIN_DEBUG_STORAGE_KEY = 'newtheria.adminDebugMode';
+
+const loadAdminDebugMode = () => {
+  try {
+    const storedValue = window.localStorage?.getItem(ADMIN_DEBUG_STORAGE_KEY);
+    if (storedValue == null) return ADMIN_DEBUG_MODE_DEFAULT;
+    if (storedValue === 'true') return true;
+    if (storedValue === 'false') return false;
+  } catch (error) {
+    console.warn('관리자 디버그 모드(localStorage) 값을 읽지 못했습니다.', error);
+  }
+  return ADMIN_DEBUG_MODE_DEFAULT;
+};
+
+const persistAdminDebugMode = (enabled) => {
+  try {
+    window.localStorage?.setItem(ADMIN_DEBUG_STORAGE_KEY, String(Boolean(enabled)));
+  } catch (error) {
+    console.warn('관리자 디버그 모드(localStorage) 값을 저장하지 못했습니다.', error);
+  }
+};
+
+let adminDebugMode = loadAdminDebugMode();
 // 문서 파싱 실패/네트워크 실패 시에는 고정 안내 문구를 표시한다.
 // 매 PR마다 fallback 버전 문자열을 수동 갱신하지 않기 위한 정책이다.
 const START_VERSION_FALLBACK = 'version 불러오기 실패';
@@ -25,6 +53,31 @@ const rootStyle = document.documentElement.style;
 let discardController = null;
 let rerollController = null;
 let isRerolling = false;
+
+const applyAdminDebugMode = () => {
+  // 관리자 디버그 모드 상태를 body 클래스로 노출해,
+  // 이후 디버그 UI/기능을 CSS/JS에서 손쉽게 확장할 수 있게 한다.
+  document.body.classList.toggle('admin-debug-mode', adminDebugMode);
+
+  if (!testModeEntryButton) return;
+
+  // 테스트 허브 버튼은 관리자 디버그 모드에서만 노출한다.
+  testModeEntryButton.hidden = !adminDebugMode;
+  testModeEntryButton.setAttribute('aria-hidden', String(!adminDebugMode));
+};
+
+const setAdminDebugMode = (enabled) => {
+  adminDebugMode = Boolean(enabled);
+  persistAdminDebugMode(adminDebugMode);
+  applyAdminDebugMode();
+};
+
+// 디버그 중 콘솔에서 빠르게 제어할 수 있도록 최소 API를 노출한다.
+// 예) NewtheriaDebug.setAdminDebugMode(false)
+window.NewtheriaDebug = Object.assign({}, window.NewtheriaDebug, {
+  getAdminDebugMode: () => adminDebugMode,
+  setAdminDebugMode
+});
 
 const bootstrapPersistentStorage = () => {
   // 시작 화면에서 캐릭터/설정/세이브 메타 기본값을 1회 시드한다.
@@ -593,6 +646,7 @@ const bootstrap = () => {
     })
     : null;
   bindStaticEvents();
+  applyAdminDebugMode();
   performanceMode.applyStarAnimationMode();
   updateStartVersionTag();
   layout.layoutCards();

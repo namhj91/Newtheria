@@ -1,5 +1,3 @@
-import { createCharacterProfileCardTemplate } from './character_profile_card_template.js';
-
 const NPC_COUNT = 300;
 const NAME_POOL_PATH = './assets/data/npc_name_pools.json';
 
@@ -70,10 +68,11 @@ const familyBoard = $('familyBoard');
 const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
-const npcProfileDialog = $('npcProfileDialog');
-const profileName = $('profileName');
-const profileMeta = $('profileMeta');
-const profileTemplateMount = $('profileTemplateMount');
+const npcProfileFloat = $('npcProfileFloat');
+const npcProfileFloatHandle = $('npcProfileFloatHandle');
+const npcProfileFloatClose = $('npcProfileFloatClose');
+const profileCardFan = $('profileCardFan');
+const profileDiscardZone = $('profileDiscardZone');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
@@ -88,7 +87,9 @@ let npcList = [];
 let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
-let profileCardTemplate = null;
+let profileCardBehavior = null;
+let profileDiscardController = null;
+let profileFloatDragState = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
@@ -406,33 +407,40 @@ const createAlignmentBarsNode = (npc) => {
   return wrap;
 };
 
-const createProfileFrontNode = (npc) => {
-  const node = document.createElement('article');
+const createProfileFrontMarkup = (npc) => {
   const statBars = STAT_KEYS.slice(0, 3).map((key) => `
     <span class="character-profile-front__bar">
       <span>${key}</span>
       <i><b style="width:${toStatPercent(npc.stats[key])}%"></b></i>
     </span>
   `).join('');
-
-  node.innerHTML = `
-    <h4 class="character-profile-front__name">${displayNpcName(npc)} (#${npc.id})</h4>
-    <p class="character-profile-front__meta">${npc.race} · ${npc.gender} · ${npc.age}세</p>
-    <div class="character-profile-front__chips">
-      <span class="character-profile-front__chip">${getFamilyName(npc)}</span>
-      <span class="character-profile-front__chip">특성 ${(npc.traits?.acquiredTraitIds || []).length}개</span>
-    </div>
-    <div class="character-profile-front__bars">${statBars}</div>
+  return `
+    <article class="character-profile-front">
+      <h4 class="character-profile-front__name">${displayNpcName(npc)} (#${npc.id})</h4>
+      <p class="character-profile-front__meta">${npc.race} · ${npc.gender} · ${npc.age}세</p>
+      <div class="character-profile-front__chips">
+        <span class="character-profile-front__chip">${getFamilyName(npc)}</span>
+        <span class="character-profile-front__chip">특성 ${(npc.traits?.acquiredTraitIds || []).length}개</span>
+      </div>
+      <div class="character-profile-front__bars">${statBars}</div>
+    </article>
   `;
-  return node;
+};
+
+const destroyProfileCardBehavior = () => {
+  profileCardBehavior?.destroy?.();
+  profileCardBehavior = null;
+  profileDiscardController?.reset?.();
+  profileDiscardController = null;
 };
 
 const openNpcProfile = (npc) => {
-  profileName.textContent = `${displayNpcName(npc)} (#${npc.id})`;
-  profileMeta.textContent = `${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}`;
-  if (!profileCardTemplate) {
-    profileCardTemplate = createCharacterProfileCardTemplate({ mount: profileTemplateMount });
+  const templates = window.NewtheriaCardTemplates;
+  if (!templates?.renderCardFanCards || !templates?.createCardFanBehavior || !templates?.createDiscardZoneController || !profileCardFan) {
+    console.warn('[npc_test] 공용 카드 템플릿 API가 준비되지 않아 프로필 카드를 열 수 없습니다.');
+    return;
   }
+  destroyProfileCardBehavior();
   const tabs = [
     {
       key: 'identity',
@@ -547,10 +555,116 @@ const openNpcProfile = (npc) => {
       }
     });
   }
-  profileCardTemplate.setFrontContent(createProfileFrontNode(npc));
-  profileCardTemplate.setTabs(tabs);
-  profileCardTemplate.close();
-  if (!npcProfileDialog.open) npcProfileDialog.showModal();
+  const cards = templates.renderCardFanCards(profileCardFan, [{
+    route: `npc-${npc.id}`,
+    icon: '🧾',
+    label: displayNpcName(npc),
+    desc: `${npc.race} · ${npc.age}세 · ${npc.gender}`,
+    brand: 'Newtheria',
+    sigil: '✦'
+  }]);
+  const card = cards[0];
+  if (!card) return;
+
+  const front = card.querySelector('.card-fan-front');
+  const back = card.querySelector('.card-fan-back');
+  if (!front || !back) return;
+  front.innerHTML = createProfileFrontMarkup(npc);
+  back.innerHTML = `
+    <span class="orbit"></span>
+    <section class="profile-back-panel">
+      <nav class="profile-back-tabs"></nav>
+      <div class="profile-back-content"></div>
+    </section>
+  `;
+
+  const tabNav = back.querySelector('.profile-back-tabs');
+  const tabContent = back.querySelector('.profile-back-content');
+  let activeTab = tabs[0]?.key || '';
+  const renderProfileTabs = () => {
+    if (!tabNav || !tabContent) return;
+    tabNav.replaceChildren();
+    const targetTab = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+    activeTab = targetTab?.key || '';
+    tabs.forEach((tab) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'profile-back-tab';
+      button.textContent = tab.label;
+      button.classList.toggle('is-active', tab.key === activeTab);
+      button.addEventListener('click', () => {
+        activeTab = tab.key;
+        renderProfileTabs();
+      });
+      tabNav.append(button);
+    });
+    const active = tabs.find((tab) => tab.key === activeTab);
+    tabContent.replaceChildren(active?.render?.() || document.createTextNode('표시할 데이터가 없습니다.'));
+  };
+  renderProfileTabs();
+
+  profileDiscardController = templates.createDiscardZoneController({ zone: profileDiscardZone });
+  profileCardBehavior = templates.createCardFanBehavior({ menu: profileCardFan, cards, ui: { cardVerticalStep: 0, hoverLiftY: -8 } });
+  profileCardBehavior.bindInteractions({
+    onCardSelected: (selectedCard) => {
+      selectedCard.classList.toggle('is-flipped');
+      templates.setActiveCard(cards, selectedCard);
+    },
+    shouldDiscardDrop: profileDiscardController.shouldDiscardDrop,
+    onCardDiscarded: () => {
+      closeNpcProfileFloat();
+    },
+    onDragStateChange: (isDragging, payload) => {
+      profileDiscardController.onDragStateChange(isDragging, payload);
+    },
+    onDragMove: (payload) => {
+      profileDiscardController.onDragMove(payload);
+    }
+  });
+  profileCardBehavior.layoutCards();
+  card.classList.add('is-flipped');
+  if (npcProfileFloat) npcProfileFloat.hidden = false;
+};
+
+const closeNpcProfileFloat = () => {
+  if (!npcProfileFloat) return;
+  npcProfileFloat.hidden = true;
+  destroyProfileCardBehavior();
+  if (profileCardFan) profileCardFan.replaceChildren();
+};
+
+const applyProfileFloatPosition = (left, top) => {
+  if (!npcProfileFloat) return;
+  npcProfileFloat.style.left = `${left}px`;
+  npcProfileFloat.style.top = `${top}px`;
+  npcProfileFloat.style.transform = 'none';
+};
+
+const startProfileFloatDrag = (event) => {
+  if (!npcProfileFloat || !npcProfileFloatHandle || npcProfileFloat.hidden) return;
+  if (event.target.closest('.modal-close')) return;
+  const rect = npcProfileFloat.getBoundingClientRect();
+  // 카드 창 자체를 이동시키기 위해 포인터와 창 좌측/상단의 차이를 저장한다.
+  profileFloatDragState = {
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+  npcProfileFloatHandle.setPointerCapture(event.pointerId);
+};
+
+const moveProfileFloatDrag = (event) => {
+  if (!profileFloatDragState || !npcProfileFloat) return;
+  const nextLeft = Math.max(8, Math.min(window.innerWidth - npcProfileFloat.offsetWidth - 8, event.clientX - profileFloatDragState.offsetX));
+  const nextTop = Math.max(8, Math.min(window.innerHeight - npcProfileFloat.offsetHeight - 8, event.clientY - profileFloatDragState.offsetY));
+  applyProfileFloatPosition(nextLeft, nextTop);
+};
+
+const endProfileFloatDrag = (event) => {
+  if (!profileFloatDragState || !npcProfileFloatHandle) return;
+  profileFloatDragState = null;
+  if (npcProfileFloatHandle.hasPointerCapture(event.pointerId)) {
+    npcProfileFloatHandle.releasePointerCapture(event.pointerId);
+  }
 };
 
 const buildFamilyTreeDom = (rootNpc, maxDepth = 3) => {
@@ -783,9 +897,15 @@ const bindEvents = () => {
     if (npc) openNpcProfile(npc);
   });
 
-  npcProfileDialog.addEventListener('close', () => {
-    // 다음 NPC를 열 때 앞면부터 다시 보이도록 상태를 리셋한다.
-    profileCardTemplate?.close();
+  if (npcProfileFloatClose) npcProfileFloatClose.addEventListener('click', closeNpcProfileFloat);
+  if (npcProfileFloatHandle) {
+    npcProfileFloatHandle.addEventListener('pointerdown', startProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointermove', moveProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointerup', endProfileFloatDrag);
+    npcProfileFloatHandle.addEventListener('pointercancel', endProfileFloatDrag);
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeNpcProfileFloat();
   });
 
   // 사용자 요청 반영: 팬카드 회전 인터랙션은 제거되어 별도 포인터/휠 이벤트를 바인딩하지 않는다.

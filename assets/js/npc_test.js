@@ -72,7 +72,6 @@ const npcProfileFloat = $('npcProfileFloat');
 const npcProfileFloatHandle = $('npcProfileFloatHandle');
 const npcProfileFloatClose = $('npcProfileFloatClose');
 const profileCardFan = $('profileCardFan');
-const profileDiscardZone = $('profileDiscardZone');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
@@ -88,7 +87,6 @@ let namePools = DEFAULT_NAME_POOLS;
 let selectedA = null;
 let selectedB = null;
 let profileCardBehavior = null;
-let profileDiscardController = null;
 let profileFloatDragState = null;
 let currentSearch = '';
 let currentRaceFilter = '';
@@ -407,22 +405,65 @@ const createAlignmentBarsNode = (npc) => {
   return wrap;
 };
 
-const createProfileFrontMarkup = (npc) => {
-  const statBars = STAT_KEYS.slice(0, 3).map((key) => `
-    <span class="character-profile-front__bar">
-      <span>${key}</span>
-      <i><b style="width:${toStatPercent(npc.stats[key])}%"></b></i>
-    </span>
-  `).join('');
+const createMiniRadarMarkup = (npc) => {
+  const size = 170;
+  const center = size / 2;
+  const radius = 52;
+  const angleStep = (Math.PI * 2) / STAT_KEYS.length;
+  const polygonPoints = STAT_KEYS.map((key, index) => {
+    const ratio = (npc.stats[key] || 0) / 20;
+    const angle = -Math.PI / 2 + index * angleStep;
+    const x = center + Math.cos(angle) * radius * ratio;
+    const y = center + Math.sin(angle) * radius * ratio;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const labels = STAT_KEYS.map((key, index) => {
+    const angle = -Math.PI / 2 + index * angleStep;
+    const x = center + Math.cos(angle) * (radius + 14);
+    const y = center + Math.sin(angle) * (radius + 14);
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle">${key}</text>`;
+  }).join('');
   return `
-    <article class="character-profile-front">
-      <h4 class="character-profile-front__name">${displayNpcName(npc)} (#${npc.id})</h4>
-      <p class="character-profile-front__meta">${npc.race} · ${npc.gender} · ${npc.age}세</p>
-      <div class="character-profile-front__chips">
-        <span class="character-profile-front__chip">${getFamilyName(npc)}</span>
-        <span class="character-profile-front__chip">특성 ${(npc.traits?.acquiredTraitIds || []).length}개</span>
-      </div>
-      <div class="character-profile-front__bars">${statBars}</div>
+    <div class="profile-mini-radar">
+      <svg viewBox="0 0 ${size} ${size}" role="img" aria-label="요약 스탯 레이더">
+        <polygon points="${polygonPoints}" fill="rgba(132, 209, 255, .28)" stroke="rgba(148, 223, 255, .9)" stroke-width="1.5"></polygon>
+        ${labels}
+      </svg>
+    </div>
+  `;
+};
+
+const createMiniAlignmentMarkup = (npc) => {
+  const alignment = npc.alignment || { aggressionVsModeration: 0, settlementVsWandering: 0, honorVsPragmatism: 0 };
+  const rows = [
+    { label: '호전', value: alignment.aggressionVsModeration },
+    { label: '정착', value: alignment.settlementVsWandering },
+    { label: '명예', value: alignment.honorVsPragmatism }
+  ];
+  return `
+    <div class="profile-mini-alignment">
+      ${rows.map((row) => `
+        <article>
+          <span>${row.label}</span>
+          <span class="track"><i class="fill" style="width:${Math.max(0, Math.min(100, 50 + (Number(row.value || 0) / 2)))}%"></i></span>
+        </article>
+      `).join('')}
+    </div>
+  `;
+};
+
+const createProfileFrontMarkup = (npc) => {
+  // 현재 NPC 샘플에는 개별 레이어가 없으므로, 우선 공용 플레이어 이미지를 외형 프리뷰 기본값으로 사용한다.
+  const portraitSrc = npc?.layers?.[0] || './assets/img/player.png';
+  return `
+    <article class="profile-front-summary">
+      <img class="profile-front-summary__portrait" src="${portraitSrc}" alt="${displayNpcName(npc)} 외형" />
+      <section class="profile-front-summary__main">
+        <h4 class="profile-front-summary__name">${npc.name?.surname || ''} ${npc.name?.given || displayNpcName(npc)}</h4>
+        <p class="profile-front-summary__meta">${npc.race} · ${npc.gender} · ${npc.age}세 · ${getFamilyName(npc)}</p>
+        ${createMiniRadarMarkup(npc)}
+        ${createMiniAlignmentMarkup(npc)}
+      </section>
     </article>
   `;
 };
@@ -430,13 +471,11 @@ const createProfileFrontMarkup = (npc) => {
 const destroyProfileCardBehavior = () => {
   profileCardBehavior?.destroy?.();
   profileCardBehavior = null;
-  profileDiscardController?.reset?.();
-  profileDiscardController = null;
 };
 
 const openNpcProfile = (npc) => {
   const templates = window.NewtheriaCardTemplates;
-  if (!templates?.renderCardFanCards || !templates?.createCardFanBehavior || !templates?.createDiscardZoneController || !profileCardFan) {
+  if (!templates?.renderCardFanCards || !templates?.createCardFanBehavior || !profileCardFan) {
     console.warn('[npc_test] 공용 카드 템플릿 API가 준비되지 않아 프로필 카드를 열 수 없습니다.');
     return;
   }
@@ -603,26 +642,14 @@ const openNpcProfile = (npc) => {
   };
   renderProfileTabs();
 
-  profileDiscardController = templates.createDiscardZoneController({ zone: profileDiscardZone });
   profileCardBehavior = templates.createCardFanBehavior({ menu: profileCardFan, cards, ui: { cardVerticalStep: 0, hoverLiftY: -8 } });
+  // 클릭은 선택만 처리하고, 뒤집기는 템플릿 기본의 롱프레스 동작으로 유지한다.
   profileCardBehavior.bindInteractions({
     onCardSelected: (selectedCard) => {
-      selectedCard.classList.toggle('is-flipped');
       templates.setActiveCard(cards, selectedCard);
-    },
-    shouldDiscardDrop: profileDiscardController.shouldDiscardDrop,
-    onCardDiscarded: () => {
-      closeNpcProfileFloat();
-    },
-    onDragStateChange: (isDragging, payload) => {
-      profileDiscardController.onDragStateChange(isDragging, payload);
-    },
-    onDragMove: (payload) => {
-      profileDiscardController.onDragMove(payload);
     }
   });
   profileCardBehavior.layoutCards();
-  card.classList.add('is-flipped');
   if (npcProfileFloat) npcProfileFloat.hidden = false;
 };
 

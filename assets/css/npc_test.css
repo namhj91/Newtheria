@@ -198,34 +198,16 @@ body {
 }
 .profile-float__body {
   margin-top: 8px;
-  display: grid;
-  gap: 10px;
-}
-.profile-card-fan-wrap {
-  display: grid;
-  place-items: center;
+  padding-top: 8px;
+  display: block;
 }
 .profile-card-fan {
-  width: min(520px, 100%);
+  width: 100%;
   height: min(72vh, 620px);
   perspective: 1600px;
   --card-w: min(76vw, 360px);
   --fan-gap: 0px;
   --fan-tilt: 0deg;
-}
-.profile-discard-zone {
-  min-height: 46px;
-  border-radius: 12px;
-  border: 1px dashed rgba(255, 149, 149, .55);
-  color: rgba(255, 211, 211, .92);
-  display: grid;
-  place-items: center;
-  font-size: .82rem;
-  background: rgba(56, 16, 24, .42);
-}
-.profile-discard-zone.is-hot {
-  background: rgba(125, 28, 45, .64);
-  border-style: solid;
 }
 .profile-back-panel { display: grid; gap: 8px; width: 100%; min-height: 0; }
 .profile-back-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -246,29 +228,30 @@ body {
   max-height: 380px;
   overflow: auto;
 }
-
-/* 사용자 요청 반영: 모달 종속이 아닌 독립 드래그 프로필 카드 창 */
-.profile-float {
-  position: fixed;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(760px, calc(100% - 24px));
-  border-radius: 18px;
-  background: rgba(16, 25, 51, 0.84);
-  backdrop-filter: blur(20px) saturate(1.12);
-  box-shadow: 0 24px 40px rgba(0, 0, 0, .44);
-  z-index: 30;
+.profile-front-summary {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  height: 100%;
 }
-.profile-float__handle {
-  margin: 0;
-  padding: 8px 12px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: move;
-  user-select: none;
+.profile-front-summary__portrait {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(177, 211, 255, .38);
+  background: rgba(12, 20, 40, .7);
 }
+.profile-front-summary__main { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.profile-front-summary__name { margin: 0; font-size: 1rem; line-height: 1.2; }
+.profile-front-summary__meta { margin: 0; color: #cddfff; font-size: .78rem; }
+.profile-mini-radar { width: 100%; max-width: 170px; }
+.profile-mini-radar svg { width: 100%; height: auto; display: block; }
+.profile-mini-radar text { fill: #d8e8ff; font-size: 8px; }
+.profile-mini-alignment { display: grid; gap: 4px; }
+.profile-mini-alignment article { display: grid; grid-template-columns: 42px 1fr; gap: 6px; align-items: center; font-size: .68rem; }
+.profile-mini-alignment .track { height: 7px; border-radius: 999px; background: rgba(9,17,41,.9); overflow: hidden; }
+.profile-mini-alignment .fill { display: block; height: 100%; background: linear-gradient(90deg, rgba(154,120,255,.92), rgba(127,219,255,.92)); }
 
 .profile-tabs { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .profile-tab { border: 0; min-height: 32px; border-radius: 10px; padding: 0 12px; color: var(--text); background: rgba(56, 81, 138, .74); cursor: pointer; }

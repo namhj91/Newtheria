@@ -192,7 +192,8 @@ body {
   width: min(760px, calc(100% - 24px));
   display: grid;
   place-items: center;
-  pointer-events: auto;
+  /* 1fr 행 전체를 차지하는 body가 상단 클릭을 가로채지 않도록 차단한다. */
+  pointer-events: none;
 }
 .profile-card-fan {
   width: min(520px, 100%);
@@ -201,6 +202,7 @@ body {
   --card-w: min(76vw, 360px);
   --fan-gap: 0px;
   --fan-tilt: 0deg;
+  pointer-events: auto;
 }
 .profile-discard-zone {
   width: min(440px, calc(100% - 24px));

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria 메인 - 프롤로그</title>
+  <link rel="stylesheet" href="./assets/css/dialogue_prototype.css" />
+  <link rel="stylesheet" href="./assets/css/character_profile_overlay.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #070b17;
+      color: #f2f4ff;
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <!-- 프롤로그 본편 화면: 테스트/디버그 제어 패널 없이 대화창만 렌더한다. -->
+  <div id="prototypeMount"></div>
+
+  <script src="./assets/js/card_templates.js"></script>
+  <script type="module" src="./assets/js/npc_test.js"></script>
+  <script src="./assets/js/dialogue_template.js"></script>
+  <script>
+    const mount = document.getElementById('prototypeMount');
+
+    window.NewtheriaDialogueTemplate.createDialogueTemplate({
+      mount,
+      csvUrl: './assets/data/dialogue_sample.asdf',
+      eventId: 'opening',
+      sceneId: '0',
+      anchor: 'intro_start',
+      backgroundUrl: 'https://picsum.photos/id/1015/1920/1080',
+      // 프롤로그에서는 event/scene/block 메타 텍스트를 노출하지 않는다.
+      showMeta: false,
+      onSkip: () => {
+        alert('SKIP 클릭됨 (프롤로그)');
+      },
+      onError: (error) => {
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

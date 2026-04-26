@@ -89,7 +89,7 @@ let profileCardBehavior = null;
 let profileDiscardController = null;
 let currentSearch = '';
 let currentRaceFilter = '';
-let npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
+let npcIndexes = { byId: new Map(), byActor: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
@@ -356,9 +356,10 @@ const assignAffairLinks = (list) => {
 };
 
 const rebuildIndexes = () => {
-  npcIndexes = { byId: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
+  npcIndexes = { byId: new Map(), byActor: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
   npcList.forEach((npc) => {
     npcIndexes.byId.set(npc.id, npc);
+    if (npc.actorId) npcIndexes.byActor.set(npc.actorId, npc.id);
     if (!npcIndexes.byRace.has(npc.race)) npcIndexes.byRace.set(npc.race, []);
     npcIndexes.byRace.get(npc.race).push(npc.id);
     if (!npcIndexes.byFamily.has(npc.familyId)) npcIndexes.byFamily.set(npc.familyId, []);
@@ -371,6 +372,7 @@ const rebuildIndexes = () => {
 };
 
 const findNpcById = (id) => npcIndexes.byId.get(id);
+const findNpcByActorId = (actorId) => findNpcById(npcIndexes.byActor.get(String(actorId)));
 
 const createInfoRow = (label, valueNodeOrText) => {
   const row = document.createElement('dl');
@@ -800,16 +802,20 @@ const registerGlobalCharacterCardApi = () => {
       if (!npc) return;
       openNpcProfile(npc);
     },
+    openByActorId: (actorId) => {
+      const npc = findNpcByActorId(actorId);
+      if (!npc) return;
+      openNpcProfile(npc);
+    },
     close: () => closeNpcProfileFloat(),
-    // 어떤 화면이든 data-character-id 속성을 붙이면 동일 카드 UI를 열 수 있다.
-    bindTriggers: ({ root = document, selector = '[data-character-id]' } = {}) => {
+    // 어떤 화면이든 data-character-id 또는 data-character-actor-id를 붙이면 동일 카드 UI를 열 수 있다.
+    bindTriggers: ({ root = document, selector = '[data-character-id], [data-character-actor-id]' } = {}) => {
       if (!root?.addEventListener) return () => {};
       const onClick = (event) => {
         const target = event.target?.closest?.(selector);
         if (!target) return;
-        const npcId = Number(target.dataset.characterId);
-        if (!Number.isFinite(npcId)) return;
-        const npc = findNpcById(npcId);
+        const actorId = target.dataset.characterActorId;
+        const npc = actorId ? findNpcByActorId(actorId) : findNpcById(Number(target.dataset.characterId));
         if (npc) openNpcProfile(npc);
       };
       const onKeydown = (event) => {
@@ -817,9 +823,8 @@ const registerGlobalCharacterCardApi = () => {
         const target = event.target?.closest?.(selector);
         if (!target) return;
         event.preventDefault();
-        const npcId = Number(target.dataset.characterId);
-        if (!Number.isFinite(npcId)) return;
-        const npc = findNpcById(npcId);
+        const actorId = target.dataset.characterActorId;
+        const npc = actorId ? findNpcByActorId(actorId) : findNpcById(Number(target.dataset.characterId));
         if (npc) openNpcProfile(npc);
       };
       root.addEventListener('click', onClick);

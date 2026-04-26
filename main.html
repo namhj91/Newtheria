@@ -6,6 +6,8 @@
   <title>Newtheria 메인 - 프롤로그</title>
   <link rel="stylesheet" href="./assets/css/dialogue_prototype.css" />
   <link rel="stylesheet" href="./assets/css/character_profile_overlay.css" />
+  <link rel="stylesheet" href="./assets/css/card_templates.css" />
+  <link rel="stylesheet" href="./assets/css/world_map.css" />
   <style>
     body {
       margin: 0;
@@ -13,19 +15,263 @@
       color: #f2f4ff;
       font-family: "Pretendard", "Noto Sans KR", sans-serif;
     }
+
+    /* 프롤로그 종료 후 월드 작성 선택지는 카드 템플릿 상속 UI로 별도 오버레이에 보여준다. */
+    .world-draft-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 220;
+      display: none;
+      place-items: center;
+      background: rgba(4, 8, 18, 0.72);
+      backdrop-filter: blur(6px);
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .world-draft-overlay.is-active {
+      display: grid;
+    }
+
+    .world-draft-panel {
+      width: min(960px, 100%);
+      padding: 20px 18px 28px;
+      border-radius: 16px;
+      border: 1px solid rgba(150, 171, 255, 0.32);
+      background: rgba(10, 15, 30, 0.94);
+      box-shadow: 0 24px 44px rgba(0, 0, 0, 0.45);
+    }
+
+    .world-draft-title {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .world-draft-desc {
+      margin: 0 0 20px;
+      opacity: 0.84;
+      line-height: 1.45;
+      white-space: pre-line;
+    }
+
+    .world-draft-fan {
+      position: relative;
+      min-height: 320px;
+      display: grid;
+      place-items: center;
+      --fan-gap: 122px;
+      --fan-tilt: 11deg;
+    }
+
+    .world-draft-fan .card-fan-card {
+      width: 210px;
+      height: 296px;
+    }
+
+    .world-draft-progress {
+      margin-top: 10px;
+      font-size: 0.84rem;
+      opacity: 0.7;
+      text-align: right;
+    }
+
+    /* iframe 임베드 대신, 같은 페이지 내에 월드맵 화면 DOM을 직접 두고 토글한다. */
+    .main-world-map-stage {
+      display: none;
+      min-height: 100vh;
+      background: #070b17;
+    }
+
+    .main-world-map-stage.is-active {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <!-- 프롤로그 본편 화면: 테스트/디버그 제어 패널 없이 대화창만 렌더한다. -->
   <div id="prototypeMount"></div>
 
+  <!-- 프롤로그 종료 후(스크립트 end) 월드 작성 선택 단계를 카드 템플릿 UI로 노출한다. -->
+  <section id="worldDraftOverlay" class="world-draft-overlay" aria-label="월드 작성 선택" aria-hidden="true">
+    <article class="world-draft-panel">
+      <h2 id="worldDraftTitle" class="world-draft-title">월드 작성 준비</h2>
+      <p id="worldDraftDesc" class="world-draft-desc"></p>
+      <div class="world-draft-fan">
+        <div id="worldDraftMenu" class="card-fan" role="group" aria-label="월드 작성 카드 선택"></div>
+      </div>
+      <p id="worldDraftProgress" class="world-draft-progress"></p>
+    </article>
+  </section>
+
+  <!-- world_map.html을 임베드하지 않고, 동일 구조를 main.html에 직접 구성해 같은 페이지에서 생성한다. -->
+  <section id="mainWorldMapStage" class="main-world-map-stage" aria-label="월드맵 생성 스테이지" aria-hidden="true">
+    <main class="world-map-screen">
+      <header class="world-map-header">
+        <h1>NEWTHERIA HEX WORLD MAP</h1>
+        <p>지상계(z=0) 200×200 기준 랜덤 월드 생성 (헥스 타일)</p>
+        <div class="world-map-actions">
+          <button id="regenButton" type="button">맵 다시 생성</button>
+          <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
+        </div>
+        <form class="world-map-roll-settings" aria-label="맵 리롤 설정">
+          <label>
+            해양 비율
+            <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
+            <span id="seaLevelRatioValue">58%</span>
+          </label>
+          <label>
+            고도 강도
+            <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" />
+            <span id="elevationScaleValue">1.00x</span>
+          </label>
+          <label>
+            지형 워프 강도
+            <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" />
+            <span id="warpStrengthValue">18</span>
+          </label>
+          <label>
+            산맥 강도
+            <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
+            <span id="ridgeStrengthValue">0.24</span>
+          </label>
+          <label>
+            강 생성 밀도
+            <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" />
+            <span id="riverBudgetScaleValue">1.00x</span>
+          </label>
+        </form>
+        <div class="world-map-layer-controls" role="group" aria-label="기후 레이어 선택">
+          <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
+          <button type="button" class="layer-button" data-layer="elevation">고도</button>
+          <button type="button" class="layer-button" data-layer="moisture">습도</button>
+          <button type="button" class="layer-button" data-layer="heat">온도</button>
+        </div>
+        <p id="worldMapVersion" class="meta version"></p>
+      </header>
+
+      <section class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
+        <canvas id="worldMapCanvas" width="1400" height="1250"></canvas>
+        <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
+      </section>
+    </main>
+
+    <dialog id="worldInfoDialog" class="world-info-dialog" aria-label="월드 정보">
+      <div class="world-info-dialog-inner">
+        <p class="world-info-kicker">WORLD BRIEFING</p>
+        <h2>월드 정보</h2>
+        <p class="world-info-subtitle">현재 생성된 세계의 핵심 데이터를 한눈에 확인하세요.</p>
+        <section class="world-info-grid">
+          <article class="world-info-card">
+            <h3>지도 요약</h3>
+            <p id="mapMeta" class="meta" aria-live="polite"></p>
+          </article>
+          <article class="world-info-card">
+            <h3>달력 요약</h3>
+            <p id="calendarMeta" class="meta" aria-live="polite"></p>
+          </article>
+        </section>
+        <div class="world-info-actions">
+          <button id="metaCloseButton" type="button">닫기</button>
+        </div>
+      </div>
+    </dialog>
+  </section>
+
   <script src="./assets/js/card_templates.js"></script>
   <script type="module" src="./assets/js/npc_test.js"></script>
   <script src="./assets/js/dialogue_template.js"></script>
+  <script src="./assets/js/calendar.js"></script>
+  <script src="./assets/js/world_map.js"></script>
   <script>
     const mount = document.getElementById('prototypeMount');
+    const worldDraftOverlay = document.getElementById('worldDraftOverlay');
+    const worldDraftTitle = document.getElementById('worldDraftTitle');
+    const worldDraftDesc = document.getElementById('worldDraftDesc');
+    const worldDraftMenu = document.getElementById('worldDraftMenu');
+    const worldDraftProgress = document.getElementById('worldDraftProgress');
+    const mainWorldMapStage = document.getElementById('mainWorldMapStage');
 
-    window.NewtheriaDialogueTemplate.createDialogueTemplate({
+    const cardTemplateApi = window.NewtheriaCardTemplates;
+    let worldDraftStepIndex = 0;
+    let worldDraftStarted = false;
+    let worldDraftBehavior = null;
+
+    // end 이후 월드 작성 흐름: 카드 선택을 여러 번 진행한 뒤 같은 페이지 안에서 월드맵 생성을 연다.
+    const WORLD_DRAFT_STEPS = [
+      {
+        title: '1단계 · 세계의 결을 고르세요',
+        description: '프롤로그를 마쳤습니다.\n이제 생성할 세계의 기본 결을 카드로 선택합니다.',
+        cards: [
+          { route: 'frontier', icon: '🧭', label: '개척의 대지', desc: '미개척 변방과 거친 국경이 많은 세계' },
+          { route: 'mystic', icon: '✨', label: '신비의 성역', desc: '유적과 성소, 비밀 전승이 많은 세계' },
+          { route: 'empire', icon: '🏛️', label: '제국의 균열', desc: '왕국·도시국가 갈등이 두드러진 세계' }
+        ]
+      },
+      {
+        title: '2단계 · 기후 성향을 고르세요',
+        description: '월드맵 생성 파라미터의 분위기를 정할 마지막 선택입니다.',
+        cards: [
+          { route: 'wet', icon: '🌧️', label: '습윤 기후', desc: '강·숲이 풍부한 생동하는 지형' },
+          { route: 'balanced', icon: '🌤️', label: '균형 기후', desc: '해양·평야·산맥이 고르게 분포' },
+          { route: 'dry', icon: '🌵', label: '건조 기후', desc: '황무지·고원·협곡이 두드러진 지형' }
+        ]
+      },
+      {
+        title: '3단계 · 생성 방식 확정',
+        description: '선택이 끝났습니다.\n카드를 고르면 이 페이지 안에서 월드맵 생성 단계가 시작됩니다.',
+        cards: [
+          { route: 'create_world', icon: '🌍', label: '월드 작성 시작', desc: 'main.html 안에서 월드맵 생성 실행' }
+        ]
+      }
+    ];
+
+    const openWorldMapStage = () => {
+      if (!mainWorldMapStage || !mount) return;
+
+      // 월드 작성 카드 선택 오버레이를 닫고, 프롤로그 대화영역 대신 월드맵 스테이지를 표시한다.
+      worldDraftOverlay.classList.remove('is-active');
+      worldDraftOverlay.setAttribute('aria-hidden', 'true');
+      mount.style.display = 'none';
+      mainWorldMapStage.classList.add('is-active');
+      mainWorldMapStage.setAttribute('aria-hidden', 'false');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    };
+
+    const renderWorldDraftStep = () => {
+      const step = WORLD_DRAFT_STEPS[worldDraftStepIndex];
+      if (!step || !cardTemplateApi || !worldDraftMenu) return;
+
+      worldDraftTitle.textContent = step.title;
+      worldDraftDesc.textContent = step.description;
+      worldDraftProgress.textContent = `진행 ${worldDraftStepIndex + 1} / ${WORLD_DRAFT_STEPS.length}`;
+
+      const renderedCards = cardTemplateApi.renderCardFanCards(worldDraftMenu, step.cards);
+      worldDraftBehavior?.destroy?.();
+      worldDraftBehavior = cardTemplateApi.createCardFanBehavior({ menu: worldDraftMenu, cards: renderedCards });
+      worldDraftBehavior.bindInteractions({
+        onCardSelected: () => {
+          // 마지막 단계 카드를 선택하면 페이지 이동 없이 월드맵 생성 스테이지를 연다.
+          if (worldDraftStepIndex >= WORLD_DRAFT_STEPS.length - 1) {
+            openWorldMapStage();
+            return;
+          }
+          worldDraftStepIndex += 1;
+          renderWorldDraftStep();
+        }
+      });
+      worldDraftBehavior.layoutCards();
+    };
+
+    const startWorldDraftFlow = () => {
+      if (worldDraftStarted) return;
+      worldDraftStarted = true;
+      worldDraftOverlay.classList.add('is-active');
+      worldDraftOverlay.setAttribute('aria-hidden', 'false');
+      renderWorldDraftStep();
+    };
+
+    const prototype = window.NewtheriaDialogueTemplate.createDialogueTemplate({
       mount,
       csvUrl: './assets/data/dialogue_sample.asdf',
       eventId: 'opening',
@@ -39,6 +285,15 @@
       },
       onError: (error) => {
         console.error(error);
+      }
+    });
+
+    // 대화 추적 로그에서 end 이벤트를 감지해, 프롤로그 종료 직후 월드 작성 카드 단계를 시작한다.
+    prototype.subscribeDebug((state = {}) => {
+      const trace = Array.isArray(state.trace) ? state.trace : [];
+      const last = trace.at(-1);
+      if (last?.type === 'end') {
+        startWorldDraftFlow();
       }
     });
   </script>

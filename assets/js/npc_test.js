@@ -1148,6 +1148,7 @@ const bootstrap = async () => {
   // 사용자 요청 반영: 상단 NPC 팬카드 UI를 제거하고 핵심 기능만 유지.
   bindEvents();
   regenerateNpcList();
+  registerGlobalCharacterCardApi();
   activateScreen('observatory');
 };
 

@@ -112,25 +112,6 @@ input, select {
   padding: 12px;
 }
 
-.embed-shell {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(15, 23, 42, 0.7);
-  margin: 14px 0;
-}
-
-.embed-frame {
-  width: 100%;
-  min-height: 500px;
-  border: 0;
-  display: block;
-}
-
-.embed-shell--map .embed-frame {
-  min-height: 620px;
-}
-
 .story-log p,
 .result-card p { margin: 8px 0; }
 

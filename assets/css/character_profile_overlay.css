@@ -47,7 +47,7 @@ body.profile-discard-active.profile-discard-visible #npcProfileFloat .profile-di
 
 .profile-back-panel { display: grid; grid-template-rows: auto 1fr; gap: 8px; width: 100%; height: 100%; min-height: 0; }
 .profile-back-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.profile-back-tab { border: 0; min-height: 28px; border-radius: 10px; padding: 0 9px; font-size: .77rem; color: #edf3ff; background: rgba(56, 81, 138, .74); cursor: pointer; }
+.profile-back-tab { display: inline-flex; align-items: center; justify-content: center; border: 0; min-height: 28px; border-radius: 10px; padding: 0 9px; font-size: .77rem; color: #edf3ff; background: rgba(56, 81, 138, .74); cursor: pointer; }
 .profile-back-tab.is-active { background: rgba(101, 131, 209, .95); }
 .profile-back-content { display: grid; gap: 8px; min-height: 0; max-height: 100%; overflow: hidden; }
 

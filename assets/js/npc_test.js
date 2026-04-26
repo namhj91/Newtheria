@@ -778,16 +778,31 @@ const openNpcProfile = (npc) => {
     const targetTab = tabs.find((tab) => tab.key === activeTab) || tabs[0];
     activeTab = targetTab?.key || '';
     tabs.forEach((tab) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'profile-back-tab';
-      button.textContent = tab.label;
-      button.classList.toggle('is-active', tab.key === activeTab);
-      button.addEventListener('click', () => {
+      // card-fan-card 자체가 <button>이므로, 뒷면 탭을 다시 <button>으로 중첩하면
+      // 데스크탑 브라우저에서 클릭 이벤트가 무시되거나 상위 카드 클릭과 충돌할 수 있다.
+      const tabNode = document.createElement('span');
+      tabNode.className = 'profile-back-tab';
+      tabNode.textContent = tab.label;
+      tabNode.setAttribute('role', 'tab');
+      tabNode.tabIndex = 0;
+      tabNode.classList.toggle('is-active', tab.key === activeTab);
+      // 상위 카드 선택/드래그 핸들러와 겹치지 않도록 이벤트 버블을 차단한다.
+      tabNode.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+      });
+      tabNode.addEventListener('click', (event) => {
+        event.stopPropagation();
         activeTab = tab.key;
         renderProfileTabs();
       });
-      tabNav.append(button);
+      tabNode.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        activeTab = tab.key;
+        renderProfileTabs();
+      });
+      tabNav.append(tabNode);
     });
     const active = tabs.find((tab) => tab.key === activeTab);
     tabContent.replaceChildren(active?.render?.() || document.createTextNode('표시할 데이터가 없습니다.'));

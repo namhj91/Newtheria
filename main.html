@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria 메인 - 프롤로그</title>
+  <link rel="stylesheet" href="./assets/css/dialogue_prototype.css" />
+  <link rel="stylesheet" href="./assets/css/character_profile_overlay.css" />
+  <style>
+    body { margin: 0; background: #070b17; color: #f2f4ff; font-family: "Pretendard", "Noto Sans KR", sans-serif; }
+    .test-controls {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      z-index: 60;
+      display: grid;
+      gap: 10px;
+      width: min(440px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(8, 12, 24, 0.9);
+      border: 1px solid rgba(152, 174, 255, 0.32);
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .test-controls label { font-size: 0.82rem; opacity: 0.9; }
+    .test-controls input, .test-controls button, .test-controls textarea {
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(152, 174, 255, 0.35);
+      background: rgba(22, 30, 56, 0.8);
+      color: inherit;
+      box-sizing: border-box;
+    }
+    .test-controls textarea {
+      min-height: 96px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      line-height: 1.4;
+    }
+    .test-controls button { cursor: pointer; }
+    .test-controls details > summary { list-style: none; }
+    .test-controls details > summary::-webkit-details-marker { display: none; }
+    .test-controls details {
+      border: 1px solid rgba(152, 174, 255, 0.24);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(12, 19, 38, 0.58);
+    }
+    .test-controls summary {
+      cursor: pointer;
+      font-size: 0.82rem;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 600;
+      color: rgba(227, 234, 255, 0.96);
+    }
+    .test-controls summary::after { content: '열기'; font-size: 0.72rem; opacity: 0.72; font-weight: 500; }
+    .test-controls details[open] summary::after { content: '닫기'; }
+    .test-controls .group { display: grid; gap: 8px; }
+    .test-controls .hint {
+      font-size: 0.76rem;
+      opacity: 0.72;
+      line-height: 1.35;
+      margin: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px dashed rgba(152, 174, 255, 0.32);
+      background: rgba(16, 24, 48, 0.58);
+    }
+    .test-controls .row { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+    .test-controls .row > * { min-width: 0; }
+    .test-controls code { font-size: 0.78rem; }
+    .test-controls__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .test-controls__title { margin: 0; font-size: 0.9rem; letter-spacing: 0.01em; }
+    .test-controls__toggle { width: auto; min-width: 98px; padding: 6px 10px; font-size: 0.78rem; }
+    .test-controls__content { display: grid; gap: 10px; min-height: 0; overflow: auto; padding-right: 2px; }
+    .test-controls__tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      border-bottom: 1px solid rgba(152, 174, 255, 0.24);
+      padding-bottom: 8px;
+    }
+    .test-controls__tab {
+      width: auto !important;
+      min-height: 30px !important;
+      padding: 5px 10px !important;
+      font-size: 0.76rem;
+      opacity: 0.78;
+      background: rgba(18, 26, 50, 0.78);
+    }
+    .test-controls__tab.is-active {
+      opacity: 1;
+      border-color: rgba(247, 213, 106, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(247, 213, 106, 0.36);
+    }
+    .test-controls__tab-panel { display: none; gap: 10px; }
+    .test-controls__tab-panel.is-active { display: grid; }
+    .test-controls.is-minimized { width: auto; min-width: 180px; max-width: calc(100vw - 24px); }
+    .test-controls.is-minimized .test-controls__content { display: none; }
+    .test-hub-button {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 130;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(152, 174, 255, 0.55);
+      background: rgba(12, 20, 42, 0.92);
+      color: #f2f4ff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+    }
+    .test-hub-button:hover { background: rgba(40, 60, 112, 0.94); }
+    @media (max-width: 900px) {
+      .test-controls { width: calc(100vw - 24px); left: 12px; top: 12px; max-height: calc(100vh - 24px); }
+      .test-controls .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- 메인 프롤로그 화면에서도 빠르게 시작 화면으로 복귀할 수 있게 내비게이션을 유지한다. -->
+  <a class="test-hub-button" href="./start_screen.html" aria-label="시작화면으로 돌아가기">← 시작화면</a>
+
+  <!-- 기존 대화창 테스트 UI를 그대로 사용해 프롤로그를 동일한 경험으로 시작한다. -->
+  <section class="test-controls is-minimized" id="testControlsPanel">
+    <div class="test-controls__header">
+      <h2 class="test-controls__title">프롤로그 설정</h2>
+      <button id="toggleControls" class="test-controls__toggle" type="button" aria-expanded="false">열기</button>
+    </div>
+
+    <div class="test-controls__content">
+      <div class="test-controls__tabs" role="tablist" aria-label="프롤로그 설정 탭">
+        <button class="test-controls__tab is-active" id="tabButtonSource" type="button" role="tab" aria-selected="true" aria-controls="tabPanelSource" data-tab-target="source">소스/시작</button>
+        <button class="test-controls__tab" id="tabButtonDebug" type="button" role="tab" aria-selected="false" aria-controls="tabPanelDebug" data-tab-target="debug">디버그</button>
+        <button class="test-controls__tab" id="tabButtonGuide" type="button" role="tab" aria-selected="false" aria-controls="tabPanelGuide" data-tab-target="guide">문법 힌트</button>
+      </div>
+
+      <section class="test-controls__tab-panel is-active" id="tabPanelSource" role="tabpanel" aria-labelledby="tabButtonSource" data-tab-panel="source">
+        <details id="sectionSource" open>
+          <summary>1) 데이터 소스</summary>
+          <div class="group">
+            <label for="csvUrl">스크립트 URL</label>
+            <input id="csvUrl" type="text" value="./assets/data/dialogue_sample.asdf" />
+            <label for="csvFile">스크립트 파일 직접 선택(.asdf/.txt)</label>
+            <input id="csvFile" type="file" accept=".asdf,.txt,text/plain" />
+          </div>
+        </details>
+        <details id="sectionAnchor" open>
+          <summary>2) 시작 위치</summary>
+          <div class="group">
+            <div class="row">
+              <div>
+                <label for="eventId">eventId (예: opening)</label>
+                <input id="eventId" type="text" value="opening" />
+              </div>
+              <div>
+                <label for="sceneId">sceneId (예: 0, 1, 2)</label>
+                <input id="sceneId" type="text" value="0" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label for="anchorId">anchor (선택)</label>
+                <input id="anchorId" type="text" value="intro_start" />
+              </div>
+            </div>
+            <button id="reloadFromUrl" type="button">조건으로 다시 불러오기</button>
+          </div>
+        </details>
+        <details id="sectionBackground">
+          <summary>3) 배경 설정</summary>
+          <div class="group">
+            <label for="backgroundUrl">기본 배경 URL(비우면 스크립트 값 우선)</label>
+            <input id="backgroundUrl" type="text" value="https://picsum.photos/id/1015/1920/1080" />
+          </div>
+        </details>
+      </section>
+
+      <section class="test-controls__tab-panel" id="tabPanelDebug" role="tabpanel" aria-labelledby="tabButtonDebug" data-tab-panel="debug">
+        <details id="sectionDebug" open>
+          <summary>4) 변수/추적 (디버그)</summary>
+          <div class="group">
+            <label for="variablePatch">변수 변경(JSON)</label>
+            <textarea id="variablePatch" placeholder='{"player_name": "순례자", "goddess_title": "아스테리아"}'></textarea>
+            <div class="row">
+              <button id="applyVariablePatch" type="button">변수 적용</button>
+              <button id="clearTrace" type="button">추적 로그 초기화</button>
+            </div>
+            <label for="variableSnapshot">현재 변수 상태</label>
+            <textarea id="variableSnapshot" readonly></textarea>
+            <label for="standingSnapshot">스탠딩 상태(일러 디버그)</label>
+            <textarea id="standingSnapshot" readonly></textarea>
+            <label for="traceSnapshot">최근 이벤트 로그</label>
+            <textarea id="traceSnapshot" readonly></textarea>
+          </div>
+        </details>
+      </section>
+
+      <section class="test-controls__tab-panel" id="tabPanelGuide" role="tabpanel" aria-labelledby="tabButtonGuide" data-tab-panel="guide">
+        <details id="sectionGuide" open>
+          <summary>5) 문법 힌트</summary>
+          <p class="hint">헤더형 .asdf 문법을 사용합니다.<br/><code>&lt;event:이름&gt;</code> / <code>&lt;scene#n:이름&gt;</code> / <code>&lt;block:anchor&gt;</code>를 사용하고, 블록 종료는 <code>---</code> 입니다.<br/>블록 내부는 <code>{ ... }</code>로 감싸고 <code>key = value</code>만 허용합니다.<br/>선택지는 <code>choice = 라벨 -> anchor</code>를 사용하고, 히든 선택지는 <code>hidden_choice = 라벨 -> anchor</code>로 작성합니다. (일반 선택지를 모두 버리면 히든 선택지 노출)<br/>문자열은 <code>{player_name}</code> 같은 변수 치환을 지원하고, <code>type_speed = 24</code> / <code>wait = 800</code>으로 타자기·자동진행 연출을 줄 수 있습니다.<br/>인라인 효과로 <code>[[spoiler:내용]]</code>/<code>[[스포:내용]]</code>, <code>[[glitch:내용]]</code>/<code>[[깨진글:내용]]</code>을 사용할 수 있으며 <code>line/speaker</code> 모두 적용됩니다.<br/><code>particle = snow|ember|off</code>, <code>particle_count</code>, <code>particle_duration</code>으로 파티클 연출을 제어할 수 있습니다.<br/><code>screen_flash = 220</code>, <code>screen_blackout = 700</code>으로 지속시간을 주고, <code>screen_flash = 220,120</code>, <code>screen_blackout = 900,300</code>처럼 한 키에 변화시간까지 함께 줄 수 있습니다. (<code>*_fade</code> 분리 키도 계속 지원, 단독 지정 시 기본 지속시간으로 동작)<br/><code>skip_lock = on|off</code>(또는 <code>skip = lock|unlock</code>)으로 스킵 잠금을 제어할 수 있으며, 해제 지시가 없으면 scene 전환 전까지 유지됩니다.<br/>씬 헤더 직후 <code>{ actor / slot_left / slot_right / focus }</code>로 기본 스탠딩을 정의하며, <code>actor = id</code>는 (1) scene 번들 → (2) 활성 세이브 슬롯 캐릭터 → (3) 대표 캐릭터 localStorage 순서로 조회됩니다.<br/>진행 포인터는 같은 탭에서 <code>sessionStorage(newtheria.dialogue.progress)</code>로 복원됩니다.</p>
+        </details>
+      </section>
+    </div>
+  </section>
+
+  <div id="prototypeMount"></div>
+
+  <script src="./assets/js/card_templates.js"></script>
+  <script type="module" src="./assets/js/npc_test.js"></script>
+  <script src="./assets/js/dialogue_template.js"></script>
+  <script>
+    const mount = document.getElementById('prototypeMount');
+    const csvUrlInput = document.getElementById('csvUrl');
+    const eventIdInput = document.getElementById('eventId');
+    const sceneIdInput = document.getElementById('sceneId');
+    const anchorIdInput = document.getElementById('anchorId');
+    const backgroundInput = document.getElementById('backgroundUrl');
+    const csvFileInput = document.getElementById('csvFile');
+    const reloadButton = document.getElementById('reloadFromUrl');
+    const variablePatchInput = document.getElementById('variablePatch');
+    const applyVariablePatchButton = document.getElementById('applyVariablePatch');
+    const clearTraceButton = document.getElementById('clearTrace');
+    const variableSnapshot = document.getElementById('variableSnapshot');
+    const standingSnapshot = document.getElementById('standingSnapshot');
+    const traceSnapshot = document.getElementById('traceSnapshot');
+    const controlsPanel = document.getElementById('testControlsPanel');
+    const toggleControlsButton = document.getElementById('toggleControls');
+    const tabButtons = Array.from(document.querySelectorAll('.test-controls__tab'));
+    const tabPanels = Array.from(document.querySelectorAll('.test-controls__tab-panel'));
+
+    const getFilters = () => ({
+      eventId: String(eventIdInput.value || '').trim(),
+      sceneId: String(sceneIdInput.value || '').trim(),
+      anchor: String(anchorIdInput.value || '').trim()
+    });
+
+    const prototype = window.NewtheriaDialogueTemplate.createDialogueTemplate({
+      mount,
+      csvUrl: csvUrlInput.value,
+      ...getFilters(),
+      backgroundUrl: backgroundInput.value,
+      onSkip: () => {
+        alert('SKIP 클릭됨 (프롤로그)');
+      },
+      onError: (error) => {
+        console.error(error);
+      }
+    });
+
+    // 변수/분기 상태를 프롤로그 화면에서도 즉시 확인할 수 있도록 추적 패널을 연결한다.
+    const renderDebugSnapshot = (state = {}) => {
+      const safeVariables = {
+        currentEventId: state.currentEventId || '',
+        currentSceneIndex: state.currentSceneIndex ?? '',
+      };
+      const safeStanding = state.standing || {};
+      const safeTrace = Array.isArray(state.trace) ? state.trace : [];
+      variableSnapshot.value = JSON.stringify(safeVariables, null, 2);
+      standingSnapshot.value = JSON.stringify(safeStanding, null, 2);
+      traceSnapshot.value = safeTrace
+        .slice(-20)
+        .map((entry) => `[${entry.at}] ${entry.type} ${JSON.stringify(entry.data || {})}`)
+        .join('\n');
+    };
+    prototype.subscribeDebug(renderDebugSnapshot);
+
+    reloadButton.addEventListener('click', async () => {
+      await prototype.loadFromCsvUrl(csvUrlInput.value, getFilters());
+    });
+
+    applyVariablePatchButton.addEventListener('click', () => {
+      try {
+        const rawValue = variablePatchInput.value.trim();
+        if (!rawValue) return;
+        const parsed = JSON.parse(rawValue);
+        prototype.setVariables(parsed);
+      } catch (error) {
+        alert(`변수 JSON 파싱 실패: ${error.message}`);
+      }
+    });
+
+    clearTraceButton.addEventListener('click', () => {
+      prototype.clearDebugTrace();
+    });
+
+    // 디버그 패널 전체를 최소화/복원한다.
+    toggleControlsButton.addEventListener('click', () => {
+      const nextMinimized = !controlsPanel.classList.contains('is-minimized');
+      controlsPanel.classList.toggle('is-minimized', nextMinimized);
+      toggleControlsButton.textContent = nextMinimized ? '열기' : '최소화';
+      toggleControlsButton.setAttribute('aria-expanded', String(!nextMinimized));
+    });
+
+    // 설정 항목이 길어져도 관리하기 쉽도록 탭 기반으로 섹션을 분리한다.
+    const activateTab = (tabTarget) => {
+      tabButtons.forEach((button) => {
+        const isActive = button.dataset.tabTarget === tabTarget;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+      });
+      tabPanels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.tabPanel === tabTarget);
+      });
+    };
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        activateTab(button.dataset.tabTarget || 'source');
+      });
+    });
+
+    csvFileInput.addEventListener('change', async (event) => {
+      const [file] = event.target.files;
+      if (!file) return;
+      await prototype.loadFromCsvFile(file, getFilters());
+    });
+  </script>
+</body>
+</html>

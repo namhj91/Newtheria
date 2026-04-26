@@ -524,6 +524,19 @@ const reroll = {
   }
 };
 
+const ROUTE_URL_MAP = {
+  new: './journey_builder.html',
+  continue: './test_mode.html',
+  codex: './test_mode.html',
+  mods: './test_mode.html'
+};
+
+const handleMenuRoute = (route) => {
+  const targetUrl = ROUTE_URL_MAP[route];
+  if (!targetUrl) return;
+  window.location.href = targetUrl;
+};
+
 const restoreCardsForStartScreen = () => {
   menu.classList.remove('selecting');
   initializeCards();
@@ -568,6 +581,10 @@ const bindCardInteractions = () => {
       if (isMobileViewport) {
         layout.applyCardTransforms(card);
       }
+      // 카드 선택 후 해당 진입 경로로 이동한다.
+      // - 새로운 여정: 본편 온보딩 플로우(프롤로그/세계생성/역사시뮬/캐릭터메이킹)
+      // - 나머지 메뉴: 현재 임시 허브(Test Mode)로 연결
+      handleMenuRoute(card.dataset.route);
     }
   });
 };

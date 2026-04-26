@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria 여정 생성</title>
+  <link rel="stylesheet" href="./assets/css/journey_builder.css" />
+</head>
+<body>
+  <main class="journey-builder">
+    <header class="journey-header">
+      <p class="journey-badge">NEW JOURNEY FLOW</p>
+      <h1>새로운 여정</h1>
+      <p class="journey-subtitle">프롤로그 → 세계 생성 → 역사 시뮬레이션 → 캐릭터 메이킹을 한 페이지에서 진행합니다.</p>
+    </header>
+
+    <ol class="journey-steps" aria-label="여정 생성 단계">
+      <li class="journey-step is-active" data-step="1">1. 프롤로그</li>
+      <li class="journey-step" data-step="2">2. 세계 생성</li>
+      <li class="journey-step" data-step="3">3. 역사 시뮬레이션</li>
+      <li class="journey-step" data-step="4">4. 캐릭터 메이킹</li>
+    </ol>
+
+    <section class="journey-panel is-active" data-panel="1" aria-label="프롤로그 진행">
+      <h2>프롤로그</h2>
+      <p>별빛 성소에 균열이 발생했습니다. 순례자는 선택을 내려야 합니다.</p>
+      <article id="prologueLog" class="story-log" aria-live="polite"></article>
+      <button id="prologueStartBtn" class="primary-btn" type="button">프롤로그 시작</button>
+    </section>
+
+    <section class="journey-panel" data-panel="2" aria-label="세계 생성">
+      <h2>세계 생성</h2>
+      <div class="form-grid">
+        <label>세계 이름
+          <input id="worldNameInput" type="text" maxlength="24" placeholder="예: 아스트라 대륙" />
+        </label>
+        <label>시드
+          <input id="worldSeedInput" type="number" min="1" max="999999" placeholder="자동 생성" />
+        </label>
+        <label>대륙 성향
+          <select id="worldToneSelect">
+            <option value="wild">야생/미개척</option>
+            <option value="balanced" selected>균형/안정</option>
+            <option value="arcane">신비/마법</option>
+          </select>
+        </label>
+      </div>
+      <button id="worldGenerateBtn" class="primary-btn" type="button">세계 만들기</button>
+      <article id="worldSummary" class="result-card" aria-live="polite"></article>
+    </section>
+
+    <section class="journey-panel" data-panel="3" aria-label="역사 시뮬레이션">
+      <h2>역사 시뮬레이션</h2>
+      <p>생성한 세계를 빠르게 120년 시뮬레이션하여 배경 연표를 만듭니다.</p>
+      <button id="historySimulateBtn" class="primary-btn" type="button">역사 시뮬레이션 실행</button>
+      <ul id="historyTimeline" class="timeline" aria-live="polite"></ul>
+    </section>
+
+    <section class="journey-panel" data-panel="4" aria-label="캐릭터 메이킹">
+      <h2>캐릭터 메이킹</h2>
+      <div class="form-grid">
+        <label>이름
+          <input id="characterNameInput" type="text" maxlength="20" placeholder="순례자 이름" />
+        </label>
+        <label>출신
+          <select id="characterOriginSelect">
+            <option value="forest">북부 숲 연맹</option>
+            <option value="coast">서부 항구 도시</option>
+            <option value="plateau">동부 고원 수도</option>
+          </select>
+        </label>
+        <label>핵심 성향
+          <select id="characterTraitSelect">
+            <option value="honor">명예</option>
+            <option value="wisdom">지혜</option>
+            <option value="ambition">야망</option>
+          </select>
+        </label>
+      </div>
+      <button id="finalizeJourneyBtn" class="primary-btn" type="button">여정 확정</button>
+      <article id="journeyResult" class="result-card" aria-live="polite"></article>
+    </section>
+
+    <footer class="journey-footer">
+      <a href="./start_screen.html">← 시작화면으로 돌아가기</a>
+    </footer>
+  </main>
+
+  <script src="./assets/js/journey_builder.js"></script>
+</body>
+</html>

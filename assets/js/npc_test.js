@@ -786,6 +786,52 @@ const closeNpcProfileFloat = () => {
   if (profileCardFan) profileCardFan.replaceChildren();
 };
 
+// 전역 프로필 카드 API:
+// - 현재 페이지뿐 아니라 이후 페이지에서도 같은 카드 UI를 재사용할 수 있게 공용 진입점을 노출한다.
+const registerGlobalCharacterCardApi = () => {
+  if (typeof window === 'undefined') return;
+  window.NewtheriaCharacterCard = {
+    openByNpc: (npc) => {
+      if (!npc) return;
+      openNpcProfile(npc);
+    },
+    openById: (id) => {
+      const npc = findNpcById(Number(id));
+      if (!npc) return;
+      openNpcProfile(npc);
+    },
+    close: () => closeNpcProfileFloat(),
+    // 어떤 화면이든 data-character-id 속성을 붙이면 동일 카드 UI를 열 수 있다.
+    bindTriggers: ({ root = document, selector = '[data-character-id]' } = {}) => {
+      if (!root?.addEventListener) return () => {};
+      const onClick = (event) => {
+        const target = event.target?.closest?.(selector);
+        if (!target) return;
+        const npcId = Number(target.dataset.characterId);
+        if (!Number.isFinite(npcId)) return;
+        const npc = findNpcById(npcId);
+        if (npc) openNpcProfile(npc);
+      };
+      const onKeydown = (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const target = event.target?.closest?.(selector);
+        if (!target) return;
+        event.preventDefault();
+        const npcId = Number(target.dataset.characterId);
+        if (!Number.isFinite(npcId)) return;
+        const npc = findNpcById(npcId);
+        if (npc) openNpcProfile(npc);
+      };
+      root.addEventListener('click', onClick);
+      root.addEventListener('keydown', onKeydown);
+      return () => {
+        root.removeEventListener('click', onClick);
+        root.removeEventListener('keydown', onKeydown);
+      };
+    }
+  };
+};
+
 const buildFamilyTreeDom = (rootNpc, maxDepth = 3) => {
   const visited = new Set();
   const buildNode = (npc, depth) => {
@@ -1061,6 +1107,7 @@ const bootstrap = async () => {
   // 사용자 요청 반영: 상단 NPC 팬카드 UI를 제거하고 핵심 기능만 유지.
   bindEvents();
   regenerateNpcList();
+  registerGlobalCharacterCardApi();
   activateScreen('observatory');
 };
 

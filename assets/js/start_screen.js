@@ -525,13 +525,14 @@ const reroll = {
 };
 
 const ROUTE_URL_MAP = {
-  new: './journey_builder.html',
   continue: './test_mode.html',
   codex: './test_mode.html',
   mods: './test_mode.html'
 };
 
 const handleMenuRoute = (route) => {
+  // 사용자 요청: "새로운 여정" 카드는 이동 동작을 제거한다.
+  // route='new'는 의도적으로 매핑하지 않아 클릭해도 현재 화면에 머문다.
   const targetUrl = ROUTE_URL_MAP[route];
   if (!targetUrl) return;
   window.location.href = targetUrl;

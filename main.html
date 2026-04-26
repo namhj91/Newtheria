@@ -107,25 +107,6 @@
     .test-controls__tab-panel.is-active { display: grid; }
     .test-controls.is-minimized { width: auto; min-width: 180px; max-width: calc(100vw - 24px); }
     .test-controls.is-minimized .test-controls__content { display: none; }
-    .test-hub-button {
-      position: fixed;
-      top: 14px;
-      right: 14px;
-      z-index: 130;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(152, 174, 255, 0.55);
-      background: rgba(12, 20, 42, 0.92);
-      color: #f2f4ff;
-      text-decoration: none;
-      font-size: 0.82rem;
-      font-weight: 600;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
-    }
-    .test-hub-button:hover { background: rgba(40, 60, 112, 0.94); }
     @media (max-width: 900px) {
       .test-controls { width: calc(100vw - 24px); left: 12px; top: 12px; max-height: calc(100vh - 24px); }
       .test-controls .row { grid-template-columns: 1fr; }
@@ -133,9 +114,6 @@
   </style>
 </head>
 <body>
-  <!-- 메인 프롤로그 화면에서도 빠르게 시작 화면으로 복귀할 수 있게 내비게이션을 유지한다. -->
-  <a class="test-hub-button" href="./start_screen.html" aria-label="시작화면으로 돌아가기">← 시작화면</a>
-
   <!-- 기존 대화창 테스트 UI를 그대로 사용해 프롤로그를 동일한 경험으로 시작한다. -->
   <section class="test-controls is-minimized" id="testControlsPanel">
     <div class="test-controls__header">
@@ -256,6 +234,8 @@
       csvUrl: csvUrlInput.value,
       ...getFilters(),
       backgroundUrl: backgroundInput.value,
+      // 프롤로그에서는 event/scene/block 메타 텍스트를 숨긴다.
+      showMeta: false,
       onSkip: () => {
         alert('SKIP 클릭됨 (프롤로그)');
       },

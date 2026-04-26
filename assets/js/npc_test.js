@@ -68,9 +68,9 @@ const familyBoard = $('familyBoard');
 const overviewMetrics = $('overviewMetrics');
 const openFocusNpc = $('openFocusNpc');
 
-const npcProfileFloat = $('npcProfileFloat');
-const profileCardFan = $('profileCardFan');
-const profileDiscardZone = $('profileDiscardZone');
+let npcProfileFloat = $('npcProfileFloat');
+let profileCardFan = $('profileCardFan');
+let profileDiscardZone = $('profileDiscardZone');
 const traitDialog = $('traitDialog');
 const traitTitle = $('traitTitle');
 const traitBody = $('traitBody');
@@ -90,6 +90,38 @@ let profileDiscardController = null;
 let currentSearch = '';
 let currentRaceFilter = '';
 let npcIndexes = { byId: new Map(), byActor: new Map(), byRace: new Map(), byFamily: new Map(), byTrait: new Map() };
+
+const ensureStyleSheet = (href) => {
+  if (!href || document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+};
+
+const ensureProfileOverlayHost = () => {
+  // 다른 화면(예: 대화 테스트)에서도 동일 카드 UI를 열 수 있게 호스트를 동적으로 보강한다.
+  if (!npcProfileFloat || !profileCardFan || !profileDiscardZone) {
+    ensureStyleSheet('./assets/css/card_templates.css');
+    ensureStyleSheet('./assets/css/character_profile_card_template.css');
+    ensureStyleSheet('./assets/css/character_profile_overlay.css');
+    const host = document.createElement('section');
+    host.id = 'npcProfileFloat';
+    host.className = 'profile-float';
+    host.setAttribute('aria-label', 'NPC 프로필');
+    host.hidden = true;
+    host.innerHTML = `
+      <section class="modal-body profile-float__body">
+        <div id="profileCardFan" class="card-fan profile-card-fan" aria-label="NPC 프로필 카드"></div>
+      </section>
+      <div id="profileDiscardZone" class="profile-discard-zone" aria-label="프로필 카드 폐기 구역">카드를 아래로 끌어 버리기</div>
+    `;
+    document.body.appendChild(host);
+    npcProfileFloat = $('npcProfileFloat');
+    profileCardFan = $('profileCardFan');
+    profileDiscardZone = $('profileDiscardZone');
+  }
+};
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pickOne = (pool) => pool[randomInt(0, pool.length - 1)];
@@ -678,6 +710,7 @@ const createDebugTabPanel = (npc) => {
 };
 
 const openNpcProfile = (npc) => {
+  ensureProfileOverlayHost();
   const templates = window.NewtheriaCardTemplates;
   if (!templates?.renderCardFanCards || !templates?.createCardFanBehavior || !profileCardFan) {
     console.warn('[npc_test] 공용 카드 템플릿 API가 준비되지 않아 프로필 카드를 열 수 없습니다.');
@@ -1108,6 +1141,9 @@ const bindEvents = () => {
 };
 
 const bootstrap = async () => {
+  registerGlobalCharacterCardApi();
+  const isNpcTestPage = Boolean(npcGalaxy && raceFilter && npcSearchInput && compareNpcA && compareNpcB && familyBoard && overviewMetrics && openFocusNpc);
+  if (!isNpcTestPage) return;
   await loadNamePools();
   // 사용자 요청 반영: 상단 NPC 팬카드 UI를 제거하고 핵심 기능만 유지.
   bindEvents();

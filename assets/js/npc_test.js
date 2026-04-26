@@ -192,16 +192,6 @@ const createNpcBase = (id, createSeed) => {
   };
 };
 
-// 시드 문자열의 맨 앞자리만 +1 한다. (한 자리 유지가 필요하므로 9 다음은 0으로 순환)
-const addOneToSeedLeadingDigit = (seed) => {
-  const text = String(seed || '');
-  const firstDigitIndex = text.search(/\d/);
-  if (firstDigitIndex < 0) return text;
-  const head = Number(text[firstDigitIndex]);
-  const nextHead = (head + 1) % 10;
-  return `${text.slice(0, firstDigitIndex)}${nextHead}${text.slice(firstDigitIndex + 1)}`;
-};
-
 const createFixedNpc = ({ id, actorId, role, name, gender, race, age, uniqueSeed, layers = [], acquiredTraitIds = null }) => ({
   id,
   actorId,
@@ -458,8 +448,6 @@ const isDebugMode = () => {
   return params.get('debug') === '1' || localStorage.getItem('newtheria.debugMode') === '1';
 };
 
-const toStatPercent = (value) => Math.max(0, Math.min(100, Math.round((value / 20) * 100)));
-
 const createRadarChartNode = (npc) => {
   // 카드 내부에서 스탯 숫자 영역이 한 화면에 보이도록 레이더 크기를 소폭 축소한다.
   const size = 240;
@@ -614,6 +602,79 @@ const destroyProfileCardBehavior = () => {
   profileDiscardController = null;
 };
 
+// 캐릭터 상세 탭 렌더링을 역할별 함수로 분리해 유지보수를 쉽게 만든다.
+const createRelationsTabPanel = (npc) => {
+  const panel = document.createDocumentFragment();
+  panel.append(
+    createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
+    // 사용자 요청 반영: 부모 이름 표기에서는 id를 숨긴다.
+    createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId, { showId: false }) : '없음'),
+    createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId, { showId: false }) : '없음'),
+    // 자녀 이름도 객체형으로 유지해, 눌러서 바로 해당 캐릭터 정보를 열 수 있게 한다.
+    createInfoRow('자녀', createNpcCompactEntityList(npc.familyLinks.childrenIds || []))
+  );
+  return panel;
+};
+
+const createTraitsTabPanel = (npc) => {
+  const panel = document.createDocumentFragment();
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-actions';
+  (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
+    const chip = document.createElement('span');
+    // 희귀도 색상을 함께 부여해 특성 가치가 즉시 구분되도록 한다.
+    chip.className = `inline-entity trait-chip ${traitRarityClassOf(traitId)}`;
+    chip.textContent = traitNameOf(traitId);
+    chip.tabIndex = 0;
+    chip.role = 'button';
+    const open = () => openTraitDialog(traitId);
+    chip.addEventListener('click', open);
+    chip.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        open();
+      }
+    });
+    wrap.append(chip);
+  });
+  panel.append(createInfoRow('특성', wrap));
+  return panel;
+};
+
+const createStatsTabPanel = (npc) => {
+  const panel = document.createDocumentFragment();
+  panel.append(createRadarChartNode(npc));
+  // 숫자 스탯은 2열 칩으로 고정 노출해 스크롤 없이 한 번에 볼 수 있게 한다.
+  panel.append(createStatGridNode(npc));
+  return panel;
+};
+
+const createDebugTabPanel = (npc) => {
+  const point = seedToTorusPoint(npc.uniqueSeed);
+  const panel = document.createDocumentFragment();
+  panel.append(
+    createInfoRow('고유 시드', npc.uniqueSeed),
+    createInfoRow('토러스 좌표', `${point[0]} / ${point[1]} / ${point[2]}`),
+    createInfoRow('형제 수(이복 포함)', String((npcList.filter((x) => x.id !== npc.id && areSiblings(x, npc))).length)),
+    createInfoRow('불륜 관계', (() => {
+      const wrap = document.createElement('div');
+      wrap.className = 'inline-actions';
+      const affairs = npc.familyLinks.affairPartnerIds || [];
+      if (affairs.length === 0) return document.createTextNode('없음');
+      affairs.forEach((id) => wrap.append(createNpcEntity(id)));
+      return wrap;
+    })()),
+    createInfoRow('패밀리 트리', (() => {
+      const button = document.createElement('button');
+      button.className = 'ghost-btn';
+      button.textContent = '트리 팝업 열기';
+      button.addEventListener('click', () => openFamilyTree(npc));
+      return button;
+    })())
+  );
+  return panel;
+};
+
 const openNpcProfile = (npc) => {
   const templates = window.NewtheriaCardTemplates;
   if (!templates?.renderCardFanCards || !templates?.createCardFanBehavior || !profileCardFan) {
@@ -625,56 +686,17 @@ const openNpcProfile = (npc) => {
     {
       key: 'relations',
       label: '관계',
-      render: () => {
-        const panel = document.createDocumentFragment();
-        panel.append(
-          createInfoRow('배우자', npc.familyLinks.spouseId ? createNpcEntity(npc.familyLinks.spouseId) : '없음'),
-          createInfoRow('아버지', npc.familyLinks.fatherId ? createNpcEntity(npc.familyLinks.fatherId) : '없음'),
-          createInfoRow('어머니', npc.familyLinks.motherId ? createNpcEntity(npc.familyLinks.motherId) : '없음'),
-          // 자녀 이름도 객체형으로 유지해, 눌러서 바로 해당 캐릭터 정보를 열 수 있게 한다.
-          createInfoRow('자녀', createNpcCompactEntityList(npc.familyLinks.childrenIds || []))
-        );
-        return panel;
-      }
+      render: () => createRelationsTabPanel(npc)
     },
     {
       key: 'traits',
       label: '특성',
-      render: () => {
-        const panel = document.createDocumentFragment();
-        const wrap = document.createElement('div');
-        wrap.className = 'inline-actions';
-        (npc.traits.acquiredTraitIds || []).forEach((traitId) => {
-          const chip = document.createElement('span');
-          // 희귀도 색상을 함께 부여해 특성 가치가 즉시 구분되도록 한다.
-          chip.className = `inline-entity trait-chip ${traitRarityClassOf(traitId)}`;
-          chip.textContent = traitNameOf(traitId);
-          chip.tabIndex = 0;
-          chip.role = 'button';
-          const open = () => openTraitDialog(traitId);
-          chip.addEventListener('click', open);
-          chip.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              open();
-            }
-          });
-          wrap.append(chip);
-        });
-        panel.append(createInfoRow('특성', wrap));
-        return panel;
-      }
+      render: () => createTraitsTabPanel(npc)
     },
     {
       key: 'stats',
       label: '스탯',
-      render: () => {
-        const panel = document.createDocumentFragment();
-        panel.append(createRadarChartNode(npc));
-        // 숫자 스탯은 2열 칩으로 고정 노출해 스크롤 없이 한 번에 볼 수 있게 한다.
-        panel.append(createStatGridNode(npc));
-        return panel;
-      }
+      render: () => createStatsTabPanel(npc)
     },
     {
       key: 'alignment',
@@ -686,31 +708,7 @@ const openNpcProfile = (npc) => {
     tabs.push({
       key: 'debug',
       label: '디버그',
-      render: () => {
-        const point = seedToTorusPoint(npc.uniqueSeed);
-        const panel = document.createDocumentFragment();
-        panel.append(
-          createInfoRow('고유 시드', npc.uniqueSeed),
-          createInfoRow('토러스 좌표', `${point[0]} / ${point[1]} / ${point[2]}`),
-          createInfoRow('형제 수(이복 포함)', String((npcList.filter((x) => x.id !== npc.id && areSiblings(x, npc))).length)),
-          createInfoRow('불륜 관계', (() => {
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-actions';
-            const affairs = npc.familyLinks.affairPartnerIds || [];
-            if (affairs.length === 0) return document.createTextNode('없음');
-            affairs.forEach((id) => wrap.append(createNpcEntity(id)));
-            return wrap;
-          })()),
-          createInfoRow('패밀리 트리', (() => {
-            const button = document.createElement('button');
-            button.className = 'ghost-btn';
-            button.textContent = '트리 팝업 열기';
-            button.addEventListener('click', () => openFamilyTree(npc));
-            return button;
-          })())
-        );
-        return panel;
-      }
+      render: () => createDebugTabPanel(npc)
     });
   }
   const cards = templates.renderCardFanCards(profileCardFan, [{

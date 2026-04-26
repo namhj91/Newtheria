@@ -1118,6 +1118,7 @@
       const actor = scene.cast?.actors?.get?.(actorId) || standingState.actors.get(actorId);
       return cleanText(resolveTemplateVariables(actor?.name, runtimeVariables), '');
     };
+    const resolveActorIdForName = (block) => cleanText(block.speakerId);
 
     const initializeStandingStateForScene = (scene) => {
       const cast = scene.cast || {};
@@ -1429,8 +1430,20 @@
         initializeStandingStateForScene(scene);
       }
       const resolvedSpeaker = resolveActorLabel(scene, block);
+      const resolvedActorId = resolveActorIdForName(block);
       clearTextEffects('speaker');
       if (el.name) {
+        // 대화창 이름도 객체형 진입점으로 취급한다.
+        // 시각 서식은 그대로 유지하고 data 속성만 붙여 공용 카드 API와 연결한다.
+        if (resolvedActorId) {
+          el.name.dataset.characterActorId = resolvedActorId;
+          el.name.setAttribute('role', 'button');
+          el.name.tabIndex = 0;
+        } else {
+          delete el.name.dataset.characterActorId;
+          el.name.removeAttribute('role');
+          el.name.removeAttribute('tabindex');
+        }
         const renderedSpeakerWithEffects = renderTextWithEffects(el.name, resolvedSpeaker, 'speaker');
         if (!renderedSpeakerWithEffects) el.name.textContent = resolvedSpeaker;
       }
@@ -1647,7 +1660,24 @@
       if (isUiHidden) return;
       if (target.closest('.dialogue-prototype__spoiler')) return;
       if (target.closest('.dialogue-prototype__skip') || target.closest('.dialogue-prototype__choice')) return;
+      if (target.closest('.dialogue-prototype__name[data-character-actor-id]')) return;
       goNext();
+    });
+
+    // 이름 클릭/엔터 시 공용 캐릭터 카드 오픈 (동일 시각 서식 유지)
+    el.name?.addEventListener('click', (event) => {
+      const actorId = event.currentTarget?.dataset?.characterActorId;
+      if (!actorId) return;
+      event.stopPropagation();
+      window?.NewtheriaCharacterCard?.openByActorId?.(actorId);
+    });
+    el.name?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const actorId = event.currentTarget?.dataset?.characterActorId;
+      if (!actorId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      window?.NewtheriaCharacterCard?.openByActorId?.(actorId);
     });
 
     el.next?.addEventListener('click', (event) => {

@@ -249,6 +249,9 @@
   font-weight: 700;
   color: var(--dialogue-accent);
 }
+.dialogue-prototype__name[data-character-actor-id] {
+  cursor: pointer;
+}
 
 .dialogue-prototype__line {
   margin: 14px 0 0;

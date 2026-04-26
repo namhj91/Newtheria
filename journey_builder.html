@@ -23,30 +23,32 @@
 
     <section class="journey-panel is-active" data-panel="1" aria-label="프롤로그 진행">
       <h2>프롤로그</h2>
-      <p>별빛 성소에 균열이 발생했습니다. 순례자는 선택을 내려야 합니다.</p>
-      <article id="prologueLog" class="story-log" aria-live="polite"></article>
-      <button id="prologueStartBtn" class="primary-btn" type="button">프롤로그 시작</button>
+      <p>기존 대사 템플릿 화면을 그대로 불러와 프롤로그를 진행합니다.</p>
+      <div class="embed-shell">
+        <iframe
+          id="prologueFrame"
+          class="embed-frame"
+          title="프롤로그 대사 진행"
+          src="./dialogue_prototype_test.html"
+          loading="lazy"
+        ></iframe>
+      </div>
+      <button id="prologueDoneBtn" class="primary-btn" type="button">프롤로그 완료 후 다음 단계</button>
     </section>
 
     <section class="journey-panel" data-panel="2" aria-label="세계 생성">
       <h2>세계 생성</h2>
-      <div class="form-grid">
-        <label>세계 이름
-          <input id="worldNameInput" type="text" maxlength="24" placeholder="예: 아스트라 대륙" />
-        </label>
-        <label>시드
-          <input id="worldSeedInput" type="number" min="1" max="999999" placeholder="자동 생성" />
-        </label>
-        <label>대륙 성향
-          <select id="worldToneSelect">
-            <option value="wild">야생/미개척</option>
-            <option value="balanced" selected>균형/안정</option>
-            <option value="arcane">신비/마법</option>
-          </select>
-        </label>
+      <p>기존 월드맵 생성기를 그대로 불러와 세계를 생성합니다.</p>
+      <div class="embed-shell embed-shell--map">
+        <iframe
+          id="worldMapFrame"
+          class="embed-frame"
+          title="세계 생성 월드맵"
+          src="./world_map.html"
+          loading="lazy"
+        ></iframe>
       </div>
-      <button id="worldGenerateBtn" class="primary-btn" type="button">세계 만들기</button>
-      <article id="worldSummary" class="result-card" aria-live="polite"></article>
+      <button id="worldDoneBtn" class="primary-btn" type="button">세계 생성 완료 후 다음 단계</button>
     </section>
 
     <section class="journey-panel" data-panel="3" aria-label="역사 시뮬레이션">

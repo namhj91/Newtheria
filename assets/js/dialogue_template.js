@@ -680,6 +680,8 @@
     backgroundUrl = '',
     characterCatalog = {},
     castBundles = {},
+    variableDefinitions = [],
+    switchDefinitions = [],
     dialogueSessionKey = STORAGE_KEYS.dialogueProgress,
     showMeta = true,
     onError,
@@ -748,6 +750,12 @@
     };
     let trace = [];
     const debugListeners = new Set();
+    // -----------------------------------------------------------------------
+    // 게임 전역 스위치/변수 저장소 사용
+    // - 대화 템플릿 내부에 상태를 중복 보관하지 않고, 전역 스토어를 참조한다.
+    // - 템플릿 치환 시점에는 평면 스냅샷(runtimeVariables)만 매번 동기화해 사용한다.
+    // -----------------------------------------------------------------------
+    const gameStateStore = global.NewtheriaGameStateStore?.getStore?.('global') || null;
     let runtimeVariables = {};
     let activeLineTimer = null;
     let activeAutoNextTimer = null;
@@ -772,6 +780,32 @@
       if (['on', 'true', '1', 'lock', 'locked', 'disable', 'disabled', '불가', '잠금'].includes(token)) return true;
       if (['off', 'false', '0', 'unlock', 'enabled', 'enable', '가능', '해제'].includes(token)) return false;
       return null;
+    };
+
+    const rebuildRuntimeTemplateVariables = () => {
+      runtimeVariables = gameStateStore?.getTemplateBindings?.() || {};
+    };
+
+    const defineVariables = (definitions = []) => {
+      gameStateStore?.defineVariables?.(definitions);
+      rebuildRuntimeTemplateVariables();
+    };
+
+    const defineSwitches = (definitions = []) => {
+      gameStateStore?.defineSwitches?.(definitions);
+      rebuildRuntimeTemplateVariables();
+    };
+
+    const setVariableValue = (idOrName, nextValue) => {
+      const ok = Boolean(gameStateStore?.setVariable?.(idOrName, nextValue));
+      if (ok) rebuildRuntimeTemplateVariables();
+      return ok;
+    };
+
+    const setSwitchValue = (idOrName, nextValue) => {
+      const ok = Boolean(gameStateStore?.setSwitch?.(idOrName, nextValue));
+      if (ok) rebuildRuntimeTemplateVariables();
+      return ok;
     };
 
     const applySkipButtonState = () => {
@@ -1859,6 +1893,11 @@
       applyUiHiddenState();
     });
 
+    // 생성 시점에 전달된 스위치/변수 정의를 먼저 등록한다.
+    // id는 1부터 시작하며, name/description/value를 중앙 저장소에 유지한다.
+    defineVariables(variableDefinitions);
+    defineSwitches(switchDefinitions);
+
     const initialFilters = { eventId, sceneId: sceneId || nodeId, anchor };
 
     if (dialogues?.events) {
@@ -1910,12 +1949,41 @@
           log('set-variables-skipped', { reason: 'patch-object-required' });
           return;
         }
-        runtimeVariables = {
-          ...runtimeVariables,
-          ...patch
-        };
+        // 하위 호환 API:
+        // key를 "변수명"으로 간주해 전역 저장소에 자동 등록/갱신한다.
+        gameStateStore?.setVariablesByName?.(patch);
+        rebuildRuntimeTemplateVariables();
         log('set-variables', { keys: Object.keys(patch) });
         renderCurrent();
+      },
+      defineVariables(definitions = []) {
+        defineVariables(definitions);
+        renderCurrent();
+      },
+      defineSwitches(definitions = []) {
+        defineSwitches(definitions);
+        renderCurrent();
+      },
+      setVariable(idOrName, value) {
+        const ok = setVariableValue(idOrName, value);
+        if (!ok) {
+          log('set-variable-skipped', { idOrName, reason: 'variable-not-found-or-invalid-number' });
+          return;
+        }
+        log('set-variable', { idOrName });
+        renderCurrent();
+      },
+      setSwitch(idOrName, value) {
+        const ok = setSwitchValue(idOrName, value);
+        if (!ok) {
+          log('set-switch-skipped', { idOrName, reason: 'switch-not-found-or-invalid-state' });
+          return;
+        }
+        log('set-switch', { idOrName, value: Boolean(value) });
+        renderCurrent();
+      },
+      getRuntimeState() {
+        return gameStateStore?.getState?.() || { variables: [], switches: [] };
       },
       getDebugState() {
         const leftActor = standingState.actors.get(standingState.left);
@@ -1948,6 +2016,9 @@
                 visible: rightLayers.length > 0
               }
             }
+          },
+          runtimeState: {
+            ...(gameStateStore?.getState?.() || { variables: [], switches: [] })
           },
           trace: trace.slice(-30)
         };

@@ -153,7 +153,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.1(260427-대화뷰보정)
+    ver.0.3.2(260427-메인대화뷰모듈리팩토링)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -207,76 +207,6 @@
 
   <script src="./assets/js/card_templates.js"></script>
   <script src="./assets/js/dialogue_template.js"></script>
-  <script>
-    // 모든 뷰를 한 번에 가져옵니다.
-    const views = Array.from(document.querySelectorAll('.view'));
-
-    // 대화 템플릿 인스턴스를 재사용하기 위한 상태 저장소입니다.
-    const dialogueViewState = {
-      instance: null,
-      lastTraceKey: ''
-    };
-
-    // 지정한 id의 뷰만 활성화하고 나머지는 비활성화합니다.
-    function activateView(viewId) {
-      views.forEach((view) => {
-        const isActive = view.id === viewId;
-        view.dataset.active = isActive ? 'true' : 'false';
-      });
-
-      // 대화창 뷰로 진입할 때 최초 1회 템플릿을 마운트합니다.
-      if (viewId === 'view-dialogue') {
-        ensureDialogueView();
-      }
-    }
-
-    // 대화창을 닫을 때는 기본 뷰로 복귀합니다.
-    function closeDialogueView() {
-      activateView('view-default');
-    }
-
-    // 기존 테스트 대화 템플릿을 메인 대화 뷰에 연결합니다.
-    // - 디버그 패널: 아예 미사용
-    // - 메타 정보: showMeta=false로 비노출
-    function ensureDialogueView() {
-      if (dialogueViewState.instance) return dialogueViewState.instance;
-
-      const mount = document.getElementById('dialogueMount');
-      dialogueViewState.instance = window.NewtheriaDialogueTemplate.createDialogueTemplate({
-        mount,
-        csvUrl: './assets/data/dialogue_sample.asdf',
-        eventId: 'opening',
-        sceneId: '0',
-        anchor: 'intro_start',
-        showMeta: false,
-        onError: (error) => {
-          console.error('[DialogueView] 대화 템플릿 오류:', error);
-        },
-        onDebugStateChange: (state) => {
-          // trace의 마지막 로그만 확인해 end 구문 종료 시점에만 뷰를 닫습니다.
-          const lastTrace = Array.isArray(state?.trace) ? state.trace[state.trace.length - 1] : null;
-          if (!lastTrace) return;
-
-          const key = `${lastTrace.at}|${lastTrace.type}|${JSON.stringify(lastTrace.data || {})}`;
-          if (key === dialogueViewState.lastTraceKey) return;
-          dialogueViewState.lastTraceKey = key;
-
-          // 사용자 요청: 대화 스크립트의 end 구문(block.end) 수신 시 대화창 뷰 닫기
-          if (lastTrace.type === 'end' && lastTrace.data?.reason === 'block-end-true') {
-            closeDialogueView();
-          }
-        }
-      });
-
-      return dialogueViewState.instance;
-    }
-
-    // 개발용 버튼 클릭 시 해당 뷰로 전환합니다.
-    document.querySelector('.dev-nav').addEventListener('click', (event) => {
-      const button = event.target.closest('button[data-view]');
-      if (!button) return;
-      activateView(button.dataset.view);
-    });
-  </script>
+  <script src="./assets/js/main_view_router.js"></script>
 </body>
 </html>

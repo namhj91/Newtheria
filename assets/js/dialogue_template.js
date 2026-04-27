@@ -759,6 +759,9 @@
       line: []
     };
     let isLineAnimating = false;
+    // 긴 대사를 "한 block 안의 다중 페이지"로 분할해 보관한다.
+    // goNext 입력 시 페이지가 남아 있으면 같은 block 내 다음 페이지를 우선 노출한다.
+    let activePagedLine = null;
     let skipLocked = false;
     let skipLockSceneKey = '';
     let isUiHidden = false;
@@ -880,6 +883,123 @@
       });
       targetEl.appendChild(fragment);
       return true;
+    };
+
+    // 고정 크기 대화창을 넘는 긴 본문을 페이지 단위로 분할한다.
+    // - 한 페이지는 "대화창 높이(또는 max-height)" 안에 들어갈 수 있는 여러 줄(2~3줄 이상 포함)을 허용한다.
+    // - 넘김 시에는 문장 단위(.!?…/한글 부호 포함) 우선으로 페이지를 자른다.
+    // - 단일 문장 자체가 너무 길면 그때만 공백/문자 단위로 보조 분할한다.
+    const splitDialogueLineIntoPages = (lineEl, text = '') => {
+      const normalizedText = String(text ?? '');
+      if (!lineEl || !normalizedText) return [normalizedText];
+
+      const style = global.getComputedStyle(lineEl);
+      const font = style.font || `${style.fontStyle} ${style.fontVariant} ${style.fontWeight} ${style.fontSize}/${style.lineHeight} ${style.fontFamily}`;
+      const fontSizePx = parseFloat(style.fontSize) || 16;
+      const parsedLineHeight = parseFloat(style.lineHeight);
+      const lineHeightPx = Number.isFinite(parsedLineHeight) ? parsedLineHeight : Math.round(fontSizePx * 1.4);
+      const parsedMaxHeight = parseFloat(style.maxHeight);
+      // 핵심: 빈 <p>는 clientHeight가 1줄 높이만 잡힐 수 있다.
+      // max-height가 선언돼 있으면 이를 페이지 높이 기준으로 우선 사용한다.
+      const explicitBoxHeight = Number.isFinite(parsedMaxHeight) ? parsedMaxHeight : 0;
+      const measuredHeight = lineEl.clientHeight || lineEl.offsetHeight || 0;
+      const boxHeight = Math.max(lineHeightPx, explicitBoxHeight, measuredHeight, lineHeightPx * 2);
+      const maxLines = Math.max(1, Math.floor((boxHeight + 0.25) / lineHeightPx));
+      const maxWidth = Math.max(1, lineEl.clientWidth || lineEl.offsetWidth || 1);
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) return [normalizedText];
+      context.font = font;
+
+      const wrapTextToLines = (sourceText = '') => {
+        if (sourceText === '') return [''];
+        const tokens = sourceText.match(/\S+\s*/g) || [sourceText];
+        const lines = [];
+        let current = '';
+        const flushCurrent = () => {
+          if (current === '') return;
+          lines.push(current.trimEnd());
+          current = '';
+        };
+        tokens.forEach((token) => {
+          const attempt = `${current}${token}`;
+          if (context.measureText(attempt).width <= maxWidth) {
+            current = attempt;
+            return;
+          }
+          if (current) flushCurrent();
+          if (context.measureText(token).width <= maxWidth) {
+            current = token;
+            return;
+          }
+          // 토큰 자체가 너무 길면 문자 단위로 안전 분할한다.
+          let chunk = '';
+          for (const ch of token) {
+            const chunkAttempt = `${chunk}${ch}`;
+            if (context.measureText(chunkAttempt).width <= maxWidth) chunk = chunkAttempt;
+            else {
+              if (chunk) lines.push(chunk);
+              chunk = ch;
+            }
+          }
+          current = chunk;
+        });
+        flushCurrent();
+        return lines.length > 0 ? lines : [''];
+      };
+
+      const splitIntoSentenceChunks = (sourceText = '') => {
+        const textValue = String(sourceText);
+        if (!textValue) return [''];
+        // 문장부호(., !, ?, …, 한글/전각 부호)를 경계로 "문장 단위"를 우선 확보한다.
+        const matches = textValue.match(/[^.!?。！？…]+[.!?。！？…]*\s*/g);
+        if (!Array.isArray(matches) || matches.length === 0) return [textValue];
+        return matches.map((item) => String(item)).filter((item) => item.length > 0);
+      };
+
+      const hardLines = normalizedText.split('\n');
+      const pages = [];
+      let currentPageLines = [];
+      const pushCurrentPage = () => {
+        pages.push(currentPageLines.join('\n'));
+        currentPageLines = [];
+      };
+
+      hardLines.forEach((hardLineText, hardLineIndex) => {
+        if (hardLineText === '') {
+          if (currentPageLines.length >= maxLines) pushCurrentPage();
+          currentPageLines.push('');
+        } else {
+          const sentenceChunks = splitIntoSentenceChunks(hardLineText);
+          sentenceChunks.forEach((sentenceChunk) => {
+            const sentenceLines = wrapTextToLines(sentenceChunk);
+            // 문장 자체가 한 페이지보다 길면 "문장 내 보조 분할"을 허용한다.
+            if (sentenceLines.length > maxLines) {
+              sentenceLines.forEach((line) => {
+                if (currentPageLines.length >= maxLines) pushCurrentPage();
+                currentPageLines.push(line);
+              });
+              return;
+            }
+            const remaining = maxLines - currentPageLines.length;
+            if (remaining < sentenceLines.length && currentPageLines.length > 0) {
+              pushCurrentPage();
+            }
+            sentenceLines.forEach((line) => {
+              if (currentPageLines.length >= maxLines) pushCurrentPage();
+              currentPageLines.push(line);
+            });
+          });
+        }
+        // 원문 개행은 페이지 경계와 무관하게 유지한다. (마지막 hard line 제외)
+        if (hardLineIndex < hardLines.length - 1 && currentPageLines.length >= maxLines) {
+          pushCurrentPage();
+        }
+      });
+
+      if (currentPageLines.length > 0 || pages.length === 0) pages.push(currentPageLines.join('\n'));
+      return pages.filter((page) => page !== null && page !== undefined);
     };
 
     const emitDebug = () => {
@@ -1460,18 +1580,27 @@
         const typeSpeed = Math.max(0, parseIntegerOrDefault(block.typeSpeed, 0));
         clearTextEffects('line');
         const renderedWithEffects = renderTextWithEffects(el.line, resolvedLine, 'line');
+        activePagedLine = null;
         if (renderedWithEffects) {
           // 스포방지/깨진글이 섞인 라인은 토큰 DOM 렌더가 필요하므로
           // 타입라이터 대신 즉시 렌더링으로 처리한다.
           isLineAnimating = false;
         } else if (typeSpeed > 0 && resolvedLine.length > 0) {
+          // 타입라이터 줄도 페이지 분할을 적용한다.
+          // 현재 페이지 타이핑이 끝난 뒤 next 입력 시 다음 페이지를 같은 block에서 이어서 보여준다.
+          const pages = splitDialogueLineIntoPages(el.line, resolvedLine);
+          const firstPage = String(pages[0] ?? '');
+          activePagedLine = {
+            pages,
+            pageIndex: 0
+          };
           isLineAnimating = true;
           let cursor = 0;
           el.line.textContent = '';
           activeLineTimer = global.setInterval(() => {
             cursor += 1;
-            el.line.textContent = resolvedLine.slice(0, cursor);
-            if (cursor >= resolvedLine.length) {
+            el.line.textContent = firstPage.slice(0, cursor);
+            if (cursor >= firstPage.length) {
               clearInterval(activeLineTimer);
               activeLineTimer = null;
               isLineAnimating = false;
@@ -1479,7 +1608,12 @@
           }, typeSpeed);
         } else {
           isLineAnimating = false;
-          el.line.textContent = resolvedLine;
+          const pages = splitDialogueLineIntoPages(el.line, resolvedLine);
+          activePagedLine = {
+            pages,
+            pageIndex: 0
+          };
+          el.line.textContent = String(pages[0] ?? '');
         }
       }
       setBackground({
@@ -1586,9 +1720,28 @@
           clearInterval(activeLineTimer);
           activeLineTimer = null;
         }
-        el.line.textContent = resolveTemplateVariables(block.line || '', runtimeVariables);
+        const fallbackLine = resolveTemplateVariables(block.line || '', runtimeVariables);
+        const typedPage = String(activePagedLine?.pages?.[activePagedLine?.pageIndex || 0] ?? fallbackLine);
+        el.line.textContent = typedPage;
         isLineAnimating = false;
         return;
+      }
+
+      // 현재 block의 대사 페이지가 남아 있으면, block 이동보다 페이지 전환을 우선한다.
+      if (el.line && activePagedLine && Array.isArray(activePagedLine.pages)) {
+        const nextPageIndex = Number(activePagedLine.pageIndex) + 1;
+        if (nextPageIndex < activePagedLine.pages.length) {
+          activePagedLine.pageIndex = nextPageIndex;
+          el.line.textContent = String(activePagedLine.pages[nextPageIndex] ?? '');
+          log('line-page-next', {
+            eventId: pointer.eventId,
+            sceneIndex: pointer.sceneIndex,
+            order: pointer.order,
+            pageIndex: nextPageIndex,
+            pageCount: activePagedLine.pages.length
+          });
+          return;
+        }
       }
 
       if (block.end) {

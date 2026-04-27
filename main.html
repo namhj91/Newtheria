@@ -4,8 +4,279 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Newtheria 메인</title>
+  <!-- 대화창 템플릿 스타일을 그대로 재사용합니다. -->
+  <link rel="stylesheet" href="./assets/css/dialogue_template.css" />
+  <!-- 카드형 선택지 렌더에 필요한 공용 카드 템플릿 스타일 -->
+  <link rel="stylesheet" href="./assets/css/card_templates.css" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1220;
+      --line: #2e365a;
+      --accent: #67d4ff;
+      --text: #eef2ff;
+      --muted: #b4bddf;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+    }
+
+    /* 메인 게임 루트: 모든 뷰를 이 안에 겹쳐서 관리합니다. */
+    #game-root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #10152b 0%, #0d1020 100%);
+    }
+
+    /* 공통 뷰 스타일: 화면 전체를 꽉 채우는 레이어 */
+    .view {
+      position: absolute;
+      inset: 0;
+      display: none;
+      width: 100%;
+      height: 100%;
+      padding: 24px;
+      background: rgba(13, 16, 32, 0.9);
+    }
+
+    .view[data-active="true"] {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .view__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(26, 31, 52, 0.85);
+    }
+
+    .view__title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .view__badge {
+      padding: 6px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .view__body {
+      flex: 1;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      background: rgba(26, 31, 52, 0.5);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    /* 대화창 뷰는 템플릿을 100% 그대로 쓰기 위해 패딩/배경을 제거합니다. */
+    #view-dialogue {
+      padding: 0;
+      background: transparent;
+      gap: 0;
+    }
+
+    #dialogueMount {
+      width: 100%;
+      height: 100%;
+    }
+
+    /*
+      대화 본문이 상하로 잘리는 현상을 막기 위해
+      패널 최소 높이와 내부 여백/줄높이를 소폭 확대합니다.
+    */
+    #view-dialogue .dialogue-prototype__panel {
+      height: clamp(230px, 30vh, 320px);
+      padding: 20px 22px 30px;
+    }
+
+    #view-dialogue .dialogue-prototype__line {
+      line-height: 1.65;
+      padding-bottom: 8px;
+    }
+
+    /* 개발 단계에서 빠른 전환을 위한 미니 네비게이션 */
+    .dev-nav {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      z-index: 99;
+    }
+
+    .dev-nav button {
+      border: 1px solid var(--line);
+      background: rgba(26, 31, 52, 0.9);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .dev-nav button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  </style>
 </head>
 <body>
-  <!-- 사용자 요청: main.html을 초기화(전체 제거)하고, 이후 새로 작성할 수 있는 빈 상태로 둔다. -->
+  <!--
+    버전 정보(사용자 요청 형식)
+    ver.0.3.1(260427-대화뷰보정)
+  -->
+
+  <main id="game-root" aria-label="게임 메인 화면">
+    <!-- 기본 뷰: 게임 진입 후 기본 상태에서 사용할 전체 화면 -->
+    <section id="view-default" class="view" data-active="true" aria-label="기본 뷰">
+      <header class="view__header">
+        <h1 class="view__title">기본 뷰</h1>
+        <span class="view__badge">기본 상태</span>
+      </header>
+      <div class="view__body">
+        기본 UI 배치 영역입니다.<br />
+        인벤토리, 상태창, 단축키 HUD 등을 이 뷰에서 확장할 수 있습니다.
+      </div>
+    </section>
+
+    <!-- 대화창 뷰: 기존 테스트 템플릿을 그대로 마운트(디버그 UI 제외, 메타 숨김) -->
+    <section id="view-dialogue" class="view" data-active="false" aria-label="대화창 뷰">
+      <div id="dialogueMount" aria-label="대화 템플릿 마운트"></div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body">
+        월드 노드, 경로, 목적지 정보를 시각화할 예정입니다.
+      </div>
+    </section>
+
+    <!-- 전투창 뷰: 턴 기반/실시간 전투 UI 공통 베이스 -->
+    <section id="view-battle" class="view" data-active="false" aria-label="전투창 뷰">
+      <header class="view__header">
+        <h2 class="view__title">전투창 뷰</h2>
+        <span class="view__badge">Battle</span>
+      </header>
+      <div class="view__body">
+        유닛 상태, 스킬 버튼, 전투 로그, 타임라인 등을 배치할 예정입니다.
+      </div>
+    </section>
+
+    <!-- 개발 편의용: 각 뷰 전환 버튼(추후 게임 로직 연결 시 제거 가능) -->
+    <nav class="dev-nav" aria-label="개발용 뷰 전환">
+      <button type="button" data-view="view-default">기본</button>
+      <button type="button" data-view="view-dialogue">대화</button>
+      <button type="button" data-view="view-worldmap">월드맵</button>
+      <button type="button" data-view="view-battle">전투</button>
+    </nav>
+  </main>
+
+  <script src="./assets/js/card_templates.js"></script>
+  <script src="./assets/js/dialogue_template.js"></script>
+  <script>
+    // 모든 뷰를 한 번에 가져옵니다.
+    const views = Array.from(document.querySelectorAll('.view'));
+
+    // 대화 템플릿 인스턴스를 재사용하기 위한 상태 저장소입니다.
+    const dialogueViewState = {
+      instance: null,
+      lastTraceKey: ''
+    };
+
+    // 지정한 id의 뷰만 활성화하고 나머지는 비활성화합니다.
+    function activateView(viewId) {
+      views.forEach((view) => {
+        const isActive = view.id === viewId;
+        view.dataset.active = isActive ? 'true' : 'false';
+      });
+
+      // 대화창 뷰로 진입할 때 최초 1회 템플릿을 마운트합니다.
+      if (viewId === 'view-dialogue') {
+        ensureDialogueView();
+      }
+    }
+
+    // 대화창을 닫을 때는 기본 뷰로 복귀합니다.
+    function closeDialogueView() {
+      activateView('view-default');
+    }
+
+    // 기존 테스트 대화 템플릿을 메인 대화 뷰에 연결합니다.
+    // - 디버그 패널: 아예 미사용
+    // - 메타 정보: showMeta=false로 비노출
+    function ensureDialogueView() {
+      if (dialogueViewState.instance) return dialogueViewState.instance;
+
+      const mount = document.getElementById('dialogueMount');
+      dialogueViewState.instance = window.NewtheriaDialogueTemplate.createDialogueTemplate({
+        mount,
+        csvUrl: './assets/data/dialogue_sample.asdf',
+        eventId: 'opening',
+        sceneId: '0',
+        anchor: 'intro_start',
+        showMeta: false,
+        onError: (error) => {
+          console.error('[DialogueView] 대화 템플릿 오류:', error);
+        },
+        onDebugStateChange: (state) => {
+          // trace의 마지막 로그만 확인해 end 구문 종료 시점에만 뷰를 닫습니다.
+          const lastTrace = Array.isArray(state?.trace) ? state.trace[state.trace.length - 1] : null;
+          if (!lastTrace) return;
+
+          const key = `${lastTrace.at}|${lastTrace.type}|${JSON.stringify(lastTrace.data || {})}`;
+          if (key === dialogueViewState.lastTraceKey) return;
+          dialogueViewState.lastTraceKey = key;
+
+          // 사용자 요청: 대화 스크립트의 end 구문(block.end) 수신 시 대화창 뷰 닫기
+          if (lastTrace.type === 'end' && lastTrace.data?.reason === 'block-end-true') {
+            closeDialogueView();
+          }
+        }
+      });
+
+      return dialogueViewState.instance;
+    }
+
+    // 개발용 버튼 클릭 시 해당 뷰로 전환합니다.
+    document.querySelector('.dev-nav').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-view]');
+      if (!button) return;
+      activateView(button.dataset.view);
+    });
+  </script>
 </body>
 </html>

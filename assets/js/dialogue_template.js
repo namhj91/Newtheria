@@ -886,8 +886,9 @@
     };
 
     // 고정 크기 대화창을 넘는 긴 본문을 페이지 단위로 분할한다.
-    // - 실제 렌더 폭/폰트/line-height를 사용해 "지금 UI에서 넘침이 발생하는지" 기준으로 계산한다.
-    // - 개행(\n)은 우선 보존하고, 필요 시 공백/문자 단위로 안전 분할한다.
+    // - 한 페이지는 "대화창 높이(또는 max-height)" 안에 들어갈 수 있는 여러 줄(2~3줄 이상 포함)을 허용한다.
+    // - 넘김 시에는 문장 단위(.!?…/한글 부호 포함) 우선으로 페이지를 자른다.
+    // - 단일 문장 자체가 너무 길면 그때만 공백/문자 단위로 보조 분할한다.
     const splitDialogueLineIntoPages = (lineEl, text = '') => {
       const normalizedText = String(text ?? '');
       if (!lineEl || !normalizedText) return [normalizedText];
@@ -897,7 +898,12 @@
       const fontSizePx = parseFloat(style.fontSize) || 16;
       const parsedLineHeight = parseFloat(style.lineHeight);
       const lineHeightPx = Number.isFinite(parsedLineHeight) ? parsedLineHeight : Math.round(fontSizePx * 1.4);
-      const boxHeight = Math.max(lineHeightPx, lineEl.clientHeight || lineEl.offsetHeight || lineHeightPx * 2);
+      const parsedMaxHeight = parseFloat(style.maxHeight);
+      // 핵심: 빈 <p>는 clientHeight가 1줄 높이만 잡힐 수 있다.
+      // max-height가 선언돼 있으면 이를 페이지 높이 기준으로 우선 사용한다.
+      const explicitBoxHeight = Number.isFinite(parsedMaxHeight) ? parsedMaxHeight : 0;
+      const measuredHeight = lineEl.clientHeight || lineEl.offsetHeight || 0;
+      const boxHeight = Math.max(lineHeightPx, explicitBoxHeight, measuredHeight, lineHeightPx * 2);
       const maxLines = Math.max(1, Math.floor((boxHeight + 0.25) / lineHeightPx));
       const maxWidth = Math.max(1, lineEl.clientWidth || lineEl.offsetWidth || 1);
 
@@ -906,65 +912,93 @@
       if (!context) return [normalizedText];
       context.font = font;
 
-      const hardLines = normalizedText.split('\n');
-      const pages = [];
-      let currentPageLines = [];
-
-      const pushLineToPage = (lineText) => {
-        if (currentPageLines.length >= maxLines) {
-          pages.push(currentPageLines.join('\n'));
-          currentPageLines = [];
-        }
-        currentPageLines.push(lineText);
-      };
-
-      const wrapOneHardLine = (hardLineText) => {
-        if (hardLineText === '') {
-          pushLineToPage('');
-          return;
-        }
-        const tokens = hardLineText.match(/\S+\s*/g) || [hardLineText];
+      const wrapTextToLines = (sourceText = '') => {
+        if (sourceText === '') return [''];
+        const tokens = sourceText.match(/\S+\s*/g) || [sourceText];
+        const lines = [];
         let current = '';
         const flushCurrent = () => {
           if (current === '') return;
-          pushLineToPage(current.trimEnd());
+          lines.push(current.trimEnd());
           current = '';
         };
-
         tokens.forEach((token) => {
           const attempt = `${current}${token}`;
-          const width = context.measureText(attempt).width;
-          if (width <= maxWidth) {
+          if (context.measureText(attempt).width <= maxWidth) {
             current = attempt;
             return;
           }
-
           if (current) flushCurrent();
-
-          // 토큰 자체가 너무 길면 문자 단위로 쪼갠다.
           if (context.measureText(token).width <= maxWidth) {
             current = token;
             return;
           }
+          // 토큰 자체가 너무 길면 문자 단위로 안전 분할한다.
           let chunk = '';
           for (const ch of token) {
             const chunkAttempt = `${chunk}${ch}`;
-            if (context.measureText(chunkAttempt).width <= maxWidth) {
-              chunk = chunkAttempt;
-            } else {
-              pushLineToPage(chunk);
+            if (context.measureText(chunkAttempt).width <= maxWidth) chunk = chunkAttempt;
+            else {
+              if (chunk) lines.push(chunk);
               chunk = ch;
             }
           }
           current = chunk;
         });
         flushCurrent();
+        return lines.length > 0 ? lines : [''];
       };
 
-      hardLines.forEach((hardLineText) => wrapOneHardLine(hardLineText));
-      if (currentPageLines.length > 0 || pages.length === 0) {
+      const splitIntoSentenceChunks = (sourceText = '') => {
+        const textValue = String(sourceText);
+        if (!textValue) return [''];
+        // 문장부호(., !, ?, …, 한글/전각 부호)를 경계로 "문장 단위"를 우선 확보한다.
+        const matches = textValue.match(/[^.!?。！？…]+[.!?。！？…]*\s*/g);
+        if (!Array.isArray(matches) || matches.length === 0) return [textValue];
+        return matches.map((item) => String(item)).filter((item) => item.length > 0);
+      };
+
+      const hardLines = normalizedText.split('\n');
+      const pages = [];
+      let currentPageLines = [];
+      const pushCurrentPage = () => {
         pages.push(currentPageLines.join('\n'));
-      }
+        currentPageLines = [];
+      };
+
+      hardLines.forEach((hardLineText, hardLineIndex) => {
+        if (hardLineText === '') {
+          if (currentPageLines.length >= maxLines) pushCurrentPage();
+          currentPageLines.push('');
+        } else {
+          const sentenceChunks = splitIntoSentenceChunks(hardLineText);
+          sentenceChunks.forEach((sentenceChunk) => {
+            const sentenceLines = wrapTextToLines(sentenceChunk);
+            // 문장 자체가 한 페이지보다 길면 "문장 내 보조 분할"을 허용한다.
+            if (sentenceLines.length > maxLines) {
+              sentenceLines.forEach((line) => {
+                if (currentPageLines.length >= maxLines) pushCurrentPage();
+                currentPageLines.push(line);
+              });
+              return;
+            }
+            const remaining = maxLines - currentPageLines.length;
+            if (remaining < sentenceLines.length && currentPageLines.length > 0) {
+              pushCurrentPage();
+            }
+            sentenceLines.forEach((line) => {
+              if (currentPageLines.length >= maxLines) pushCurrentPage();
+              currentPageLines.push(line);
+            });
+          });
+        }
+        // 원문 개행은 페이지 경계와 무관하게 유지한다. (마지막 hard line 제외)
+        if (hardLineIndex < hardLines.length - 1 && currentPageLines.length >= maxLines) {
+          pushCurrentPage();
+        }
+      });
+
+      if (currentPageLines.length > 0 || pages.length === 0) pages.push(currentPageLines.join('\n'));
       return pages.filter((page) => page !== null && page !== undefined);
     };
 

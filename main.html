@@ -6,6 +6,8 @@
   <title>Newtheria 메인</title>
   <!-- 대화창 템플릿 스타일을 그대로 재사용합니다. -->
   <link rel="stylesheet" href="./assets/css/dialogue_template.css" />
+  <!-- 카드형 선택지 렌더에 필요한 공용 카드 템플릿 스타일 -->
+  <link rel="stylesheet" href="./assets/css/card_templates.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -107,6 +109,20 @@
       height: 100%;
     }
 
+    /*
+      대화 본문이 상하로 잘리는 현상을 막기 위해
+      패널 최소 높이와 내부 여백/줄높이를 소폭 확대합니다.
+    */
+    #view-dialogue .dialogue-prototype__panel {
+      height: clamp(230px, 30vh, 320px);
+      padding: 20px 22px 30px;
+    }
+
+    #view-dialogue .dialogue-prototype__line {
+      line-height: 1.65;
+      padding-bottom: 8px;
+    }
+
     /* 개발 단계에서 빠른 전환을 위한 미니 네비게이션 */
     .dev-nav {
       position: absolute;
@@ -137,7 +153,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.0(260427-대화뷰통합)
+    ver.0.3.1(260427-대화뷰보정)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">

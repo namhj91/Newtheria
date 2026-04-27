@@ -4,11 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Newtheria 메인</title>
+  <!-- 대화창 템플릿 스타일을 그대로 재사용합니다. -->
+  <link rel="stylesheet" href="./assets/css/dialogue_template.css" />
   <style>
     :root {
       color-scheme: dark;
       --bg: #0f1220;
-      --panel: #1a1f34;
       --line: #2e365a;
       --accent: #67d4ff;
       --text: #eef2ff;
@@ -49,7 +50,6 @@
       background: rgba(13, 16, 32, 0.9);
     }
 
-    /* 현재 활성 뷰는 data-active="true"로 표시 */
     .view[data-active="true"] {
       display: flex;
       flex-direction: column;
@@ -95,6 +95,18 @@
       line-height: 1.6;
     }
 
+    /* 대화창 뷰는 템플릿을 100% 그대로 쓰기 위해 패딩/배경을 제거합니다. */
+    #view-dialogue {
+      padding: 0;
+      background: transparent;
+      gap: 0;
+    }
+
+    #dialogueMount {
+      width: 100%;
+      height: 100%;
+    }
+
     /* 개발 단계에서 빠른 전환을 위한 미니 네비게이션 */
     .dev-nav {
       position: absolute;
@@ -125,7 +137,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.0.1(260427-뷰초기구성)
+    ver.0.3.0(260427-대화뷰통합)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -141,15 +153,9 @@
       </div>
     </section>
 
-    <!-- 대화창 뷰: NPC/스토리 대화 연출 전용 -->
+    <!-- 대화창 뷰: 기존 테스트 템플릿을 그대로 마운트(디버그 UI 제외, 메타 숨김) -->
     <section id="view-dialogue" class="view" data-active="false" aria-label="대화창 뷰">
-      <header class="view__header">
-        <h2 class="view__title">대화창 뷰</h2>
-        <span class="view__badge">Dialogue</span>
-      </header>
-      <div class="view__body">
-        캐릭터 초상, 대사 텍스트, 선택지 UI를 배치할 예정입니다.
-      </div>
+      <div id="dialogueMount" aria-label="대화 템플릿 마운트"></div>
     </section>
 
     <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
@@ -183,9 +189,17 @@
     </nav>
   </main>
 
+  <script src="./assets/js/card_templates.js"></script>
+  <script src="./assets/js/dialogue_template.js"></script>
   <script>
     // 모든 뷰를 한 번에 가져옵니다.
     const views = Array.from(document.querySelectorAll('.view'));
+
+    // 대화 템플릿 인스턴스를 재사용하기 위한 상태 저장소입니다.
+    const dialogueViewState = {
+      instance: null,
+      lastTraceKey: ''
+    };
 
     // 지정한 id의 뷰만 활성화하고 나머지는 비활성화합니다.
     function activateView(viewId) {
@@ -193,6 +207,52 @@
         const isActive = view.id === viewId;
         view.dataset.active = isActive ? 'true' : 'false';
       });
+
+      // 대화창 뷰로 진입할 때 최초 1회 템플릿을 마운트합니다.
+      if (viewId === 'view-dialogue') {
+        ensureDialogueView();
+      }
+    }
+
+    // 대화창을 닫을 때는 기본 뷰로 복귀합니다.
+    function closeDialogueView() {
+      activateView('view-default');
+    }
+
+    // 기존 테스트 대화 템플릿을 메인 대화 뷰에 연결합니다.
+    // - 디버그 패널: 아예 미사용
+    // - 메타 정보: showMeta=false로 비노출
+    function ensureDialogueView() {
+      if (dialogueViewState.instance) return dialogueViewState.instance;
+
+      const mount = document.getElementById('dialogueMount');
+      dialogueViewState.instance = window.NewtheriaDialogueTemplate.createDialogueTemplate({
+        mount,
+        csvUrl: './assets/data/dialogue_sample.asdf',
+        eventId: 'opening',
+        sceneId: '0',
+        anchor: 'intro_start',
+        showMeta: false,
+        onError: (error) => {
+          console.error('[DialogueView] 대화 템플릿 오류:', error);
+        },
+        onDebugStateChange: (state) => {
+          // trace의 마지막 로그만 확인해 end 구문 종료 시점에만 뷰를 닫습니다.
+          const lastTrace = Array.isArray(state?.trace) ? state.trace[state.trace.length - 1] : null;
+          if (!lastTrace) return;
+
+          const key = `${lastTrace.at}|${lastTrace.type}|${JSON.stringify(lastTrace.data || {})}`;
+          if (key === dialogueViewState.lastTraceKey) return;
+          dialogueViewState.lastTraceKey = key;
+
+          // 사용자 요청: 대화 스크립트의 end 구문(block.end) 수신 시 대화창 뷰 닫기
+          if (lastTrace.type === 'end' && lastTrace.data?.reason === 'block-end-true') {
+            closeDialogueView();
+          }
+        }
+      });
+
+      return dialogueViewState.instance;
     }
 
     // 개발용 버튼 클릭 시 해당 뷰로 전환합니다.

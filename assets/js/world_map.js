@@ -1102,9 +1102,11 @@ const renderWorld = (world) => {
         // 이렇게 하면 (max index)와 (0 index) 경계가 동일 규칙으로 정확히 이어진다.
         // odd-r 좌표계에서 세로 주기를 홀수 줄 수만큼 이동하면 행 홀짝이 뒤집히고,
         // 이때 "홀수 y행 색상만 x=-1로 밀려 보이는" 현상이 생길 수 있다.
-        // 세로 주기 홀짝 반전이 있을 때 홀수 행은 q를 +1 보정해 색상/형상이 같은 타일로 맞춘다.
+        // 세로 주기 홀짝 반전이 있을 때(높이가 홀수), odd-r 좌표계의 홀수 행은 q를 -1 보정해야
+        // 블록 전체가 동일한 반 칸 오프셋으로 정렬된다.
+        // (+1 보정은 홀수 행 샘플을 x+1 이웃으로 밀어 색상 오버라이드 증상을 만들 수 있다.)
         const hasVerticalParityFlip = Math.abs((dy * height) % 2) === 1;
-        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? 1 : 0;
+        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? -1 : 0;
         const repeatedQ = tile.coord.x + dx * width + oddRowQShift;
         const repeatedR = tile.coord.y + dy * height;
         const { x, y } = hexToPixel(repeatedQ, repeatedR, HEX_CONFIG.size);
@@ -1182,8 +1184,12 @@ const maintainWrappedScroll = () => {
 
   if (nextTop < topMin) {
     nextTop += mapPixelHeight;
+    // 세로 워프(위→아래) 시 홀수 높이 맵은 odd-r 기준 반 칸 x 보정이 필요하다.
+    nextLeft += verticalWrapParityShift;
   } else if (nextTop > topMax) {
     nextTop -= mapPixelHeight;
+    // 세로 워프(아래→위)는 반대 방향으로 동일 보정을 적용한다.
+    nextLeft -= verticalWrapParityShift;
   }
 
   if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {

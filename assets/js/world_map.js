@@ -67,6 +67,7 @@ const HEX_CONFIG = {
 
 const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
+const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
 const calendarMeta = document.getElementById('calendarMeta');
@@ -97,6 +98,8 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let worldCanvasMetrics = { mapPixelWidth: 0, mapPixelHeight: 0 };
+let isRecenteringViewport = false;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1014,17 +1017,28 @@ const renderWorld = (world) => {
 
   const hexWidth = SQRT3 * HEX_CONFIG.size;
   const hexHeight = HEX_CONFIG.size * 2;
-  const canvasWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
-  const canvasHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  const mapPixelWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
+  const mapPixelHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
+  // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
+  const canvasWidth = mapPixelWidth * 3;
+  const canvasHeight = mapPixelHeight * 3;
 
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
+  worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  tiles.forEach((tile) => {
-    const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-    drawHex(x + 8, y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
-  });
+  for (let ty = 0; ty < 3; ty += 1) {
+    for (let tx = 0; tx < 3; tx += 1) {
+      const offsetX = tx * mapPixelWidth;
+      const offsetY = ty * mapPixelHeight;
+      tiles.forEach((tile) => {
+        const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
+        drawHex(offsetX + x + 8, offsetY + y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
+      });
+    }
+  }
 
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
@@ -1044,6 +1058,47 @@ const renderWorld = (world) => {
   ].join('\n');
 };
 
+const recenterViewportToMiddle = (force = false) => {
+  if (!worldMapViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+  const targetLeft = mapPixelWidth;
+  const targetTop = mapPixelHeight;
+  // 첫 렌더 또는 강제 이동 시 중앙 블록으로 스크롤을 옮긴다.
+  if (force
+    || (worldMapViewport.scrollLeft === 0 && worldMapViewport.scrollTop === 0)) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = targetLeft;
+    worldMapViewport.scrollTop = targetTop;
+    isRecenteringViewport = false;
+  }
+};
+
+const maintainWrappedScroll = () => {
+  if (!worldMapViewport || isRecenteringViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+
+  let nextLeft = worldMapViewport.scrollLeft;
+  let nextTop = worldMapViewport.scrollTop;
+  const leftMin = mapPixelWidth * 0.5;
+  const leftMax = mapPixelWidth * 1.5;
+  const topMin = mapPixelHeight * 0.5;
+  const topMax = mapPixelHeight * 1.5;
+
+  if (nextLeft < leftMin) nextLeft += mapPixelWidth;
+  else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
+  if (nextTop < topMin) nextTop += mapPixelHeight;
+  else if (nextTop > topMax) nextTop -= mapPixelHeight;
+
+  if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = nextLeft;
+    worldMapViewport.scrollTop = nextTop;
+    isRecenteringViewport = false;
+  }
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1051,6 +1106,7 @@ const generateAndRender = () => {
   currentWorld = world;
   tilePopup.hidden = true;
   renderWorld(world);
+  recenterViewportToMiddle(true);
 };
 
 const updateVersionTag = async () => {
@@ -1160,6 +1216,7 @@ worldInfoDialog?.addEventListener('close', () => {
 
 updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
+worldMapViewport?.addEventListener('scroll', maintainWrappedScroll, { passive: true });
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();

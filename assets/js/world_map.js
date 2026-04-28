@@ -1100,7 +1100,12 @@ const renderWorld = (world) => {
       repeatSteps.forEach((dx) => {
         // tile.coord를 월드 1주기(width/height)만큼 이동해 3x3 반복 배치를 만든다.
         // 이렇게 하면 (max index)와 (0 index) 경계가 동일 규칙으로 정확히 이어진다.
-        const repeatedQ = tile.coord.x + dx * width;
+        // odd-r 좌표계에서 세로 주기를 홀수 줄 수만큼 이동하면 행 홀짝이 뒤집히고,
+        // 이때 "홀수 y행 색상만 x=-1로 밀려 보이는" 현상이 생길 수 있다.
+        // 세로 주기 홀짝 반전이 있을 때 홀수 행은 q를 +1 보정해 색상/형상이 같은 타일로 맞춘다.
+        const hasVerticalParityFlip = Math.abs((dy * height) % 2) === 1;
+        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? 1 : 0;
+        const repeatedQ = tile.coord.x + dx * width + oddRowQShift;
         const repeatedR = tile.coord.y + dy * height;
         const { x, y } = hexToPixel(repeatedQ, repeatedR, HEX_CONFIG.size);
         // 중앙 블록(1,1)이 기본 시야가 되도록 +1주기만큼 평행 이동한다.
@@ -1177,15 +1182,9 @@ const maintainWrappedScroll = () => {
 
   if (nextTop < topMin) {
     nextTop += mapPixelHeight;
-    if (verticalWrapParityShift !== 0) nextLeft += verticalWrapParityShift;
   } else if (nextTop > topMax) {
     nextTop -= mapPixelHeight;
-    if (verticalWrapParityShift !== 0) nextLeft -= verticalWrapParityShift;
   }
-
-  // 세로 워프 보정으로 좌우 기준 범위를 벗어날 수 있으므로 마지막에 다시 정규화한다.
-  if (nextLeft < leftMin) nextLeft += mapPixelWidth;
-  else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
 
   if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {
     isRecenteringViewport = true;

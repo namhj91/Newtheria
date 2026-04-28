@@ -1153,6 +1153,15 @@ const renderWorld = (world) => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
+  // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
+  //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const repeatingPattern = ctx.createPattern(worldTextureCanvas, 'repeat');
+  if (repeatingPattern) {
+    ctx.fillStyle = repeatingPattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
     return acc;

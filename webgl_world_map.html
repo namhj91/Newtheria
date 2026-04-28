@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria WebGL 월드맵</title>
+  <link rel="stylesheet" href="./assets/css/webgl_world_map.css" />
+</head>
+<body>
+  <!-- 테스트 페이지 공통: 우상단 고정 위치에서 테스트 허브로 복귀한다. -->
+  <a class="test-hub-button" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
+
+  <main class="webgl-map-screen">
+    <header class="webgl-map-header">
+      <h1>NEWTHERIA WEBGL WORLD MAP</h1>
+      <p>기존 월드맵과 동일한 생성 절차 + WebGL 렌더링 (드래그 이동, 휠 줌, R 리셋)</p>
+      <div class="webgl-map-actions">
+        <button id="webglRegenButton" type="button">맵 다시 생성</button>
+      </div>
+      <form class="webgl-map-roll-settings" aria-label="WebGL 맵 리롤 설정">
+        <label>
+          해양 비율
+          <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" />
+          <span id="seaLevelRatioValue">58%</span>
+        </label>
+        <label>
+          고도 강도
+          <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" />
+          <span id="elevationScaleValue">1.00x</span>
+        </label>
+        <label>
+          지형 워프 강도
+          <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" />
+          <span id="warpStrengthValue">18</span>
+        </label>
+        <label>
+          산맥 강도
+          <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" />
+          <span id="ridgeStrengthValue">0.24</span>
+        </label>
+        <label>
+          강 생성 밀도
+          <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" />
+          <span id="riverBudgetScaleValue">1.00x</span>
+        </label>
+      </form>
+      <p id="webglMapVersion" class="meta version"></p>
+    </header>
+
+    <section class="webgl-map-viewport" aria-label="WebGL 월드맵 미리보기">
+      <canvas id="webglWorldCanvas"></canvas>
+      <aside class="webgl-map-help" aria-live="polite">
+        <strong>조작법</strong>
+        <span>드래그: 카메라 이동</span>
+        <span>휠: 줌 인/아웃</span>
+        <span>R 키: 기본 시야로 리셋</span>
+      </aside>
+    </section>
+  </main>
+
+  <script src="./assets/js/world_map.js"></script>
+  <script src="./assets/js/webgl_world_map.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newtheria WebGL 월드맵</title>
+  <link rel="stylesheet" href="./assets/css/webgl_world_map.css" />
+</head>
+<body>
+  <!-- 테스트 페이지 공통: 우상단 고정 위치에서 테스트 허브로 복귀한다. -->
+  <a class="test-hub-button" href="./test_mode.html" aria-label="테스트 허브로 돌아가기">← 테스트 허브</a>
+
+  <main class="webgl-map-screen">
+    <header class="webgl-map-header">
+      <h1>NEWTHERIA WEBGL WORLD MAP</h1>
+      <p>GPU 셰이더 기반 월드맵 렌더링 (드래그 이동, 휠 줌, R 리셋)</p>
+      <p id="webglMapVersion" class="meta version"></p>
+    </header>
+
+    <section class="webgl-map-viewport" aria-label="WebGL 월드맵 미리보기">
+      <canvas id="webglWorldCanvas"></canvas>
+      <aside class="webgl-map-help" aria-live="polite">
+        <strong>조작법</strong>
+        <span>드래그: 카메라 이동</span>
+        <span>휠: 줌 인/아웃</span>
+        <span>R 키: 기본 시야로 리셋</span>
+      </aside>
+    </section>
+  </main>
+
+  <script src="./assets/js/webgl_world_map.js"></script>
+</body>
+</html>

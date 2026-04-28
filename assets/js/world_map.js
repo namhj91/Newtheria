@@ -89,9 +89,6 @@ const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
 const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
 const landmassBiasInput = document.getElementById('landmassBiasInput');
 const landmassBiasValue = document.getElementById('landmassBiasValue');
-const worldBuildCardFan = document.getElementById('worldBuildCardFan');
-const buildRoundLabel = document.getElementById('buildRoundLabel');
-const drawBuildCardsButton = document.getElementById('drawBuildCardsButton');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -343,80 +340,6 @@ const updateRerollLabels = () => {
       landmassBiasValue.textContent = '중립';
     }
   }
-};
-
-const pickMany = (pool, size = 4) => {
-  const cloned = [...pool];
-  for (let i = cloned.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
-  }
-  return cloned.slice(0, size);
-};
-
-const WORLD_BUILD_CARD_POOL = [
-  { route: 'elevation_up', icon: '⛰️', label: '고도 +', desc: '산악 지형을 더 거칠게 만든다.', key: 'elevationScale', delta: 0.14 },
-  { route: 'elevation_down', icon: '🪨', label: '고도 -', desc: '평탄 지형을 크게 늘린다.', key: 'elevationScale', delta: -0.14 },
-  { route: 'sea_up', icon: '🌊', label: '해양 +', desc: '바다/해안 비중을 크게 늘린다.', key: 'seaLevelRatio', delta: 0.08 },
-  { route: 'sea_down', icon: '🏞️', label: '해양 -', desc: '육지 면적을 크게 늘린다.', key: 'seaLevelRatio', delta: -0.08 },
-  { route: 'river_up', icon: '💧', label: '강 +', desc: '강 생성 밀도를 높인다.', key: 'riverBudgetScale', delta: 0.25 },
-  { route: 'river_down', icon: '🏜️', label: '강 -', desc: '강 생성 밀도를 낮춘다.', key: 'riverBudgetScale', delta: -0.25 },
-  { route: 'ridge_up', icon: '🧱', label: '산맥 +', desc: '능선이 더 강조된다.', key: 'ridgeStrength', delta: 0.05 },
-  { route: 'ridge_down', icon: '🛤️', label: '산맥 -', desc: '능선 강조를 줄인다.', key: 'ridgeStrength', delta: -0.05 },
-  { route: 'warp_up', icon: '🌀', label: '워프 +', desc: '경계가 더 뒤틀리고 파편화된다.', key: 'warpStrength', delta: 3 },
-  { route: 'warp_down', icon: '📏', label: '워프 -', desc: '지형 경계가 더 매끈해진다.', key: 'warpStrength', delta: -3 },
-  { route: 'landmass_islands', icon: '🧭', label: '다도해 +', desc: '큰 대륙보다 섬 군집을 선호한다.', key: 'landmassBias', delta: -0.22 },
-  { route: 'landmass_continent', icon: '🗺️', label: '대륙형 +', desc: '연결된 큰 육괴를 선호한다.', key: 'landmassBias', delta: 0.22 }
-];
-
-const WORLD_BUILD_LIMITS = {
-  seaLevelRatio: { min: -0.2, max: 1.25, input: seaLevelRatioInput },
-  elevationScale: { min: 0.2, max: 2.4, input: elevationScaleInput },
-  warpStrength: { min: 0, max: 64, input: warpStrengthInput },
-  ridgeStrength: { min: -0.15, max: 0.8, input: ridgeStrengthInput },
-  riverBudgetScale: { min: 0, max: 4.2, input: riverBudgetScaleInput },
-  landmassBias: { min: -1.2, max: 1.2, input: landmassBiasInput }
-};
-
-const applyWorldBuildCardDelta = (cardMeta) => {
-  const limits = WORLD_BUILD_LIMITS[cardMeta.key];
-  if (!limits) return;
-  const nextValue = clamp((HEX_CONFIG[cardMeta.key] ?? 0) + cardMeta.delta, limits.min, limits.max);
-  HEX_CONFIG[cardMeta.key] = nextValue;
-  if (limits.input) limits.input.value = `${nextValue}`;
-  updateRerollLabels();
-};
-
-const updateWorldBuildRoundLabel = () => {
-  if (!buildRoundLabel) return;
-  buildRoundLabel.textContent = `빌드 라운드 · ${worldBuildRound} / ${MAX_WORLD_BUILD_ROUND}`;
-};
-
-const drawWorldBuildCards = () => {
-  if (!worldBuildCardFan || !window.NewtheriaCardTemplates) return;
-  if (worldBuildRound >= MAX_WORLD_BUILD_ROUND) {
-    updateWorldBuildRoundLabel();
-    return;
-  }
-  const cardDefs = pickMany(WORLD_BUILD_CARD_POOL, WORLD_BUILD_CARD_OPTIONS).map((card) => ({
-    ...card,
-    meta: card
-  }));
-  const cards = window.NewtheriaCardTemplates.renderCardFanCards(worldBuildCardFan, cardDefs);
-  const behavior = window.NewtheriaCardTemplates.createCardFanBehavior({ menu: worldBuildCardFan, cards });
-  behavior.bindInteractions({
-    onCardSelected: (card) => {
-      const selected = cardDefs.find((entry) => entry.route === card.dataset.route);
-      if (!selected?.meta) return;
-      applyWorldBuildCardDelta(selected.meta);
-      worldBuildRound += 1;
-      updateWorldBuildRoundLabel();
-      if (worldBuildRound < MAX_WORLD_BUILD_ROUND) drawWorldBuildCards();
-      else generateAndRender();
-    }
-  });
-  behavior.layoutCards();
-  updateWorldBuildRoundLabel();
 };
 
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
@@ -887,13 +810,25 @@ const buildScalarFields = (width, height, noiseContext) => {
         0.58
       );
 
-      // 다도해(-)~대륙형(+) 축: 저주파 지형 강도를 조절해 육괴 연결성을 크게 바꾼다.
+      // 다도해(-)~대륙형(+) 축을 더 극명하게 만들기 위해
+      // 1) 초저주파 대륙 마스크를 추가하고
+      // 2) 해양 산란 강도와 고도 오프셋을 bias 방향으로 크게 이동시킨다.
       const landmassBias = HEX_CONFIG.landmassBias;
-      const macroWeight = clamp(0.56 + landmassBias * 0.28, 0.18, 0.9);
-      const regionalWeight = clamp(0.24 + landmassBias * 0.08, 0.05, 0.42);
-      const microWeight = clamp(0.12 - landmassBias * 0.08, 0.03, 0.24);
-      const ruggedWeight = clamp(0.08 - landmassBias * 0.05, 0.02, 0.18);
-      const oceanScatterWeight = clamp(0.09 + (-landmassBias) * 0.09, 0.02, 0.22);
+      const continentalMask = fbmPerlin(
+        noiseContext.elevation,
+        wx * HEX_CONFIG.elevationFrequency * 0.24 - 401,
+        wy * HEX_CONFIG.elevationFrequency * 0.24 + 263,
+        3,
+        2,
+        0.52
+      ) * 0.5 + 0.5;
+      const macroWeight = clamp(0.5 + landmassBias * 0.35, 0.14, 0.94);
+      const regionalWeight = clamp(0.26 + landmassBias * 0.06, 0.04, 0.44);
+      const microWeight = clamp(0.13 - landmassBias * 0.12, 0.02, 0.26);
+      const ruggedWeight = clamp(0.09 - landmassBias * 0.07, 0.01, 0.2);
+      const oceanScatterWeight = clamp(0.08 + (-landmassBias) * 0.2, 0.01, 0.36);
+      const continentalLift = (continentalMask - 0.5) * landmassBias * 0.7;
+      const baseElevationShift = landmassBias * 0.16;
 
       const elevation = clamp01(
         ((macroElevation * 0.5 + 0.5) * macroWeight
@@ -903,6 +838,8 @@ const buildScalarFields = (width, height, noiseContext) => {
         + macroRidge * HEX_CONFIG.ridgeStrength
         + detailRidge * HEX_CONFIG.ridgeStrength * 0.34)
         - (oceanScatter * 0.5 + 0.5) * oceanScatterWeight
+        + continentalLift
+        + baseElevationShift
         + biomePatch * HEX_CONFIG.biomePatchStrength
       ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
@@ -1263,9 +1200,6 @@ riverBudgetScaleInput?.addEventListener('input', () => {
 landmassBiasInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();
-});
-drawBuildCardsButton?.addEventListener('click', () => {
-  drawWorldBuildCards();
 });
 applyRerollSettings();
 updateRerollLabels();

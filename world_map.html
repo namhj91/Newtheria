@@ -44,6 +44,11 @@
           <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" />
           <span id="riverBudgetScaleValue">1.00x</span>
         </label>
+        <label>
+          지형 형태(다도해 ↔ 대륙형)
+          <input id="landmassBiasInput" type="range" min="-1" max="1" step="0.01" value="0" />
+          <span id="landmassBiasValue">중립</span>
+        </label>
       </form>
       <div class="world-map-layer-controls" role="group" aria-label="기후 레이어 선택">
         <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>

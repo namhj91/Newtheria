@@ -1077,12 +1077,14 @@ const renderWorld = (world) => {
   const hexWidth = SQRT3 * HEX_CONFIG.size;
   // 토러스 반복 주기는 "타일 인덱스 1주기"와 동일해야 한다.
   // 즉 (199,x) 다음이 (0,x)처럼 붙도록 가로/세로 오프셋을 타일 개수 기준으로 계산한다.
-  const mapPixelWidth = Math.round(hexWidth * width);
-  const mapPixelHeight = Math.round(HEX_CONFIG.size * 1.5 * height);
+  // Math.round를 사용하면 주기 오프셋이 누적 오차를 만들 수 있어 seam/밀림 체감이 생긴다.
+  // 렌더/워프 기준 주기는 부동소수 원값을 유지한다.
+  const mapPixelWidth = hexWidth * width;
+  const mapPixelHeight = HEX_CONFIG.size * 1.5 * height;
   // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
   // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
-  const canvasWidth = mapPixelWidth * 3;
-  const canvasHeight = mapPixelHeight * 3;
+  const canvasWidth = Math.ceil(mapPixelWidth * 3);
+  const canvasHeight = Math.ceil(mapPixelHeight * 3);
 
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -1158,6 +1160,10 @@ const maintainWrappedScroll = () => {
   if (!worldMapViewport || isRecenteringViewport) return;
   const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
   if (!mapPixelWidth || !mapPixelHeight) return;
+  const hexWidth = SQRT3 * HEX_CONFIG.size;
+  // odd-r 오프셋 좌표계에서는 "세로 1주기 이동" 시 행 개수가 홀수면 좌우 반 칸 보정이 필요하다.
+  // (짝수 행 높이에서는 보정량 0)
+  const verticalWrapParityShift = (HEX_CONFIG.rows % 2 === 0) ? 0 : (hexWidth / 2);
 
   let nextLeft = worldMapViewport.scrollLeft;
   let nextTop = worldMapViewport.scrollTop;
@@ -1168,8 +1174,18 @@ const maintainWrappedScroll = () => {
 
   if (nextLeft < leftMin) nextLeft += mapPixelWidth;
   else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
-  if (nextTop < topMin) nextTop += mapPixelHeight;
-  else if (nextTop > topMax) nextTop -= mapPixelHeight;
+
+  if (nextTop < topMin) {
+    nextTop += mapPixelHeight;
+    if (verticalWrapParityShift !== 0) nextLeft += verticalWrapParityShift;
+  } else if (nextTop > topMax) {
+    nextTop -= mapPixelHeight;
+    if (verticalWrapParityShift !== 0) nextLeft -= verticalWrapParityShift;
+  }
+
+  // 세로 워프 보정으로 좌우 기준 범위를 벗어날 수 있으므로 마지막에 다시 정규화한다.
+  if (nextLeft < leftMin) nextLeft += mapPixelWidth;
+  else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
 
   if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {
     isRecenteringViewport = true;

@@ -296,6 +296,63 @@ const ridgedNoise = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   return ampSum === 0 ? 0 : sum / ampSum;
 };
 
+// 생성 단계부터 완전 루프 지형이 되도록, 노이즈 자체를 주기(period) 기반으로 샘플링한다.
+// x/y가 period를 넘어가면 동일 값으로 되돌아와 경계 seam이 원천적으로 사라진다.
+const sampleTileableNoise2D = (noise2D, x, y, periodX, periodY) => {
+  const px = Math.max(1e-6, periodX);
+  const py = Math.max(1e-6, periodY);
+  const nx = wrapCoord(x, px);
+  const ny = wrapCoord(y, py);
+  const tx = nx / px;
+  const ty = ny / py;
+  const a = noise2D(nx, ny);
+  const b = noise2D(nx - px, ny);
+  const c = noise2D(nx, ny - py);
+  const d = noise2D(nx - px, ny - py);
+  return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
+};
+
+const fbmPerlinTileable = (noise2D, x, y, periodX, periodY, octaves, lacunarity = 2, gain = 0.5) => {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let ampSum = 0;
+
+  for (let i = 0; i < octaves; i += 1) {
+    const periodFx = periodX * freq;
+    const periodFy = periodY * freq;
+    sum += sampleTileableNoise2D(noise2D, x * freq, y * freq, periodFx, periodFy) * amp;
+    ampSum += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+
+  return ampSum === 0 ? 0 : sum / ampSum;
+};
+
+const ridgedNoiseTileable = (noise2D, x, y, periodX, periodY, octaves, lacunarity = 2, gain = 0.5) => {
+  let sum = 0;
+  let amp = 0.55;
+  let freq = 1;
+  let ampSum = 0;
+  let weight = 1;
+
+  for (let i = 0; i < octaves; i += 1) {
+    const periodFx = periodX * freq;
+    const periodFy = periodY * freq;
+    const sample = 1 - Math.abs(sampleTileableNoise2D(noise2D, x * freq, y * freq, periodFx, periodFy));
+    const ridge = sample * sample;
+    const signal = ridge * weight;
+    sum += signal * amp;
+    ampSum += amp;
+    weight = clamp01(signal * 1.85);
+    freq *= lacunarity;
+    amp *= gain;
+  }
+
+  return ampSum === 0 ? 0 : sum / ampSum;
+};
+
 const applyRerollSettings = () => {
   const seaLevelRatio = Number.parseFloat(seaLevelRatioInput?.value ?? `${HEX_CONFIG.seaLevelRatio}`);
   const elevationScale = Number.parseFloat(elevationScaleInput?.value ?? `${HEX_CONFIG.elevationScale}`);
@@ -327,7 +384,6 @@ const updateRerollLabels = () => {
   }
 };
 
-const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
 // 월드맵을 토러스(루프) 구조로 다루기 위한 좌표 래핑 유틸.
 // 음수/초과 좌표도 항상 0..(size-1) 범위로 되돌린다.
 const wrapCoord = (value, size) => {
@@ -350,22 +406,6 @@ const getNeighbors = (x, y, width, height) => {
       [0, 1], [1, 1]
     ];
   return offsets.map(([dx, dy]) => [wrapCoord(x + dx, width), wrapCoord(y + dy, height)]);
-};
-
-const getNeighborsBounded = (x, y, width, height) => {
-  if (y % 2 === 0) {
-    return [
-      [x - 1, y - 1], [x, y - 1],
-      [x - 1, y], [x + 1, y],
-      [x - 1, y + 1], [x, y + 1]
-    ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
-  }
-
-  return [
-    [x, y - 1], [x + 1, y - 1],
-    [x - 1, y], [x + 1, y],
-    [x, y + 1], [x + 1, y + 1]
-  ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
 };
 
 const smoothField = (field, width, height, passes = 1) => {
@@ -645,9 +685,9 @@ const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220)
         const current = get(cx, cy);
         body.push(current);
 
-        // 호수 판정은 실제로 연결된 바다를 보호해야 하므로,
-        // 루프 이웃이 아닌 "화면 경계 기준 연결"으로 물 덩어리를 계산한다.
-        for (const [nx, ny] of getNeighborsBounded(cx, cy, width, height)) {
+        // 사용자 요청에 따라 호수/해양 연결성도 완전 토러스 규칙으로 통일한다.
+        // 따라서 물 덩어리 BFS 역시 wrap 이웃(getNeighbors)을 사용한다.
+        for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
           const nKey = `${nx},${ny}`;
           const neighbor = get(nx, ny);
           if (!visited.has(nKey) && isWaterTerrain(neighbor.terrainType)) {
@@ -798,23 +838,43 @@ const buildScalarFields = (width, height, noiseContext) => {
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
-      const warpX = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.warpFrequency + 71, y * HEX_CONFIG.warpFrequency - 29, 3, 2, 0.5);
-      const warpY = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.warpFrequency - 113, y * HEX_CONFIG.warpFrequency + 167, 3, 2, 0.5);
+      const warpX = fbmPerlinTileable(
+        noiseContext.moisture,
+        x * HEX_CONFIG.warpFrequency + 71,
+        y * HEX_CONFIG.warpFrequency - 29,
+        width * HEX_CONFIG.warpFrequency,
+        height * HEX_CONFIG.warpFrequency,
+        3,
+        2,
+        0.5
+      );
+      const warpY = fbmPerlinTileable(
+        noiseContext.heat,
+        x * HEX_CONFIG.warpFrequency - 113,
+        y * HEX_CONFIG.warpFrequency + 167,
+        width * HEX_CONFIG.warpFrequency,
+        height * HEX_CONFIG.warpFrequency,
+        3,
+        2,
+        0.5
+      );
       const wx = x + warpX * HEX_CONFIG.warpStrength;
       const wy = y + warpY * HEX_CONFIG.warpStrength;
 
-      const macroElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency, wy * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
-      const regionalElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
-      const microElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
-      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
-      const macroRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeFrequency + 181, wy * HEX_CONFIG.ridgeFrequency - 127, 4, 2.05, 0.58);
-      const detailRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeDetailFrequency - 311, wy * HEX_CONFIG.ridgeDetailFrequency + 89, 3, 2.2, 0.55);
-      const oceanScatter = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
+      const macroElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency, wy * HEX_CONFIG.elevationFrequency, width * HEX_CONFIG.elevationFrequency, height * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
+      const regionalElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, width * HEX_CONFIG.elevationFrequency * 2.6, height * HEX_CONFIG.elevationFrequency * 2.6, 5, 2.08, 0.57);
+      const microElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, width * HEX_CONFIG.elevationFrequency * 5.5, height * HEX_CONFIG.elevationFrequency * 5.5, 4, 2.12, 0.6);
+      const ruggedNoise = Math.abs(fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, width * HEX_CONFIG.elevationFrequency * 8.8, height * HEX_CONFIG.elevationFrequency * 8.8, 3, 2.18, 0.6));
+      const macroRidge = ridgedNoiseTileable(noiseContext.elevation, wx * HEX_CONFIG.ridgeFrequency + 181, wy * HEX_CONFIG.ridgeFrequency - 127, width * HEX_CONFIG.ridgeFrequency, height * HEX_CONFIG.ridgeFrequency, 4, 2.05, 0.58);
+      const detailRidge = ridgedNoiseTileable(noiseContext.elevation, wx * HEX_CONFIG.ridgeDetailFrequency - 311, wy * HEX_CONFIG.ridgeDetailFrequency + 89, width * HEX_CONFIG.ridgeDetailFrequency, height * HEX_CONFIG.ridgeDetailFrequency, 3, 2.2, 0.55);
+      const oceanScatter = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, width * HEX_CONFIG.elevationFrequency * 0.9, height * HEX_CONFIG.elevationFrequency * 0.9, 3, 2, 0.5);
 
-      const biomePatch = fbmPerlin(
+      const biomePatch = fbmPerlinTileable(
         noiseContext.elevation,
         wx * HEX_CONFIG.biomePatchFrequency + 211,
         wy * HEX_CONFIG.biomePatchFrequency - 157,
+        width * HEX_CONFIG.biomePatchFrequency,
+        height * HEX_CONFIG.biomePatchFrequency,
         3,
         2.2,
         0.58
@@ -832,14 +892,14 @@ const buildScalarFields = (width, height, noiseContext) => {
       ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
 
-      const heatLarge = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
-      const heatDetail = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 4.1 + 12, wy * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
-      const heatPatch = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 9.8 - 143, wy * HEX_CONFIG.heatFrequency * 9.8 + 227, 3, 2.24, 0.58);
+      const heatLarge = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, width * HEX_CONFIG.heatFrequency, height * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
+      const heatDetail = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 4.1 + 12, wy * HEX_CONFIG.heatFrequency * 4.1 - 9, width * HEX_CONFIG.heatFrequency * 4.1, height * HEX_CONFIG.heatFrequency * 4.1, 4, 2.1, 0.58);
+      const heatPatch = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 9.8 - 143, wy * HEX_CONFIG.heatFrequency * 9.8 + 227, width * HEX_CONFIG.heatFrequency * 9.8, height * HEX_CONFIG.heatFrequency * 9.8, 3, 2.24, 0.58);
       heats[idx] = clamp01(equatorBase * 0.5 + (heatLarge * 0.5 + 0.5) * 0.3 + (heatDetail * 0.5 + 0.5) * 0.14 + (heatPatch * 0.5 + 0.5) * 0.06);
 
-      const moistureLarge = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency, wy * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
-      const moistureDetail = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 4.5 - 17, wy * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
-      const moisturePatch = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 10.2 + 71, wy * HEX_CONFIG.moistureFrequency * 10.2 - 93, 3, 2.18, 0.6);
+      const moistureLarge = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency, wy * HEX_CONFIG.moistureFrequency, width * HEX_CONFIG.moistureFrequency, height * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
+      const moistureDetail = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 4.5 - 17, wy * HEX_CONFIG.moistureFrequency * 4.5 + 29, width * HEX_CONFIG.moistureFrequency * 4.5, height * HEX_CONFIG.moistureFrequency * 4.5, 5, 2.08, 0.57);
+      const moisturePatch = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 10.2 + 71, wy * HEX_CONFIG.moistureFrequency * 10.2 - 93, width * HEX_CONFIG.moistureFrequency * 10.2, height * HEX_CONFIG.moistureFrequency * 10.2, 3, 2.18, 0.6);
       const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
       moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.56 + (moistureDetail * 0.5 + 0.5) * 0.24 + (moisturePatch * 0.5 + 0.5) * 0.1 + (1 - elevation) * 0.1 - elevationPenalty);
     }

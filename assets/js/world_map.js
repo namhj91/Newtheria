@@ -373,6 +373,21 @@ const applyRerollSettings = () => {
   HEX_CONFIG.riverBudgetScale = Number.isFinite(riverBudgetScale) ? riverBudgetScale : HEX_CONFIG.riverBudgetScale;
 };
 
+// 외부(WebGL 테스트 등)에서 동일한 월드 생성 절차를 재사용할 수 있도록,
+// 입력값 기반으로 HEX_CONFIG를 갱신하는 헬퍼를 제공한다.
+const applyRerollSettingsFromValues = (settings = {}) => {
+  const nextSeaLevelRatio = Number.parseFloat(`${settings.seaLevelRatio ?? HEX_CONFIG.seaLevelRatio}`);
+  const nextElevationScale = Number.parseFloat(`${settings.elevationScale ?? HEX_CONFIG.elevationScale}`);
+  const nextWarpStrength = Number.parseFloat(`${settings.warpStrength ?? HEX_CONFIG.warpStrength}`);
+  const nextRidgeStrength = Number.parseFloat(`${settings.ridgeStrength ?? HEX_CONFIG.ridgeStrength}`);
+  const nextRiverBudgetScale = Number.parseFloat(`${settings.riverBudgetScale ?? HEX_CONFIG.riverBudgetScale}`);
+  HEX_CONFIG.seaLevelRatio = Number.isFinite(nextSeaLevelRatio) ? nextSeaLevelRatio : HEX_CONFIG.seaLevelRatio;
+  HEX_CONFIG.elevationScale = Number.isFinite(nextElevationScale) ? nextElevationScale : HEX_CONFIG.elevationScale;
+  HEX_CONFIG.warpStrength = Number.isFinite(nextWarpStrength) ? nextWarpStrength : HEX_CONFIG.warpStrength;
+  HEX_CONFIG.ridgeStrength = Number.isFinite(nextRidgeStrength) ? nextRidgeStrength : HEX_CONFIG.ridgeStrength;
+  HEX_CONFIG.riverBudgetScale = Number.isFinite(nextRiverBudgetScale) ? nextRiverBudgetScale : HEX_CONFIG.riverBudgetScale;
+};
+
 const updateRerollLabels = () => {
   if (seaLevelRatioValue) {
     seaLevelRatioValue.textContent = `${Math.round(HEX_CONFIG.seaLevelRatio * 100)}%`;
@@ -1011,6 +1026,18 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   };
 }
 
+window.NewtheriaWorldGen = {
+  generateWorldMap,
+  applyRerollSettingsFromValues,
+  getConfig: () => ({
+    seaLevelRatio: HEX_CONFIG.seaLevelRatio,
+    elevationScale: HEX_CONFIG.elevationScale,
+    warpStrength: HEX_CONFIG.warpStrength,
+    ridgeStrength: HEX_CONFIG.ridgeStrength,
+    riverBudgetScale: HEX_CONFIG.riverBudgetScale
+  })
+};
+
 const hexToPixel = (q, r, size) => ({
   x: size * SQRT3 * (q + (r % 2) / 2),
   y: size * 1.5 * r
@@ -1373,35 +1400,39 @@ worldInfoDialog?.addEventListener('close', () => {
   metaToggleButton?.setAttribute('aria-expanded', 'false');
 });
 
-updateCalendarMeta();
-regenButton.addEventListener('click', generateAndRender);
-window.addEventListener('resize', () => {
-  if (!currentWorld) return;
-  scheduleRender();
-});
-window.addEventListener('beforeunload', cancelScheduledRender);
-seaLevelRatioInput?.addEventListener('input', () => {
-  applyRerollSettings();
-  updateRerollLabels();
-});
-elevationScaleInput?.addEventListener('input', () => {
-  applyRerollSettings();
-  updateRerollLabels();
-});
-warpStrengthInput?.addEventListener('input', () => {
-  applyRerollSettings();
-  updateRerollLabels();
-});
-ridgeStrengthInput?.addEventListener('input', () => {
-  applyRerollSettings();
-  updateRerollLabels();
-});
-riverBudgetScaleInput?.addEventListener('input', () => {
-  applyRerollSettings();
-  updateRerollLabels();
-});
-applyRerollSettings();
-updateRerollLabels();
-updateVersionTag();
+const canBootWorldMapScreen = Boolean(canvas && worldMapViewport && regenButton && mapMeta && calendarMeta && versionTag && tilePopup);
 
-generateAndRender();
+if (canBootWorldMapScreen) {
+  updateCalendarMeta();
+  regenButton.addEventListener('click', generateAndRender);
+  window.addEventListener('resize', () => {
+    if (!currentWorld) return;
+    scheduleRender();
+  });
+  window.addEventListener('beforeunload', cancelScheduledRender);
+  seaLevelRatioInput?.addEventListener('input', () => {
+    applyRerollSettings();
+    updateRerollLabels();
+  });
+  elevationScaleInput?.addEventListener('input', () => {
+    applyRerollSettings();
+    updateRerollLabels();
+  });
+  warpStrengthInput?.addEventListener('input', () => {
+    applyRerollSettings();
+    updateRerollLabels();
+  });
+  ridgeStrengthInput?.addEventListener('input', () => {
+    applyRerollSettings();
+    updateRerollLabels();
+  });
+  riverBudgetScaleInput?.addEventListener('input', () => {
+    applyRerollSettings();
+    updateRerollLabels();
+  });
+  applyRerollSettings();
+  updateRerollLabels();
+  updateVersionTag();
+
+  generateAndRender();
+}

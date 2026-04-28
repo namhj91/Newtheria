@@ -1,15 +1,33 @@
 // 문서 파싱 실패/네트워크 실패 시에는 고정 안내 문구를 표시한다.
 const WEBGL_MAP_VERSION_FALLBACK = 'version 불러오기 실패';
+const MAP_SIZE = 200;
 
 const canvas = document.getElementById('webglWorldCanvas');
 const versionTag = document.getElementById('webglMapVersion');
+const regenButton = document.getElementById('webglRegenButton');
 
-if (!canvas) {
-  throw new Error('webglWorldCanvas 요소를 찾지 못했습니다.');
+const seaLevelRatioInput = document.getElementById('seaLevelRatioInput');
+const seaLevelRatioValue = document.getElementById('seaLevelRatioValue');
+const elevationScaleInput = document.getElementById('elevationScaleInput');
+const elevationScaleValue = document.getElementById('elevationScaleValue');
+const warpStrengthInput = document.getElementById('warpStrengthInput');
+const warpStrengthValue = document.getElementById('warpStrengthValue');
+const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
+const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
+const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
+const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+
+if (!canvas || !regenButton) {
+  throw new Error('WebGL 월드맵 필수 DOM 요소를 찾지 못했습니다.');
+}
+
+const worldGenApi = window.NewtheriaWorldGen;
+if (!worldGenApi?.generateWorldMap || !worldGenApi?.applyRerollSettingsFromValues) {
+  throw new Error('월드 생성 API(window.NewtheriaWorldGen)를 찾지 못했습니다.');
 }
 
 const gl = canvas.getContext('webgl', {
-  antialias: true,
+  antialias: false,
   depth: false,
   stencil: false,
   alpha: false,
@@ -20,8 +38,7 @@ if (!gl) {
   throw new Error('WebGL을 지원하지 않는 브라우저/환경입니다.');
 }
 
-// 화면 전체를 그릴 정점 셰이더.
-// 두 개의 삼각형으로 클립스페이스를 꽉 채운다.
+// 정점 셰이더: 화면을 덮는 두 개 삼각형(quad) 렌더.
 const VERTEX_SHADER_SOURCE = `
   attribute vec2 a_position;
   varying vec2 v_uv;
@@ -32,96 +49,28 @@ const VERTEX_SHADER_SOURCE = `
   }
 `;
 
-// 월드맵 지형을 절차적으로 생성하는 프래그먼트 셰이더.
-// fBM 노이즈와 해수면 임계값으로 대륙/바다를 분리한다.
+// 프래그먼트 셰이더: 생성된 타일 텍스처를 반복(repeat) 샘플링해 토러스 월드를 표현.
 const FRAGMENT_SHADER_SOURCE = `
   precision highp float;
 
   varying vec2 v_uv;
+  uniform sampler2D u_worldTexture;
   uniform vec2 u_resolution;
   uniform vec2 u_offset;
   uniform float u_zoom;
-  uniform float u_time;
-
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-  }
-
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-  }
-
-  float fbm(vec2 p) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-
-    for (int i = 0; i < 6; i++) {
-      value += noise(p * frequency) * amplitude;
-      frequency *= 2.0;
-      amplitude *= 0.5;
-    }
-
-    return value;
-  }
-
-  vec3 oceanColor(float depth) {
-    vec3 deepOcean = vec3(0.04, 0.15, 0.32);
-    vec3 shallowOcean = vec3(0.09, 0.36, 0.64);
-    return mix(shallowOcean, deepOcean, smoothstep(0.0, 1.0, depth));
-  }
-
-  vec3 landColor(float height, float heat) {
-    vec3 coast = vec3(0.82, 0.77, 0.56);
-    vec3 plains = vec3(0.25, 0.56, 0.28);
-    vec3 forest = vec3(0.12, 0.37, 0.21);
-    vec3 mountain = vec3(0.45, 0.46, 0.44);
-    vec3 snow = vec3(0.91, 0.94, 0.98);
-
-    vec3 low = mix(coast, plains, smoothstep(0.46, 0.54, height));
-    vec3 mid = mix(low, forest, smoothstep(0.57, 0.72, height));
-    vec3 high = mix(mid, mountain, smoothstep(0.73, 0.88, height));
-    vec3 snowy = mix(high, snow, smoothstep(0.86, 0.98, height + (1.0 - heat) * 0.2));
-
-    return snowy;
-  }
 
   void main() {
     vec2 centered = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
     vec2 worldUv = centered / u_zoom + u_offset;
 
-    // 대륙 모양은 저주파 + 고주파를 혼합해 결정한다.
-    float largeShape = fbm(worldUv * 1.35);
-    float detailShape = fbm(worldUv * 4.0 + vec2(3.7, 9.2));
-    float ridge = abs(noise(worldUv * 7.2 + vec2(4.0, 8.0)) * 2.0 - 1.0);
+    // fract를 사용해 텍스처 좌표를 0..1로 래핑하면 경계가 자연스럽게 이어진다.
+    vec2 wrappedUv = fract(worldUv);
+    vec3 baseColor = texture2D(u_worldTexture, wrappedUv).rgb;
 
-    float elevation = largeShape * 0.73 + detailShape * 0.22 + (1.0 - ridge) * 0.05;
-    float heat = fbm(worldUv * 2.1 + vec2(11.0, -7.0) + u_time * 0.008);
-    float seaLevel = 0.52;
-
-    vec3 color;
-    if (elevation < seaLevel) {
-      float depth = (seaLevel - elevation) / seaLevel;
-      color = oceanColor(depth);
-
-      // 해안선 근처에 얕은 물 색을 살짝 섞어 윤곽을 강조한다.
-      float coastBand = smoothstep(0.0, 0.035, seaLevel - elevation);
-      color = mix(vec3(0.2, 0.56, 0.78), color, coastBand);
-    } else {
-      color = landColor(elevation, heat);
-    }
-
-    // 격자 보조선(아주 은은하게): 월드 좌표 감각을 제공한다.
-    vec2 gridUv = fract(worldUv * 10.0);
-    float grid = step(gridUv.x, 0.01) + step(gridUv.y, 0.01);
-    color = mix(color, color * 0.82, clamp(grid * 0.08, 0.0, 0.08));
+    // 줌아웃 시 타일 경계를 은은하게 확인할 수 있도록 얇은 그리드 보조선을 추가한다.
+    vec2 gridUv = fract(worldUv * 40.0);
+    float grid = step(gridUv.x, 0.012) + step(gridUv.y, 0.012);
+    vec3 color = mix(baseColor, baseColor * 0.82, clamp(grid * 0.06, 0.0, 0.06));
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -129,30 +78,22 @@ const FRAGMENT_SHADER_SOURCE = `
 
 const compileShader = (type, source) => {
   const shader = gl.createShader(type);
-  if (!shader) {
-    throw new Error('셰이더 객체 생성에 실패했습니다.');
-  }
-
+  if (!shader) throw new Error('셰이더 객체 생성에 실패했습니다.');
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     const message = gl.getShaderInfoLog(shader) || 'unknown shader compile error';
     gl.deleteShader(shader);
     throw new Error(`셰이더 컴파일 실패: ${message}`);
   }
-
   return shader;
 };
 
 const createProgram = (vertexSource, fragmentSource) => {
   const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
   const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
-
   const program = gl.createProgram();
-  if (!program) {
-    throw new Error('프로그램 객체 생성에 실패했습니다.');
-  }
+  if (!program) throw new Error('프로그램 객체 생성에 실패했습니다.');
 
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
@@ -166,7 +107,6 @@ const createProgram = (vertexSource, fragmentSource) => {
 
   gl.deleteShader(vertexShader);
   gl.deleteShader(fragmentShader);
-
   return program;
 };
 
@@ -174,42 +114,99 @@ const program = createProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
 gl.useProgram(program);
 
 const positionLocation = gl.getAttribLocation(program, 'a_position');
+const worldTextureLocation = gl.getUniformLocation(program, 'u_worldTexture');
 const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
 const offsetLocation = gl.getUniformLocation(program, 'u_offset');
 const zoomLocation = gl.getUniformLocation(program, 'u_zoom');
-const timeLocation = gl.getUniformLocation(program, 'u_time');
 
 const quadBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
 gl.bufferData(
   gl.ARRAY_BUFFER,
-  new Float32Array([
-    -1, -1,
-    1, -1,
-    -1, 1,
-    -1, 1,
-    1, -1,
-    1, 1
-  ]),
+  new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
   gl.STATIC_DRAW
 );
-
 gl.enableVertexAttribArray(positionLocation);
 gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
+const worldTexture = gl.createTexture();
+if (!worldTexture) {
+  throw new Error('월드 텍스처 객체 생성에 실패했습니다.');
+}
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, worldTexture);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+gl.uniform1i(worldTextureLocation, 0);
+
 const camera = {
-  zoom: 1.2,
+  zoom: 1.25,
   minZoom: 0.55,
-  maxZoom: 8,
+  maxZoom: 9,
   offsetX: 0,
   offsetY: 0,
-  dragSensitivity: 0.0022
+  dragSensitivity: 0.0018
 };
 
 const pointerState = {
   active: false,
   lastX: 0,
   lastY: 0
+};
+
+const updateRerollLabels = () => {
+  if (seaLevelRatioValue) seaLevelRatioValue.textContent = `${Math.round(Number.parseFloat(seaLevelRatioInput?.value || '0.58') * 100)}%`;
+  if (elevationScaleValue) elevationScaleValue.textContent = `${Number.parseFloat(elevationScaleInput?.value || '1').toFixed(2)}x`;
+  if (warpStrengthValue) warpStrengthValue.textContent = `${Math.round(Number.parseFloat(warpStrengthInput?.value || '18'))}`;
+  if (ridgeStrengthValue) ridgeStrengthValue.textContent = `${Number.parseFloat(ridgeStrengthInput?.value || '0.24').toFixed(2)}`;
+  if (riverBudgetScaleValue) riverBudgetScaleValue.textContent = `${Number.parseFloat(riverBudgetScaleInput?.value || '1').toFixed(2)}x`;
+};
+
+const syncInputsFromWorldGenConfig = () => {
+  const config = worldGenApi.getConfig?.();
+  if (!config) return;
+  if (seaLevelRatioInput) seaLevelRatioInput.value = `${config.seaLevelRatio}`;
+  if (elevationScaleInput) elevationScaleInput.value = `${config.elevationScale}`;
+  if (warpStrengthInput) warpStrengthInput.value = `${config.warpStrength}`;
+  if (ridgeStrengthInput) ridgeStrengthInput.value = `${config.ridgeStrength}`;
+  if (riverBudgetScaleInput) riverBudgetScaleInput.value = `${config.riverBudgetScale}`;
+  updateRerollLabels();
+};
+
+const readRerollSettingsFromInputs = () => ({
+  seaLevelRatio: Number.parseFloat(seaLevelRatioInput?.value || '0.58'),
+  elevationScale: Number.parseFloat(elevationScaleInput?.value || '1'),
+  warpStrength: Number.parseFloat(warpStrengthInput?.value || '18'),
+  ridgeStrength: Number.parseFloat(ridgeStrengthInput?.value || '0.24'),
+  riverBudgetScale: Number.parseFloat(riverBudgetScaleInput?.value || '1')
+});
+
+const hexToRgb = (hex) => {
+  const normalized = hex.replace('#', '');
+  const value = normalized.length === 3 ? normalized.split('').map((c) => c + c).join('') : normalized;
+  const int = Number.parseInt(value, 16);
+  return [(int >> 16) & 255, (int >> 8) & 255, int & 255];
+};
+
+const uploadWorldTexture = (world) => {
+  const { width, height, tiles } = world;
+  const pixels = new Uint8Array(width * height * 4);
+
+  // 기존 월드 생성 절차 결과(tile.color)를 그대로 텍스처 픽셀로 업로드한다.
+  for (let index = 0; index < tiles.length; index += 1) {
+    const [r, g, b] = hexToRgb(tiles[index].color);
+    const pixelOffset = index * 4;
+    pixels[pixelOffset] = r;
+    pixels[pixelOffset + 1] = g;
+    pixels[pixelOffset + 2] = b;
+    pixels[pixelOffset + 3] = 255;
+  }
+
+  gl.bindTexture(gl.TEXTURE_2D, worldTexture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 };
 
 const resizeCanvas = () => {
@@ -224,16 +221,19 @@ const resizeCanvas = () => {
   }
 };
 
-const drawFrame = (timeMs) => {
+const drawFrame = () => {
   resizeCanvas();
-
   gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
   gl.uniform2f(offsetLocation, camera.offsetX, camera.offsetY);
   gl.uniform1f(zoomLocation, camera.zoom);
-  gl.uniform1f(timeLocation, timeMs * 0.001);
-
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   window.requestAnimationFrame(drawFrame);
+};
+
+const regenerateWorld = () => {
+  worldGenApi.applyRerollSettingsFromValues(readRerollSettingsFromInputs());
+  const world = worldGenApi.generateWorldMap(MAP_SIZE, MAP_SIZE);
+  uploadWorldTexture(world);
 };
 
 canvas.addEventListener('pointerdown', (event) => {
@@ -245,13 +245,10 @@ canvas.addEventListener('pointerdown', (event) => {
 
 canvas.addEventListener('pointermove', (event) => {
   if (!pointerState.active) return;
-
   const dx = event.clientX - pointerState.lastX;
   const dy = event.clientY - pointerState.lastY;
   pointerState.lastX = event.clientX;
   pointerState.lastY = event.clientY;
-
-  // 줌이 클수록 이동량을 줄여서 시점 제어를 안정화한다.
   camera.offsetX -= dx * camera.dragSensitivity / camera.zoom;
   camera.offsetY += dy * camera.dragSensitivity / camera.zoom;
 });
@@ -268,25 +265,30 @@ canvas.addEventListener('pointerup', endPointerDrag);
 canvas.addEventListener('pointercancel', endPointerDrag);
 canvas.addEventListener('wheel', (event) => {
   event.preventDefault();
-
   const zoomDelta = Math.exp(-event.deltaY * 0.0015);
   camera.zoom = Math.min(camera.maxZoom, Math.max(camera.minZoom, camera.zoom * zoomDelta));
 }, { passive: false });
 
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() !== 'r') return;
-  camera.zoom = 1.2;
+  camera.zoom = 1.25;
   camera.offsetX = 0;
   camera.offsetY = 0;
 });
 
+regenButton.addEventListener('click', regenerateWorld);
+
+[seaLevelRatioInput, elevationScaleInput, warpStrengthInput, ridgeStrengthInput, riverBudgetScaleInput].forEach((input) => {
+  input?.addEventListener('input', () => {
+    updateRerollLabels();
+  });
+});
+
 const updateVersionLabel = async () => {
   if (!versionTag) return;
-
   try {
-    const response = await fetch('./docs/99_변경이력.md');
+    const response = await fetch('./docs/99_변경이력.md', { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
     const text = await response.text();
     const match = text.match(/##\s*(ver\.[^\n]+)/);
     versionTag.textContent = match?.[1] || WEBGL_MAP_VERSION_FALLBACK;
@@ -296,5 +298,7 @@ const updateVersionLabel = async () => {
   }
 };
 
+syncInputsFromWorldGenConfig();
+regenerateWorld();
 updateVersionLabel();
 window.requestAnimationFrame(drawFrame);

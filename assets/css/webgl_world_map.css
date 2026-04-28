@@ -49,6 +49,48 @@ body {
   color: #c6d5ff;
 }
 
+.webgl-map-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.webgl-map-actions button {
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  background: rgba(34, 53, 89, 0.8);
+  color: #f1f5ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.webgl-map-actions button:hover {
+  background: rgba(59, 89, 141, 0.92);
+}
+
+.webgl-map-roll-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.webgl-map-roll-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(166, 193, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(16, 28, 50, 0.75);
+  color: #dce7ff;
+  font-size: 0.9rem;
+}
+
+.webgl-map-roll-settings input[type="range"] {
+  accent-color: #7fb2ff;
+}
+
 .webgl-map-viewport {
   position: relative;
   width: 100%;

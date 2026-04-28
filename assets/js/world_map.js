@@ -97,6 +97,14 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+// 이벤트 폭주 시 중복 렌더를 막기 위한 RAF 스케줄링 상태.
+let renderRequestId = null;
+let isRenderQueued = false;
+
+// 월드 1주기 오프스크린 텍스처 캐시.
+let worldTextureCanvas = null;
+let worldTextureCtx = null;
+let worldTextureKey = '';
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1047,18 +1055,6 @@ const resizeCanvasToViewport = () => {
   }
 };
 
-const drawHexPath = (centerX, centerY, radius) => {
-  ctx.beginPath();
-  for (let i = 0; i < 6; i += 1) {
-    const angle = (Math.PI / 180) * (60 * i - 30);
-    const px = centerX + radius * Math.cos(angle);
-    const py = centerY + radius * Math.sin(angle);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-};
-
 const valueToGradient = (value, stops) => {
   if (value <= stops[0].value) return stops[0].color;
   if (value >= stops[stops.length - 1].value) return stops[stops.length - 1].color;
@@ -1078,6 +1074,90 @@ const valueToGradient = (value, stops) => {
   }
 
   return `rgb(${stops[stops.length - 1].color.join(', ')})`;
+};
+
+const getWorldTextureKey = (world, layer) => `${world.seed}:${world.width}x${world.height}:${layer}`;
+
+const ensureWorldTextureCache = (world) => {
+  if (!world) return false;
+  const nextKey = getWorldTextureKey(world, activeLayer);
+  if (worldTextureCanvas && worldTextureCtx && worldTextureKey === nextKey) return true;
+
+  const textureWidth = Math.max(1, Math.ceil(SQRT3 * HEX_CONFIG.size * world.width));
+  const textureHeight = Math.max(1, Math.ceil(HEX_CONFIG.size * 1.5 * world.height));
+  const textureCanvas = document.createElement('canvas');
+  textureCanvas.width = textureWidth;
+  textureCanvas.height = textureHeight;
+  const textureCtx = textureCanvas.getContext('2d');
+  if (!textureCtx) return false;
+
+  textureCtx.clearRect(0, 0, textureWidth, textureHeight);
+  for (let r = 0; r < world.height; r += 1) {
+    for (let q = 0; q < world.width; q += 1) {
+      const tile = world.tiles[r * world.width + q];
+      if (!tile) continue;
+      const { x, y } = hexToPixel(q, r, HEX_CONFIG.size);
+      textureCtx.beginPath();
+      for (let i = 0; i < 6; i += 1) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        const px = x + HEX_CONFIG.size * Math.cos(angle);
+        const py = y + HEX_CONFIG.size * Math.sin(angle);
+        if (i === 0) textureCtx.moveTo(px, py);
+        else textureCtx.lineTo(px, py);
+      }
+      textureCtx.closePath();
+      textureCtx.fillStyle = getTileColorByLayer(tile, activeLayer);
+      textureCtx.fill();
+    }
+  }
+
+  worldTextureCanvas = textureCanvas;
+  worldTextureCtx = textureCtx;
+  worldTextureKey = nextKey;
+  return true;
+};
+
+const invalidateWorldTextureCache = () => {
+  worldTextureCanvas = null;
+  worldTextureCtx = null;
+  worldTextureKey = '';
+};
+
+const drawWorldTextureViewport = () => {
+  if (!canvas || !ctx || !worldTextureCanvas || !worldPixelWidth || !worldPixelHeight) return;
+  const viewWorldWidth = canvas.width / VIEWPORT_CAMERA.zoom;
+  const viewWorldHeight = canvas.height / VIEWPORT_CAMERA.zoom;
+  const srcStartX = wrapCoord(VIEWPORT_CAMERA.offsetX, worldPixelWidth);
+  const srcStartY = wrapCoord(VIEWPORT_CAMERA.offsetY, worldPixelHeight);
+
+  const xSegments = [];
+  const firstXWidth = Math.min(worldPixelWidth - srcStartX, viewWorldWidth);
+  xSegments.push({ src: srcStartX, size: firstXWidth, dst: 0 });
+  const secondXWidth = viewWorldWidth - firstXWidth;
+  if (secondXWidth > 0) xSegments.push({ src: 0, size: secondXWidth, dst: firstXWidth });
+
+  const ySegments = [];
+  const firstYHeight = Math.min(worldPixelHeight - srcStartY, viewWorldHeight);
+  ySegments.push({ src: srcStartY, size: firstYHeight, dst: 0 });
+  const secondYHeight = viewWorldHeight - firstYHeight;
+  if (secondYHeight > 0) ySegments.push({ src: 0, size: secondYHeight, dst: firstYHeight });
+
+  for (const xSegment of xSegments) {
+    for (const ySegment of ySegments) {
+      if (xSegment.size <= 0 || ySegment.size <= 0) continue;
+      ctx.drawImage(
+        worldTextureCanvas,
+        xSegment.src,
+        ySegment.src,
+        xSegment.size,
+        ySegment.size,
+        xSegment.dst * VIEWPORT_CAMERA.zoom,
+        ySegment.dst * VIEWPORT_CAMERA.zoom,
+        xSegment.size * VIEWPORT_CAMERA.zoom,
+        ySegment.size * VIEWPORT_CAMERA.zoom
+      );
+    }
+  }
 };
 
 const getTileColorByLayer = (tile, layer) => {
@@ -1119,39 +1199,10 @@ const renderWorld = (world) => {
   resizeCanvasToViewport();
   if (!canvas || !ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // "뷰포트에 보이는 만큼만" 그리기 위해 월드 좌표 가시 범위를 역계산한다.
-  const pad = HEX_CONFIG.size * 3;
-  const worldLeft = VIEWPORT_CAMERA.offsetX - pad;
-  const worldTop = VIEWPORT_CAMERA.offsetY - pad;
-  const worldRight = VIEWPORT_CAMERA.offsetX + canvas.width / VIEWPORT_CAMERA.zoom + pad;
-  const worldBottom = VIEWPORT_CAMERA.offsetY + canvas.height / VIEWPORT_CAMERA.zoom + pad;
-
-  const rowHeight = HEX_CONFIG.size * 1.5;
-  const colWidth = HEX_CONFIG.size * SQRT3;
-  const minR = Math.floor(worldTop / rowHeight) - 1;
-  const maxR = Math.ceil(worldBottom / rowHeight) + 1;
-  const minQ = Math.floor(worldLeft / colWidth) - 2;
-  const maxQ = Math.ceil(worldRight / colWidth) + 2;
-
-  // 화면에 보이는 타일만 draw: O(visible tiles).
-  for (let r = minR; r <= maxR; r += 1) {
-    for (let q = minQ; q <= maxQ; q += 1) {
-      const wrappedQ = wrapCoord(q, width);
-      const wrappedR = wrapCoord(r, height);
-      const tile = tiles[wrappedR * width + wrappedQ];
-      if (!tile) continue;
-      const { x, y } = hexToPixel(q, r, HEX_CONFIG.size);
-      const screenX = (x - VIEWPORT_CAMERA.offsetX) * VIEWPORT_CAMERA.zoom;
-      const screenY = (y - VIEWPORT_CAMERA.offsetY) * VIEWPORT_CAMERA.zoom;
-      const radius = HEX_CONFIG.size * VIEWPORT_CAMERA.zoom;
-      if (screenX < -radius * 2 || screenY < -radius * 2 || screenX > canvas.width + radius * 2 || screenY > canvas.height + radius * 2) {
-        continue;
-      }
-      drawHexPath(screenX, screenY, radius);
-      ctx.fillStyle = getTileColorByLayer(tile, activeLayer);
-      ctx.fill();
-    }
+  // 화면 출력은 오프스크린 1주기 텍스처를 잘라/확대해 처리한다.
+  // 줌아웃 시에도 프레임당 타일 루프를 돌지 않아서 렌더량이 일정해진다.
+  if (ensureWorldTextureCache(world)) {
+    drawWorldTextureViewport();
   }
 
   const terrainStat = tiles.reduce((acc, tile) => {
@@ -1172,16 +1223,27 @@ const renderWorld = (world) => {
   ].join('\n');
 };
 
+const scheduleRender = () => {
+  if (!currentWorld || isRenderQueued) return;
+  isRenderQueued = true;
+  renderRequestId = window.requestAnimationFrame(() => {
+    isRenderQueued = false;
+    renderRequestId = null;
+    renderWorld(currentWorld);
+  });
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
   const world = generateWorldMap(MAP_SIZE, MAP_SIZE);
   currentWorld = world;
+  invalidateWorldTextureCache();
   tilePopup.hidden = true;
   // 새 월드가 생성되면 카메라는 0,0부터 시작하되, 토러스 래핑으로 자연스럽게 순환한다.
   VIEWPORT_CAMERA.offsetX = 0;
   VIEWPORT_CAMERA.offsetY = 0;
-  renderWorld(world);
+  scheduleRender();
 };
 
 const updateVersionTag = async () => {
@@ -1265,7 +1327,8 @@ layerButtons.forEach((button) => {
   button.addEventListener('click', () => {
     activeLayer = button.dataset.layer || LAYER_MODE.TERRAIN;
     updateLayerButtons();
-    if (currentWorld) renderWorld(currentWorld);
+    invalidateWorldTextureCache();
+    if (currentWorld) scheduleRender();
   });
 });
 
@@ -1286,7 +1349,7 @@ canvas?.addEventListener('wheel', (event) => {
   VIEWPORT_CAMERA.offsetX = worldAtCursorX - screenX / VIEWPORT_CAMERA.zoom;
   VIEWPORT_CAMERA.offsetY = worldAtCursorY - screenY / VIEWPORT_CAMERA.zoom;
   wrapWorldPosition();
-  renderWorld(currentWorld);
+  scheduleRender();
 }, { passive: false });
 
 canvas?.addEventListener('pointerdown', (event) => {
@@ -1308,7 +1371,7 @@ canvas?.addEventListener('pointermove', (event) => {
   VIEWPORT_CAMERA.offsetY = VIEWPORT_CAMERA.dragStartOffsetY - dy / VIEWPORT_CAMERA.zoom;
   wrapWorldPosition();
   tilePopup.hidden = true;
-  renderWorld(currentWorld);
+  scheduleRender();
 });
 
 canvas?.addEventListener('pointerup', (event) => {
@@ -1352,7 +1415,7 @@ updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
 window.addEventListener('resize', () => {
   if (!currentWorld) return;
-  renderWorld(currentWorld);
+  scheduleRender();
 });
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();

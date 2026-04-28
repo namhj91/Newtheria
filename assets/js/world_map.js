@@ -1017,8 +1017,10 @@ const renderWorld = (world) => {
 
   const hexWidth = SQRT3 * HEX_CONFIG.size;
   const hexHeight = HEX_CONFIG.size * 2;
-  const mapPixelWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
-  const mapPixelHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  // 경계 이음새(검은 선)를 없애기 위해 반복 주기를 "순수 맵 크기"로 맞춘다.
+  // 기존 +16 여백은 블록 사이에 빈 띠를 만들어 seam처럼 보이는 원인이었다.
+  const mapPixelWidth = Math.round(hexWidth * (width + 0.5));
+  const mapPixelHeight = Math.round(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight);
   // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
   // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
   const canvasWidth = mapPixelWidth * 3;
@@ -1035,7 +1037,7 @@ const renderWorld = (world) => {
       const offsetY = ty * mapPixelHeight;
       tiles.forEach((tile) => {
         const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-        drawHex(offsetX + x + 8, offsetY + y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
+        drawHex(offsetX + x, offsetY + y, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
       });
     }
   }
@@ -1145,8 +1147,9 @@ const cubeRound = (x, y, z) => {
 };
 
 const pixelToHexCoord = (pixelX, pixelY, size) => {
-  const px = pixelX - 8;
-  const py = pixelY - 8;
+  // drawHex 오프셋(+8)을 제거했으므로 역변환도 동일 기준(0,0)으로 맞춘다.
+  const px = pixelX;
+  const py = pixelY;
   const q = (SQRT3 / 3 * px - py / 3) / size;
   const r = ((2 / 3) * py) / size;
   const cube = cubeRound(q, -q - r, r);

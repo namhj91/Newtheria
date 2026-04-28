@@ -1094,18 +1094,22 @@ const renderWorld = (world) => {
   //    핵심은 픽셀 오프셋 복사가 아니라 "좌표 1주기(width/height) 이동"으로 타일을 재배치하는 것이다.
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const repeatSteps = [-1, 0, 1];
-  tiles.forEach((tile) => {
-    const color = getTileColorByLayer(tile, activeLayer);
-    repeatSteps.forEach((dy) => {
-      repeatSteps.forEach((dx) => {
+  repeatSteps.forEach((dy) => {
+    repeatSteps.forEach((dx) => {
+      // 블록별 clip을 적용해 인접 블록의 돌출 육각형이 색을 덮어쓰는 문제를 차단한다.
+      // (세로 워프 시 홀수 줄 색상만 한 칸 밀려 보이던 현상의 주요 원인)
+      const blockLeft = mapPixelWidth * (dx + 1);
+      const blockTop = mapPixelHeight * (dy + 1);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(blockLeft, blockTop, mapPixelWidth, mapPixelHeight);
+      ctx.clip();
+
+      tiles.forEach((tile) => {
+        const color = getTileColorByLayer(tile, activeLayer);
         // tile.coord를 월드 1주기(width/height)만큼 이동해 3x3 반복 배치를 만든다.
         // 이렇게 하면 (max index)와 (0 index) 경계가 동일 규칙으로 정확히 이어진다.
-        // odd-r 좌표계에서 세로 주기를 홀수 줄 수만큼 이동하면 행 홀짝이 뒤집히고,
-        // 이때 "홀수 y행 색상만 x=-1로 밀려 보이는" 현상이 생길 수 있다.
-        // 세로 주기 홀짝 반전이 있을 때 홀수 행은 q를 +1 보정해 색상/형상이 같은 타일로 맞춘다.
-        const hasVerticalParityFlip = Math.abs((dy * height) % 2) === 1;
-        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? 1 : 0;
-        const repeatedQ = tile.coord.x + dx * width + oddRowQShift;
+        const repeatedQ = tile.coord.x + dx * width;
         const repeatedR = tile.coord.y + dy * height;
         const { x, y } = hexToPixel(repeatedQ, repeatedR, HEX_CONFIG.size);
         // 중앙 블록(1,1)이 기본 시야가 되도록 +1주기만큼 평행 이동한다.
@@ -1123,6 +1127,7 @@ const renderWorld = (world) => {
         ctx.fillStyle = color;
         ctx.fill();
       });
+      ctx.restore();
     });
   });
   // 2) 스크롤 워프(recenter)로 중앙 블록을 유지해, 사용자는 무한 반복처럼 탐색한다.

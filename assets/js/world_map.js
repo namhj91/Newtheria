@@ -100,6 +100,9 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let worldBuildRound = 0;
+const MAX_WORLD_BUILD_ROUND = 6;
+const WORLD_BUILD_CARD_OPTIONS = 4;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1201,5 +1204,6 @@ landmassBiasInput?.addEventListener('input', () => {
 applyRerollSettings();
 updateRerollLabels();
 updateVersionTag();
+drawWorldBuildCards();
 
 generateAndRender();

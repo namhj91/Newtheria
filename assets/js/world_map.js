@@ -810,9 +810,9 @@ const buildScalarFields = (width, height, noiseContext) => {
         0.58
       );
 
-      // 다도해(-)~대륙형(+) 축을 더 극명하게 만들기 위해
-      // 1) 초저주파 대륙 마스크를 추가하고
-      // 2) 해양 산란 강도와 고도 오프셋을 bias 방향으로 크게 이동시킨다.
+      // 다도해(-)~대륙형(+) 축:
+      // - 대륙형은 "저주파 연결성"을 강화하되, 고주파 굴곡(능선/험지)은 유지해 평지 일색을 피한다.
+      // - 다도해는 "분절성"을 높여 섬 군집을 만들되, 지형 다이나믹(고도 기복)은 유지한다.
       const landmassBias = HEX_CONFIG.landmassBias;
       const continentalMask = fbmPerlin(
         noiseContext.elevation,
@@ -822,26 +822,37 @@ const buildScalarFields = (width, height, noiseContext) => {
         2,
         0.52
       ) * 0.5 + 0.5;
-      const macroWeight = clamp(0.5 + landmassBias * 0.35, 0.14, 0.94);
-      const regionalWeight = clamp(0.26 + landmassBias * 0.06, 0.04, 0.44);
-      const microWeight = clamp(0.13 - landmassBias * 0.12, 0.02, 0.26);
-      const ruggedWeight = clamp(0.09 - landmassBias * 0.07, 0.01, 0.2);
-      const oceanScatterWeight = clamp(0.08 + (-landmassBias) * 0.2, 0.01, 0.36);
-      const continentalLift = (continentalMask - 0.5) * landmassBias * 0.7;
-      const baseElevationShift = landmassBias * 0.16;
+      const continentBlend = Math.max(0, landmassBias);
+      const archipelagoBlend = Math.max(0, -landmassBias);
+      const macroWeight = clamp(0.52 + landmassBias * 0.28, 0.18, 0.9);
+      const regionalWeight = clamp(0.24 + landmassBias * 0.05, 0.05, 0.4);
+      const microWeight = clamp(0.13 - landmassBias * 0.06, 0.06, 0.22);
+      const ruggedWeight = clamp(0.1 - landmassBias * 0.03, 0.04, 0.18);
+      const oceanScatterWeight = clamp(0.09 + archipelagoBlend * 0.15, 0.04, 0.32);
+      const effectiveRidgeStrength = HEX_CONFIG.ridgeStrength * (1 + continentBlend * 0.48 + archipelagoBlend * 0.18);
+      const continentalCore = clamp01((continentalMask - 0.5) * (1.4 + continentBlend * 0.9) + 0.5);
 
-      const elevation = clamp01(
+      let elevationBase = clamp01(
         ((macroElevation * 0.5 + 0.5) * macroWeight
         + (regionalElevation * 0.5 + 0.5) * regionalWeight
         + (microElevation * 0.5 + 0.5) * microWeight
         + ruggedNoise * ruggedWeight
-        + macroRidge * HEX_CONFIG.ridgeStrength
-        + detailRidge * HEX_CONFIG.ridgeStrength * 0.34)
+        + macroRidge * effectiveRidgeStrength
+        + detailRidge * effectiveRidgeStrength * 0.46)
         - (oceanScatter * 0.5 + 0.5) * oceanScatterWeight
-        + continentalLift
-        + baseElevationShift
         + biomePatch * HEX_CONFIG.biomePatchStrength
-      ) ** HEX_CONFIG.elevationScale;
+      );
+
+      // 대륙형일수록 저주파 육괴 코어를 더 강하게 섞어 "뭉친 땅"을 만들고,
+      // 다도해일수록 분절 마스크를 더해 육지가 끊어지도록 유도한다.
+      const continentTarget = clamp01(elevationBase * 0.55 + continentalCore * 0.7);
+      const archipelagoFragment = clamp01((1 - continentalCore) * 0.72 + (oceanScatter * 0.5 + 0.5) * 0.28);
+      elevationBase = lerp(elevationBase, continentTarget, continentBlend * 0.78);
+      elevationBase = lerp(elevationBase, elevationBase - archipelagoFragment * 0.34, archipelagoBlend * 0.92);
+
+      // 극단 축에서도 고도 기복이 죽지 않도록 relief 보정.
+      const reliefBoost = 1 + continentBlend * 0.16 + archipelagoBlend * 0.1;
+      const elevation = clamp01(clamp01(elevationBase) * reliefBoost) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
 
       const heatLarge = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);

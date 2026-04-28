@@ -1122,36 +1122,38 @@ const renderWorld = (world) => {
     });
   });
   // 텍스처 경계의 빈 띠를 반대편 엣지 픽셀로 채워, 육각형 꼭지점 불일치로 생기는 seam을 완화한다.
+  // 중요: 같은 캔버스에서 drawImage를 "원본+대상"으로 동시에 사용하면 브라우저별로 복사 결과가
+  //       달라질 수 있어(겹침 복사 아티팩트) 맵이 깨져 보일 수 있다.
+  //       그래서 아래는 스냅샷 캔버스를 만들어 "읽기 소스"를 분리해 안정적으로 복사한다.
   const edgeFill = Math.ceil(HEX_CONFIG.size * 1.5);
+  const edgeSnapshotCanvas = document.createElement('canvas');
+  edgeSnapshotCanvas.width = mapPixelWidth;
+  edgeSnapshotCanvas.height = mapPixelHeight;
+  const edgeSnapshotCtx = edgeSnapshotCanvas.getContext('2d');
+  if (edgeSnapshotCtx) {
+    edgeSnapshotCtx.drawImage(worldTextureCanvas, 0, 0);
+  }
+  const edgeSource = edgeSnapshotCtx ? edgeSnapshotCanvas : worldTextureCanvas;
   worldTextureCtx.drawImage(
-    worldTextureCanvas,
+    edgeSource,
     mapPixelWidth - edgeFill, 0, edgeFill, mapPixelHeight,
     0, 0, edgeFill, mapPixelHeight
   );
   worldTextureCtx.drawImage(
-    worldTextureCanvas,
+    edgeSource,
     0, 0, edgeFill, mapPixelHeight,
     mapPixelWidth - edgeFill, 0, edgeFill, mapPixelHeight
   );
   worldTextureCtx.drawImage(
-    worldTextureCanvas,
+    edgeSource,
     0, mapPixelHeight - edgeFill, mapPixelWidth, edgeFill,
     0, 0, mapPixelWidth, edgeFill
   );
   worldTextureCtx.drawImage(
-    worldTextureCanvas,
+    edgeSource,
     0, 0, mapPixelWidth, edgeFill,
     0, mapPixelHeight - edgeFill, mapPixelWidth, edgeFill
   );
-
-  // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
-  //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const repeatingPattern = ctx.createPattern(worldTextureCanvas, 'repeat');
-  if (repeatingPattern) {
-    ctx.fillStyle = repeatingPattern;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
 
   // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
   //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.

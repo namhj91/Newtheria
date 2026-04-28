@@ -97,6 +97,8 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let rafRenderId = 0;
+let isRenderQueued = false;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1172,6 +1174,28 @@ const renderWorld = (world) => {
   ].join('\n');
 };
 
+// 월드맵 렌더 스케줄러:
+// - wheel/pointermove/resize 같은 고빈도 이벤트에서 바로 렌더하지 않고
+//   requestAnimationFrame으로 1프레임에 1회만 합쳐서 그린다.
+// - 동일 프레임 내 중복 렌더 요청을 자동 병합(coalesce)해 드래그 체감을 개선한다.
+const scheduleRender = (world = currentWorld) => {
+  if (!world) return;
+  if (isRenderQueued) return;
+  isRenderQueued = true;
+  rafRenderId = window.requestAnimationFrame(() => {
+    isRenderQueued = false;
+    rafRenderId = 0;
+    renderWorld(world);
+  });
+};
+
+const cancelScheduledRender = () => {
+  if (!rafRenderId) return;
+  window.cancelAnimationFrame(rafRenderId);
+  rafRenderId = 0;
+  isRenderQueued = false;
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1181,7 +1205,8 @@ const generateAndRender = () => {
   // 새 월드가 생성되면 카메라는 0,0부터 시작하되, 토러스 래핑으로 자연스럽게 순환한다.
   VIEWPORT_CAMERA.offsetX = 0;
   VIEWPORT_CAMERA.offsetY = 0;
-  renderWorld(world);
+  // 새 월드 생성 직후에도 즉시 draw 대신 rAF 스케줄로 정렬해 렌더 타이밍을 통일한다.
+  scheduleRender(world);
 };
 
 const updateVersionTag = async () => {
@@ -1265,7 +1290,7 @@ layerButtons.forEach((button) => {
   button.addEventListener('click', () => {
     activeLayer = button.dataset.layer || LAYER_MODE.TERRAIN;
     updateLayerButtons();
-    if (currentWorld) renderWorld(currentWorld);
+    scheduleRender();
   });
 });
 
@@ -1286,7 +1311,7 @@ canvas?.addEventListener('wheel', (event) => {
   VIEWPORT_CAMERA.offsetX = worldAtCursorX - screenX / VIEWPORT_CAMERA.zoom;
   VIEWPORT_CAMERA.offsetY = worldAtCursorY - screenY / VIEWPORT_CAMERA.zoom;
   wrapWorldPosition();
-  renderWorld(currentWorld);
+  scheduleRender();
 }, { passive: false });
 
 canvas?.addEventListener('pointerdown', (event) => {
@@ -1308,7 +1333,7 @@ canvas?.addEventListener('pointermove', (event) => {
   VIEWPORT_CAMERA.offsetY = VIEWPORT_CAMERA.dragStartOffsetY - dy / VIEWPORT_CAMERA.zoom;
   wrapWorldPosition();
   tilePopup.hidden = true;
-  renderWorld(currentWorld);
+  scheduleRender();
 });
 
 canvas?.addEventListener('pointerup', (event) => {
@@ -1352,8 +1377,9 @@ updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
 window.addEventListener('resize', () => {
   if (!currentWorld) return;
-  renderWorld(currentWorld);
+  scheduleRender();
 });
+window.addEventListener('beforeunload', cancelScheduledRender);
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();

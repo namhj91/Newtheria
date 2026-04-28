@@ -67,6 +67,9 @@ const HEX_CONFIG = {
 
 const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
+// 반복 텍스처 방식 렌더링을 위한 오프스크린 캔버스.
+const worldTextureCanvas = document.createElement('canvas');
+const worldTextureCtx = worldTextureCanvas.getContext('2d');
 const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
@@ -1089,26 +1092,41 @@ const renderWorld = (world) => {
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
   worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  for (let ty = 0; ty < 3; ty += 1) {
-    for (let tx = 0; tx < 3; tx += 1) {
-      const offsetX = tx * mapPixelWidth;
-      const offsetY = ty * mapPixelHeight;
-      tiles.forEach((tile) => {
-        const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-        drawHex(offsetX + x, offsetY + y, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
+  // 1) 원본 맵 1주기 텍스처를 먼저 만든다.
+  //    각 타일을 ±1주기까지 함께 그려 경계 바깥으로 튀어나간 헥스 면이 반대편에도 정확히 채워지게 한다.
+  worldTextureCanvas.width = mapPixelWidth;
+  worldTextureCanvas.height = mapPixelHeight;
+  worldTextureCtx.clearRect(0, 0, mapPixelWidth, mapPixelHeight);
+  const repeatOffsetsX = [-mapPixelWidth, 0, mapPixelWidth];
+  const repeatOffsetsY = [-mapPixelHeight, 0, mapPixelHeight];
+  tiles.forEach((tile) => {
+    const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
+    const color = getTileColorByLayer(tile, activeLayer);
+    repeatOffsetsY.forEach((oy) => {
+      repeatOffsetsX.forEach((ox) => {
+        worldTextureCtx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = (Math.PI / 180) * (60 * i - 30);
+          const px = x + ox + HEX_CONFIG.size * Math.cos(angle);
+          const py = y + oy + HEX_CONFIG.size * Math.sin(angle);
+          if (i === 0) worldTextureCtx.moveTo(px, py);
+          else worldTextureCtx.lineTo(px, py);
+        }
+        worldTextureCtx.closePath();
+        worldTextureCtx.fillStyle = color;
+        worldTextureCtx.fill();
       });
-    }
-  }
-  // 브라우저 안티앨리어싱으로 블록 경계에 1~2px 검은 seam이 남는 경우를 막기 위한 봉합 단계.
-  // 경계 직전 픽셀을 경계선 위에 다시 덮어써 "한 장짜리 맵처럼" 보이게 만든다.
-  const seamWidth = 2;
-  for (let i = 1; i < 3; i += 1) {
-    const seamX = i * mapPixelWidth;
-    ctx.drawImage(canvas, seamX - seamWidth, 0, seamWidth, canvas.height, seamX, 0, seamWidth, canvas.height);
-    const seamY = i * mapPixelHeight;
-    ctx.drawImage(canvas, 0, seamY - seamWidth, canvas.width, seamWidth, 0, seamY, canvas.width, seamWidth);
+    });
+  });
+
+  // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
+  //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const repeatingPattern = ctx.createPattern(worldTextureCanvas, 'repeat');
+  if (repeatingPattern) {
+    ctx.fillStyle = repeatingPattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   const terrainStat = tiles.reduce((acc, tile) => {
@@ -1216,7 +1234,7 @@ const cubeRound = (x, y, z) => {
 };
 
 const pixelToHexCoord = (pixelX, pixelY, size) => {
-  // drawHex 오프셋(+8)을 제거했으므로 역변환도 동일 기준(0,0)으로 맞춘다.
+  // 렌더 원점을 (0,0)으로 통일했으므로 역변환도 동일 기준을 사용한다.
   const px = pixelX;
   const py = pixelY;
   const q = (SQRT3 / 3 * px - py / 3) / size;

@@ -24,6 +24,7 @@ const HEX_CONFIG = {
   ridgeDetailFrequency: 0.023,
   ridgeStrength: 0.24,
   riverBudgetScale: 1,
+  landmassBias: 0,
   biomePatchFrequency: 0.054,
   biomePatchStrength: 0.12,
   terrains: {
@@ -86,6 +87,8 @@ const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
 const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
 const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
 const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+const landmassBiasInput = document.getElementById('landmassBiasInput');
+const landmassBiasValue = document.getElementById('landmassBiasValue');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -103,6 +106,7 @@ const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (a, b, t) => a + (b - a) * t;
 const quintic = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 const updateCalendarMeta = () => {
@@ -299,11 +303,13 @@ const applyRerollSettings = () => {
   const warpStrength = Number.parseFloat(warpStrengthInput?.value ?? `${HEX_CONFIG.warpStrength}`);
   const ridgeStrength = Number.parseFloat(ridgeStrengthInput?.value ?? `${HEX_CONFIG.ridgeStrength}`);
   const riverBudgetScale = Number.parseFloat(riverBudgetScaleInput?.value ?? `${HEX_CONFIG.riverBudgetScale}`);
+  const landmassBias = Number.parseFloat(landmassBiasInput?.value ?? `${HEX_CONFIG.landmassBias}`);
   HEX_CONFIG.seaLevelRatio = Number.isFinite(seaLevelRatio) ? seaLevelRatio : HEX_CONFIG.seaLevelRatio;
   HEX_CONFIG.elevationScale = Number.isFinite(elevationScale) ? elevationScale : HEX_CONFIG.elevationScale;
   HEX_CONFIG.warpStrength = Number.isFinite(warpStrength) ? warpStrength : HEX_CONFIG.warpStrength;
   HEX_CONFIG.ridgeStrength = Number.isFinite(ridgeStrength) ? ridgeStrength : HEX_CONFIG.ridgeStrength;
   HEX_CONFIG.riverBudgetScale = Number.isFinite(riverBudgetScale) ? riverBudgetScale : HEX_CONFIG.riverBudgetScale;
+  HEX_CONFIG.landmassBias = Number.isFinite(landmassBias) ? landmassBias : HEX_CONFIG.landmassBias;
 };
 
 const updateRerollLabels = () => {
@@ -321,6 +327,15 @@ const updateRerollLabels = () => {
   }
   if (riverBudgetScaleValue) {
     riverBudgetScaleValue.textContent = `${HEX_CONFIG.riverBudgetScale.toFixed(2)}x`;
+  }
+  if (landmassBiasValue) {
+    if (HEX_CONFIG.landmassBias > 0.08) {
+      landmassBiasValue.textContent = `대륙형 +${HEX_CONFIG.landmassBias.toFixed(2)}`;
+    } else if (HEX_CONFIG.landmassBias < -0.08) {
+      landmassBiasValue.textContent = `다도해 ${HEX_CONFIG.landmassBias.toFixed(2)}`;
+    } else {
+      landmassBiasValue.textContent = '중립';
+    }
   }
 };
 
@@ -792,14 +807,36 @@ const buildScalarFields = (width, height, noiseContext) => {
         0.58
       );
 
+      // 다도해(-)~대륙형(+) 축을 더 극명하게 만들기 위해
+      // 1) 초저주파 대륙 마스크를 추가하고
+      // 2) 해양 산란 강도와 고도 오프셋을 bias 방향으로 크게 이동시킨다.
+      const landmassBias = HEX_CONFIG.landmassBias;
+      const continentalMask = fbmPerlin(
+        noiseContext.elevation,
+        wx * HEX_CONFIG.elevationFrequency * 0.24 - 401,
+        wy * HEX_CONFIG.elevationFrequency * 0.24 + 263,
+        3,
+        2,
+        0.52
+      ) * 0.5 + 0.5;
+      const macroWeight = clamp(0.5 + landmassBias * 0.35, 0.14, 0.94);
+      const regionalWeight = clamp(0.26 + landmassBias * 0.06, 0.04, 0.44);
+      const microWeight = clamp(0.13 - landmassBias * 0.12, 0.02, 0.26);
+      const ruggedWeight = clamp(0.09 - landmassBias * 0.07, 0.01, 0.2);
+      const oceanScatterWeight = clamp(0.08 + (-landmassBias) * 0.2, 0.01, 0.36);
+      const continentalLift = (continentalMask - 0.5) * landmassBias * 0.7;
+      const baseElevationShift = landmassBias * 0.16;
+
       const elevation = clamp01(
-        ((macroElevation * 0.5 + 0.5) * 0.56
-        + (regionalElevation * 0.5 + 0.5) * 0.24
-        + (microElevation * 0.5 + 0.5) * 0.12
-        + ruggedNoise * 0.08
+        ((macroElevation * 0.5 + 0.5) * macroWeight
+        + (regionalElevation * 0.5 + 0.5) * regionalWeight
+        + (microElevation * 0.5 + 0.5) * microWeight
+        + ruggedNoise * ruggedWeight
         + macroRidge * HEX_CONFIG.ridgeStrength
         + detailRidge * HEX_CONFIG.ridgeStrength * 0.34)
-        - (oceanScatter * 0.5 + 0.5) * 0.09
+        - (oceanScatter * 0.5 + 0.5) * oceanScatterWeight
+        + continentalLift
+        + baseElevationShift
         + biomePatch * HEX_CONFIG.biomePatchStrength
       ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
@@ -1015,7 +1052,8 @@ const renderWorld = (world) => {
     `시드 · ${seed}`,
     `헥스 크기 · ${width}x${height} (${tiles.length.toLocaleString()} 타일)`,
     `지형 분포 · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`,
-    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`
+    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`,
+    `지형 형태 축 · ${HEX_CONFIG.landmassBias.toFixed(2)}`
   ].join('\n');
 };
 
@@ -1153,6 +1191,10 @@ ridgeStrengthInput?.addEventListener('input', () => {
   updateRerollLabels();
 });
 riverBudgetScaleInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+landmassBiasInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();
 });

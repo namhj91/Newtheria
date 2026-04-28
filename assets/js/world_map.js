@@ -325,8 +325,31 @@ const updateRerollLabels = () => {
 };
 
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
+// 월드맵을 토러스(루프) 구조로 다루기 위한 좌표 래핑 유틸.
+// 음수/초과 좌표도 항상 0..(size-1) 범위로 되돌린다.
+const wrapCoord = (value, size) => {
+  if (!Number.isFinite(size) || size <= 0) return 0;
+  return ((value % size) + size) % size;
+};
 
 const getNeighbors = (x, y, width, height) => {
+  // 홀짝 행에 따라 헥스 이웃 방향이 다르므로 오프셋을 분리한다.
+  // 이후 모든 이웃을 wrapCoord로 감싸 좌우/상하 경계가 연결되게 만든다.
+  const offsets = y % 2 === 0
+    ? [
+      [-1, -1], [0, -1],
+      [-1, 0], [1, 0],
+      [-1, 1], [0, 1]
+    ]
+    : [
+      [0, -1], [1, -1],
+      [-1, 0], [1, 0],
+      [0, 1], [1, 1]
+    ];
+  return offsets.map(([dx, dy]) => [wrapCoord(x + dx, width), wrapCoord(y + dy, height)]);
+};
+
+const getNeighborsBounded = (x, y, width, height) => {
   if (y % 2 === 0) {
     return [
       [x - 1, y - 1], [x, y - 1],
@@ -602,7 +625,7 @@ const assignTerrainResources = (tiles, random) => {
 
 const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220) => {
   const visited = new Set();
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -619,7 +642,9 @@ const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220)
         const current = get(cx, cy);
         body.push(current);
 
-        for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
+        // 호수 판정은 실제로 연결된 바다를 보호해야 하므로,
+        // 루프 이웃이 아닌 "화면 경계 기준 연결"으로 물 덩어리를 계산한다.
+        for (const [nx, ny] of getNeighborsBounded(cx, cy, width, height)) {
           const nKey = `${nx},${ny}`;
           const neighbor = get(nx, ny);
           if (!visited.has(nKey) && isWaterTerrain(neighbor.terrainType)) {
@@ -704,7 +729,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 };
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
   let sources = tiles.filter((tile) => tile.elevation > 0.69 && tile.moisture > 0.44);
 
   if (sources.length < 30) {
@@ -1106,12 +1131,11 @@ canvas.addEventListener('click', (event) => {
   if (!currentWorld) return;
   const { offsetX, offsetY } = event;
   const target = pixelToHexCoord(offsetX, offsetY, HEX_CONFIG.size);
-  if (!inBounds(target.x, target.y, currentWorld.width, currentWorld.height)) {
-    tilePopup.hidden = true;
-    return;
-  }
+  // 클릭 좌표도 동일한 루프 규칙을 따르도록 경계 바깥 좌표를 반대편으로 보정한다.
+  const wrappedX = wrapCoord(target.x, currentWorld.width);
+  const wrappedY = wrapCoord(target.y, currentWorld.height);
 
-  const tile = currentWorld.tiles[target.y * currentWorld.width + target.x];
+  const tile = currentWorld.tiles[wrappedY * currentWorld.width + wrappedX];
   if (!tile) {
     tilePopup.hidden = true;
     return;

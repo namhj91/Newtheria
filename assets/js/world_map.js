@@ -64,9 +64,15 @@ const HEX_CONFIG = {
     고대성소: '#94a3b8'
   }
 };
+// 육각형 경계에서 생기는 미세 틈(seam)을 줄이기 위한 겹침 렌더 여유값.
+const HEX_RENDER_OVERLAP = 0.65;
 
 const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
+// 반복 텍스처 방식 렌더링을 위한 오프스크린 캔버스.
+const worldTextureCanvas = document.createElement('canvas');
+const worldTextureCtx = worldTextureCanvas.getContext('2d');
+const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
 const calendarMeta = document.getElementById('calendarMeta');
@@ -97,6 +103,8 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let worldCanvasMetrics = { mapPixelWidth: 0, mapPixelHeight: 0 };
+let isRecenteringViewport = false;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -293,6 +301,63 @@ const ridgedNoise = (noise2D, x, y, octaves, lacunarity = 2, gain = 0.5) => {
   return ampSum === 0 ? 0 : sum / ampSum;
 };
 
+// 생성 단계부터 완전 루프 지형이 되도록, 노이즈 자체를 주기(period) 기반으로 샘플링한다.
+// x/y가 period를 넘어가면 동일 값으로 되돌아와 경계 seam이 원천적으로 사라진다.
+const sampleTileableNoise2D = (noise2D, x, y, periodX, periodY) => {
+  const px = Math.max(1e-6, periodX);
+  const py = Math.max(1e-6, periodY);
+  const nx = wrapCoord(x, px);
+  const ny = wrapCoord(y, py);
+  const tx = nx / px;
+  const ty = ny / py;
+  const a = noise2D(nx, ny);
+  const b = noise2D(nx - px, ny);
+  const c = noise2D(nx, ny - py);
+  const d = noise2D(nx - px, ny - py);
+  return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
+};
+
+const fbmPerlinTileable = (noise2D, x, y, periodX, periodY, octaves, lacunarity = 2, gain = 0.5) => {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let ampSum = 0;
+
+  for (let i = 0; i < octaves; i += 1) {
+    const periodFx = periodX * freq;
+    const periodFy = periodY * freq;
+    sum += sampleTileableNoise2D(noise2D, x * freq, y * freq, periodFx, periodFy) * amp;
+    ampSum += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+
+  return ampSum === 0 ? 0 : sum / ampSum;
+};
+
+const ridgedNoiseTileable = (noise2D, x, y, periodX, periodY, octaves, lacunarity = 2, gain = 0.5) => {
+  let sum = 0;
+  let amp = 0.55;
+  let freq = 1;
+  let ampSum = 0;
+  let weight = 1;
+
+  for (let i = 0; i < octaves; i += 1) {
+    const periodFx = periodX * freq;
+    const periodFy = periodY * freq;
+    const sample = 1 - Math.abs(sampleTileableNoise2D(noise2D, x * freq, y * freq, periodFx, periodFy));
+    const ridge = sample * sample;
+    const signal = ridge * weight;
+    sum += signal * amp;
+    ampSum += amp;
+    weight = clamp01(signal * 1.85);
+    freq *= lacunarity;
+    amp *= gain;
+  }
+
+  return ampSum === 0 ? 0 : sum / ampSum;
+};
+
 const applyRerollSettings = () => {
   const seaLevelRatio = Number.parseFloat(seaLevelRatioInput?.value ?? `${HEX_CONFIG.seaLevelRatio}`);
   const elevationScale = Number.parseFloat(elevationScaleInput?.value ?? `${HEX_CONFIG.elevationScale}`);
@@ -324,22 +389,28 @@ const updateRerollLabels = () => {
   }
 };
 
-const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
+// 월드맵을 토러스(루프) 구조로 다루기 위한 좌표 래핑 유틸.
+// 음수/초과 좌표도 항상 0..(size-1) 범위로 되돌린다.
+const wrapCoord = (value, size) => {
+  if (!Number.isFinite(size) || size <= 0) return 0;
+  return ((value % size) + size) % size;
+};
 
 const getNeighbors = (x, y, width, height) => {
-  if (y % 2 === 0) {
-    return [
-      [x - 1, y - 1], [x, y - 1],
-      [x - 1, y], [x + 1, y],
-      [x - 1, y + 1], [x, y + 1]
-    ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
-  }
-
-  return [
-    [x, y - 1], [x + 1, y - 1],
-    [x - 1, y], [x + 1, y],
-    [x, y + 1], [x + 1, y + 1]
-  ].filter(([nx, ny]) => inBounds(nx, ny, width, height));
+  // 홀짝 행에 따라 헥스 이웃 방향이 다르므로 오프셋을 분리한다.
+  // 이후 모든 이웃을 wrapCoord로 감싸 좌우/상하 경계가 연결되게 만든다.
+  const offsets = y % 2 === 0
+    ? [
+      [-1, -1], [0, -1],
+      [-1, 0], [1, 0],
+      [-1, 1], [0, 1]
+    ]
+    : [
+      [0, -1], [1, -1],
+      [-1, 0], [1, 0],
+      [0, 1], [1, 1]
+    ];
+  return offsets.map(([dx, dy]) => [wrapCoord(x + dx, width), wrapCoord(y + dy, height)]);
 };
 
 const smoothField = (field, width, height, passes = 1) => {
@@ -602,7 +673,7 @@ const assignTerrainResources = (tiles, random) => {
 
 const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220) => {
   const visited = new Set();
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -619,6 +690,8 @@ const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220)
         const current = get(cx, cy);
         body.push(current);
 
+        // 사용자 요청에 따라 호수/해양 연결성도 완전 토러스 규칙으로 통일한다.
+        // 따라서 물 덩어리 BFS 역시 wrap 이웃(getNeighbors)을 사용한다.
         for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
           const nKey = `${nx},${ny}`;
           const neighbor = get(nx, ny);
@@ -704,7 +777,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 };
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
   let sources = tiles.filter((tile) => tile.elevation > 0.69 && tile.moisture > 0.44);
 
   if (sources.length < 30) {
@@ -770,23 +843,43 @@ const buildScalarFields = (width, height, noiseContext) => {
 
     for (let x = 0; x < width; x += 1) {
       const idx = y * width + x;
-      const warpX = fbmPerlin(noiseContext.moisture, x * HEX_CONFIG.warpFrequency + 71, y * HEX_CONFIG.warpFrequency - 29, 3, 2, 0.5);
-      const warpY = fbmPerlin(noiseContext.heat, x * HEX_CONFIG.warpFrequency - 113, y * HEX_CONFIG.warpFrequency + 167, 3, 2, 0.5);
+      const warpX = fbmPerlinTileable(
+        noiseContext.moisture,
+        x * HEX_CONFIG.warpFrequency + 71,
+        y * HEX_CONFIG.warpFrequency - 29,
+        width * HEX_CONFIG.warpFrequency,
+        height * HEX_CONFIG.warpFrequency,
+        3,
+        2,
+        0.5
+      );
+      const warpY = fbmPerlinTileable(
+        noiseContext.heat,
+        x * HEX_CONFIG.warpFrequency - 113,
+        y * HEX_CONFIG.warpFrequency + 167,
+        width * HEX_CONFIG.warpFrequency,
+        height * HEX_CONFIG.warpFrequency,
+        3,
+        2,
+        0.5
+      );
       const wx = x + warpX * HEX_CONFIG.warpStrength;
       const wy = y + warpY * HEX_CONFIG.warpStrength;
 
-      const macroElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency, wy * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
-      const regionalElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, 5, 2.08, 0.57);
-      const microElevation = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, 4, 2.12, 0.6);
-      const ruggedNoise = Math.abs(fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, 3, 2.18, 0.6));
-      const macroRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeFrequency + 181, wy * HEX_CONFIG.ridgeFrequency - 127, 4, 2.05, 0.58);
-      const detailRidge = ridgedNoise(noiseContext.elevation, wx * HEX_CONFIG.ridgeDetailFrequency - 311, wy * HEX_CONFIG.ridgeDetailFrequency + 89, 3, 2.2, 0.55);
-      const oceanScatter = fbmPerlin(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, 3, 2, 0.5);
+      const macroElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency, wy * HEX_CONFIG.elevationFrequency, width * HEX_CONFIG.elevationFrequency, height * HEX_CONFIG.elevationFrequency, 6, 2.02, 0.56);
+      const regionalElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 2.6 + 37, wy * HEX_CONFIG.elevationFrequency * 2.6 - 41, width * HEX_CONFIG.elevationFrequency * 2.6, height * HEX_CONFIG.elevationFrequency * 2.6, 5, 2.08, 0.57);
+      const microElevation = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 5.5 - 13, wy * HEX_CONFIG.elevationFrequency * 5.5 + 17, width * HEX_CONFIG.elevationFrequency * 5.5, height * HEX_CONFIG.elevationFrequency * 5.5, 4, 2.12, 0.6);
+      const ruggedNoise = Math.abs(fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 8.8 + 59, wy * HEX_CONFIG.elevationFrequency * 8.8 - 83, width * HEX_CONFIG.elevationFrequency * 8.8, height * HEX_CONFIG.elevationFrequency * 8.8, 3, 2.18, 0.6));
+      const macroRidge = ridgedNoiseTileable(noiseContext.elevation, wx * HEX_CONFIG.ridgeFrequency + 181, wy * HEX_CONFIG.ridgeFrequency - 127, width * HEX_CONFIG.ridgeFrequency, height * HEX_CONFIG.ridgeFrequency, 4, 2.05, 0.58);
+      const detailRidge = ridgedNoiseTileable(noiseContext.elevation, wx * HEX_CONFIG.ridgeDetailFrequency - 311, wy * HEX_CONFIG.ridgeDetailFrequency + 89, width * HEX_CONFIG.ridgeDetailFrequency, height * HEX_CONFIG.ridgeDetailFrequency, 3, 2.2, 0.55);
+      const oceanScatter = fbmPerlinTileable(noiseContext.elevation, wx * HEX_CONFIG.elevationFrequency * 0.9 + 101, wy * HEX_CONFIG.elevationFrequency * 0.9 - 73, width * HEX_CONFIG.elevationFrequency * 0.9, height * HEX_CONFIG.elevationFrequency * 0.9, 3, 2, 0.5);
 
-      const biomePatch = fbmPerlin(
+      const biomePatch = fbmPerlinTileable(
         noiseContext.elevation,
         wx * HEX_CONFIG.biomePatchFrequency + 211,
         wy * HEX_CONFIG.biomePatchFrequency - 157,
+        width * HEX_CONFIG.biomePatchFrequency,
+        height * HEX_CONFIG.biomePatchFrequency,
         3,
         2.2,
         0.58
@@ -804,14 +897,14 @@ const buildScalarFields = (width, height, noiseContext) => {
       ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
 
-      const heatLarge = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
-      const heatDetail = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 4.1 + 12, wy * HEX_CONFIG.heatFrequency * 4.1 - 9, 4, 2.1, 0.58);
-      const heatPatch = fbmPerlin(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 9.8 - 143, wy * HEX_CONFIG.heatFrequency * 9.8 + 227, 3, 2.24, 0.58);
+      const heatLarge = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency, wy * HEX_CONFIG.heatFrequency, width * HEX_CONFIG.heatFrequency, height * HEX_CONFIG.heatFrequency, 5, 2.03, 0.6);
+      const heatDetail = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 4.1 + 12, wy * HEX_CONFIG.heatFrequency * 4.1 - 9, width * HEX_CONFIG.heatFrequency * 4.1, height * HEX_CONFIG.heatFrequency * 4.1, 4, 2.1, 0.58);
+      const heatPatch = fbmPerlinTileable(noiseContext.heat, wx * HEX_CONFIG.heatFrequency * 9.8 - 143, wy * HEX_CONFIG.heatFrequency * 9.8 + 227, width * HEX_CONFIG.heatFrequency * 9.8, height * HEX_CONFIG.heatFrequency * 9.8, 3, 2.24, 0.58);
       heats[idx] = clamp01(equatorBase * 0.5 + (heatLarge * 0.5 + 0.5) * 0.3 + (heatDetail * 0.5 + 0.5) * 0.14 + (heatPatch * 0.5 + 0.5) * 0.06);
 
-      const moistureLarge = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency, wy * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
-      const moistureDetail = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 4.5 - 17, wy * HEX_CONFIG.moistureFrequency * 4.5 + 29, 5, 2.08, 0.57);
-      const moisturePatch = fbmPerlin(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 10.2 + 71, wy * HEX_CONFIG.moistureFrequency * 10.2 - 93, 3, 2.18, 0.6);
+      const moistureLarge = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency, wy * HEX_CONFIG.moistureFrequency, width * HEX_CONFIG.moistureFrequency, height * HEX_CONFIG.moistureFrequency, 6, 2.05, 0.58);
+      const moistureDetail = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 4.5 - 17, wy * HEX_CONFIG.moistureFrequency * 4.5 + 29, width * HEX_CONFIG.moistureFrequency * 4.5, height * HEX_CONFIG.moistureFrequency * 4.5, 5, 2.08, 0.57);
+      const moisturePatch = fbmPerlinTileable(noiseContext.moisture, wx * HEX_CONFIG.moistureFrequency * 10.2 + 71, wy * HEX_CONFIG.moistureFrequency * 10.2 - 93, width * HEX_CONFIG.moistureFrequency * 10.2, height * HEX_CONFIG.moistureFrequency * 10.2, 3, 2.18, 0.6);
       const elevationPenalty = Math.max(0, elevation - 0.64) * 0.24;
       moistures[idx] = clamp01((moistureLarge * 0.5 + 0.5) * 0.56 + (moistureDetail * 0.5 + 0.5) * 0.24 + (moisturePatch * 0.5 + 0.5) * 0.1 + (1 - elevation) * 0.1 - elevationPenalty);
     }
@@ -989,17 +1082,87 @@ const renderWorld = (world) => {
 
   const hexWidth = SQRT3 * HEX_CONFIG.size;
   const hexHeight = HEX_CONFIG.size * 2;
-  const canvasWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
-  const canvasHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  // 경계 이음새(검은 선)를 없애기 위해 반복 주기를 "순수 맵 크기"로 맞춘다.
+  // 기존 +16 여백은 블록 사이에 빈 띠를 만들어 seam처럼 보이는 원인이었다.
+  const mapPixelWidth = Math.round(hexWidth * (width + 0.5));
+  const mapPixelHeight = Math.round(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight);
+  // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
+  // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
+  const canvasWidth = mapPixelWidth * 3;
+  const canvasHeight = mapPixelHeight * 3;
 
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
 
+  // 1) 원본 맵 1주기 텍스처를 먼저 만든다.
+  //    각 타일을 ±1주기까지 함께 그려 경계 바깥으로 튀어나간 헥스 면이 반대편에도 정확히 채워지게 한다.
+  worldTextureCanvas.width = mapPixelWidth;
+  worldTextureCanvas.height = mapPixelHeight;
+  worldTextureCtx.clearRect(0, 0, mapPixelWidth, mapPixelHeight);
+  const repeatOffsetsX = [-mapPixelWidth, 0, mapPixelWidth];
+  const repeatOffsetsY = [-mapPixelHeight, 0, mapPixelHeight];
   tiles.forEach((tile) => {
     const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-    drawHex(x + 8, y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
+    const color = getTileColorByLayer(tile, activeLayer);
+    repeatOffsetsY.forEach((oy) => {
+      repeatOffsetsX.forEach((ox) => {
+        worldTextureCtx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = (Math.PI / 180) * (60 * i - 30);
+          const px = x + ox + (HEX_CONFIG.size + HEX_RENDER_OVERLAP) * Math.cos(angle);
+          const py = y + oy + (HEX_CONFIG.size + HEX_RENDER_OVERLAP) * Math.sin(angle);
+          if (i === 0) worldTextureCtx.moveTo(px, py);
+          else worldTextureCtx.lineTo(px, py);
+        }
+        worldTextureCtx.closePath();
+        worldTextureCtx.fillStyle = color;
+        worldTextureCtx.fill();
+      });
+    });
   });
+  // 텍스처 경계의 빈 띠를 반대편 엣지 픽셀로 채워, 육각형 꼭지점 불일치로 생기는 seam을 완화한다.
+  // 중요: 같은 캔버스에서 drawImage를 "원본+대상"으로 동시에 사용하면 브라우저별로 복사 결과가
+  //       달라질 수 있어(겹침 복사 아티팩트) 맵이 깨져 보일 수 있다.
+  //       그래서 아래는 스냅샷 캔버스를 만들어 "읽기 소스"를 분리해 안정적으로 복사한다.
+  const edgeFill = Math.ceil(HEX_CONFIG.size * 1.5);
+  const edgeSnapshotCanvas = document.createElement('canvas');
+  edgeSnapshotCanvas.width = mapPixelWidth;
+  edgeSnapshotCanvas.height = mapPixelHeight;
+  const edgeSnapshotCtx = edgeSnapshotCanvas.getContext('2d');
+  if (edgeSnapshotCtx) {
+    edgeSnapshotCtx.drawImage(worldTextureCanvas, 0, 0);
+  }
+  const edgeSource = edgeSnapshotCtx ? edgeSnapshotCanvas : worldTextureCanvas;
+  worldTextureCtx.drawImage(
+    edgeSource,
+    mapPixelWidth - edgeFill, 0, edgeFill, mapPixelHeight,
+    0, 0, edgeFill, mapPixelHeight
+  );
+  worldTextureCtx.drawImage(
+    edgeSource,
+    0, 0, edgeFill, mapPixelHeight,
+    mapPixelWidth - edgeFill, 0, edgeFill, mapPixelHeight
+  );
+  worldTextureCtx.drawImage(
+    edgeSource,
+    0, mapPixelHeight - edgeFill, mapPixelWidth, edgeFill,
+    0, 0, mapPixelWidth, edgeFill
+  );
+  worldTextureCtx.drawImage(
+    edgeSource,
+    0, 0, mapPixelWidth, edgeFill,
+    0, mapPixelHeight - edgeFill, mapPixelWidth, edgeFill
+  );
+
+  // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
+  //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const repeatingPattern = ctx.createPattern(worldTextureCanvas, 'repeat');
+  if (repeatingPattern) {
+    ctx.fillStyle = repeatingPattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
@@ -1019,6 +1182,47 @@ const renderWorld = (world) => {
   ].join('\n');
 };
 
+const recenterViewportToMiddle = (force = false) => {
+  if (!worldMapViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+  const targetLeft = mapPixelWidth;
+  const targetTop = mapPixelHeight;
+  // 첫 렌더 또는 강제 이동 시 중앙 블록으로 스크롤을 옮긴다.
+  if (force
+    || (worldMapViewport.scrollLeft === 0 && worldMapViewport.scrollTop === 0)) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = targetLeft;
+    worldMapViewport.scrollTop = targetTop;
+    isRecenteringViewport = false;
+  }
+};
+
+const maintainWrappedScroll = () => {
+  if (!worldMapViewport || isRecenteringViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+
+  let nextLeft = worldMapViewport.scrollLeft;
+  let nextTop = worldMapViewport.scrollTop;
+  const leftMin = mapPixelWidth * 0.5;
+  const leftMax = mapPixelWidth * 1.5;
+  const topMin = mapPixelHeight * 0.5;
+  const topMax = mapPixelHeight * 1.5;
+
+  if (nextLeft < leftMin) nextLeft += mapPixelWidth;
+  else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
+  if (nextTop < topMin) nextTop += mapPixelHeight;
+  else if (nextTop > topMax) nextTop -= mapPixelHeight;
+
+  if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = nextLeft;
+    worldMapViewport.scrollTop = nextTop;
+    isRecenteringViewport = false;
+  }
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1026,6 +1230,7 @@ const generateAndRender = () => {
   currentWorld = world;
   tilePopup.hidden = true;
   renderWorld(world);
+  recenterViewportToMiddle(true);
 };
 
 const updateVersionTag = async () => {
@@ -1064,8 +1269,9 @@ const cubeRound = (x, y, z) => {
 };
 
 const pixelToHexCoord = (pixelX, pixelY, size) => {
-  const px = pixelX - 8;
-  const py = pixelY - 8;
+  // 렌더 원점을 (0,0)으로 통일했으므로 역변환도 동일 기준을 사용한다.
+  const px = pixelX;
+  const py = pixelY;
   const q = (SQRT3 / 3 * px - py / 3) / size;
   const r = ((2 / 3) * py) / size;
   const cube = cubeRound(q, -q - r, r);
@@ -1106,12 +1312,11 @@ canvas.addEventListener('click', (event) => {
   if (!currentWorld) return;
   const { offsetX, offsetY } = event;
   const target = pixelToHexCoord(offsetX, offsetY, HEX_CONFIG.size);
-  if (!inBounds(target.x, target.y, currentWorld.width, currentWorld.height)) {
-    tilePopup.hidden = true;
-    return;
-  }
+  // 클릭 좌표도 동일한 루프 규칙을 따르도록 경계 바깥 좌표를 반대편으로 보정한다.
+  const wrappedX = wrapCoord(target.x, currentWorld.width);
+  const wrappedY = wrapCoord(target.y, currentWorld.height);
 
-  const tile = currentWorld.tiles[target.y * currentWorld.width + target.x];
+  const tile = currentWorld.tiles[wrappedY * currentWorld.width + wrappedX];
   if (!tile) {
     tilePopup.hidden = true;
     return;
@@ -1136,6 +1341,7 @@ worldInfoDialog?.addEventListener('close', () => {
 
 updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
+worldMapViewport?.addEventListener('scroll', maintainWrappedScroll, { passive: true });
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();

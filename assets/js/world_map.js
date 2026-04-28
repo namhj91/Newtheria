@@ -1101,6 +1101,15 @@ const renderWorld = (world) => {
       });
     }
   }
+  // 브라우저 안티앨리어싱으로 블록 경계에 1~2px 검은 seam이 남는 경우를 막기 위한 봉합 단계.
+  // 경계 직전 픽셀을 경계선 위에 다시 덮어써 "한 장짜리 맵처럼" 보이게 만든다.
+  const seamWidth = 2;
+  for (let i = 1; i < 3; i += 1) {
+    const seamX = i * mapPixelWidth;
+    ctx.drawImage(canvas, seamX - seamWidth, 0, seamWidth, canvas.height, seamX, 0, seamWidth, canvas.height);
+    const seamY = i * mapPixelHeight;
+    ctx.drawImage(canvas, 0, seamY - seamWidth, canvas.width, seamWidth, 0, seamY, canvas.width, seamWidth);
+  }
 
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;

@@ -4,6 +4,10 @@
   const DIALOGUE_VIEW_ID = 'view-dialogue';
   const DEFAULT_VIEW_ID = 'view-default';
   const DIALOGUE_MOUNT_ID = 'dialogueMount';
+  const STORAGE_KEYS = Object.freeze({
+    saveSlotsMeta: 'newtheria.saveSlots.meta',
+    saveSlotsData: 'newtheria.saveSlots.data'
+  });
 
   // 대화 세션 기본 진입점은 한 곳에서만 선언해 재사용한다.
   const DIALOGUE_ENTRY = Object.freeze({
@@ -42,6 +46,71 @@
   const isDialogueEndTrace = (trace) => (
     trace?.type === 'end' && trace?.data?.reason === 'block-end-true'
   );
+
+  const cleanText = (value, fallback = '') => {
+    if (value == null) return fallback;
+    return String(value).trim();
+  };
+
+  const readJsonStorage = (key, fallback = null) => {
+    try {
+      const raw = global.localStorage?.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.warn(`[MainViewRouter] 스토리지(${key}) 파싱에 실패했습니다.`, error);
+      return fallback;
+    }
+  };
+
+  const writeJsonStorage = (key, value) => {
+    try {
+      global.localStorage?.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.warn(`[MainViewRouter] 스토리지(${key}) 저장에 실패했습니다.`, error);
+      return false;
+    }
+  };
+
+  const parseEntryContext = () => {
+    // URL 예시
+    // - 새로운 여정: ./main.html?entry=new
+    // - 불러오기:   ./main.html?entry=load&slot=slot2
+    const params = new URLSearchParams(global.location?.search || '');
+    const entry = cleanText(params.get('entry'), 'new').toLowerCase();
+    const slotId = cleanText(params.get('slot'));
+    return { entry, slotId };
+  };
+
+  const loadSaveSlotContext = (requestedSlotId = '') => {
+    const meta = readJsonStorage(STORAGE_KEYS.saveSlotsMeta, {});
+    const data = readJsonStorage(STORAGE_KEYS.saveSlotsData, {});
+    const slots = data?.slots && typeof data.slots === 'object' ? data.slots : {};
+    const fallbackSlotId = cleanText(meta?.activeSlotId || data?.activeSlotId || 'slot1', 'slot1');
+    const resolvedSlotId = cleanText(requestedSlotId || fallbackSlotId, fallbackSlotId);
+    const slotPayload = slots[resolvedSlotId];
+
+    if (!slotPayload || typeof slotPayload !== 'object') {
+      return {
+        ok: false,
+        slotId: resolvedSlotId,
+        reason: 'slot-not-found'
+      };
+    }
+
+    // 실제 로드 슬롯을 전역 메타에도 반영해 이후 시스템(대화 템플릿 등)과 정합을 맞춘다.
+    const nextMeta = { ...meta, activeSlotId: resolvedSlotId, updatedAt: new Date().toISOString() };
+    const nextData = { ...data, activeSlotId: resolvedSlotId };
+    writeJsonStorage(STORAGE_KEYS.saveSlotsMeta, nextMeta);
+    writeJsonStorage(STORAGE_KEYS.saveSlotsData, nextData);
+
+    return {
+      ok: true,
+      slotId: resolvedSlotId,
+      saveData: slotPayload
+    };
+  };
 
   // 대화 인스턴스 생명주기를 한 객체로 모아 UI 라우팅 코드와 분리한다.
   const dialogueController = {
@@ -99,4 +168,35 @@
     if (!button) return;
     activateView(button.dataset.view);
   });
+
+  const entryContext = parseEntryContext();
+  const shouldStartWithPrologue = entryContext.entry !== 'load';
+
+  if (shouldStartWithPrologue) {
+    // 로드 버튼 이외 진입은 항상 프롤로그부터 시작한다.
+    activateView(DIALOGUE_VIEW_ID);
+  } else {
+    // 로드는 지정 슬롯을 실제로 식별/적용한 뒤 기본 뷰를 연다.
+    const loadResult = loadSaveSlotContext(entryContext.slotId);
+    if (!loadResult.ok) {
+      console.warn('[MainViewRouter] 요청한 로드 슬롯을 찾지 못해 기본 슬롯으로 재시도합니다.', loadResult);
+      const fallbackLoad = loadSaveSlotContext('slot1');
+      global.NewtheriaRuntimeSession = {
+        entry: 'load',
+        requestedSlotId: entryContext.slotId,
+        loadedSlotId: fallbackLoad.slotId,
+        saveData: fallbackLoad.saveData || null
+      };
+      activateView(DEFAULT_VIEW_ID);
+      return;
+    }
+
+    global.NewtheriaRuntimeSession = {
+      entry: 'load',
+      requestedSlotId: entryContext.slotId,
+      loadedSlotId: loadResult.slotId,
+      saveData: loadResult.saveData
+    };
+    activateView(DEFAULT_VIEW_ID);
+  }
 })(window);

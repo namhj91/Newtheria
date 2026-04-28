@@ -531,9 +531,45 @@ const ROUTE_URL_MAP = {
   mods: './test_mode.html'
 };
 
+const readJsonStorage = (key, fallback = null) => {
+  try {
+    const raw = window.localStorage?.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`[StartScreen] 스토리지(${key}) 파싱에 실패했습니다.`, error);
+    return fallback;
+  }
+};
+
+const resolveActiveSaveSlotId = () => {
+  // 불러오기는 "어느 슬롯을 로드했는지" 식별 가능해야 하므로
+  // 시작 화면에서는 메타에 기록된 활성 슬롯 id를 기본 전달값으로 사용한다.
+  const meta = readJsonStorage(STORAGE_KEYS.saveSlotsMeta, {});
+  const activeSlotId = String(meta?.activeSlotId || '').trim();
+  if (activeSlotId) return activeSlotId;
+  return 'slot1';
+};
+
+const buildMainRouteUrl = (entry, slotId = '') => {
+  const params = new URLSearchParams();
+  params.set('entry', entry);
+  if (slotId) params.set('slot', slotId);
+  return `./main.html?${params.toString()}`;
+};
+
 const handleMenuRoute = (route) => {
-  // 사용자 요청: "새로운 여정" 카드는 본편 메인(main.html)으로 이동한다.
-  const targetUrl = ROUTE_URL_MAP[route];
+  // 진입 경로 규칙
+  // - 새로운 여정: entry=new  -> 프롤로그부터 시작
+  // - 불러오기:   entry=load -> 슬롯 지정 후 기본 뷰로 시작
+  let targetUrl = ROUTE_URL_MAP[route];
+  if (route === 'new') {
+    targetUrl = buildMainRouteUrl('new');
+  }
+  if (route === 'continue') {
+    const slotId = resolveActiveSaveSlotId();
+    targetUrl = buildMainRouteUrl('load', slotId);
+  }
   if (!targetUrl) return;
   window.location.href = targetUrl;
 };

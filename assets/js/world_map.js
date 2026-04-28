@@ -69,11 +69,6 @@ const ctx = canvas.getContext('2d');
 // 반복 텍스처 방식 렌더링을 위한 오프스크린 캔버스.
 const worldTextureCanvas = document.createElement('canvas');
 const worldTextureCtx = worldTextureCanvas.getContext('2d');
-// 헥스 폴리곤 사이 안티앨리어싱 삼각형 틈(검은 점/줄)을 메우기 위한 겹침 반지름(px).
-const HEX_RENDER_OVERLAP = 0.75;
-// 맵 경계 seam 보정을 위한 스냅샷 버퍼(동일 캔버스 겹침 복사 방지).
-const textureSnapshotCanvas = document.createElement('canvas');
-const textureSnapshotCtx = textureSnapshotCanvas.getContext('2d');
 const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
@@ -1112,12 +1107,10 @@ const renderWorld = (world) => {
         worldTextureCtx.beginPath();
         for (let i = 0; i < 6; i += 1) {
           const angle = (Math.PI / 180) * (60 * i - 30);
-          // 사용자가 말한 "타일 사이 삼각형 빈틈"을 줄이기 위해
-          // 텍스처 렌더 반지름만 소폭 확장해 이웃 헥스가 1px 내외로 겹치게 한다.
-          // (좌표계/타일 판정은 기존 size를 유지)
-          const renderRadius = HEX_CONFIG.size + HEX_RENDER_OVERLAP;
-          const px = x + ox + renderRadius * Math.cos(angle);
-          const py = y + oy + renderRadius * Math.sin(angle);
+          // ver.0.3.21 롤백: 육각형을 기본 반지름(size)으로만 렌더링한다.
+          // (겹침 렌더/엣지 복사 후처리 제거)
+          const px = x + ox + HEX_CONFIG.size * Math.cos(angle);
+          const py = y + oy + HEX_CONFIG.size * Math.sin(angle);
           if (i === 0) worldTextureCtx.moveTo(px, py);
           else worldTextureCtx.lineTo(px, py);
         }
@@ -1127,32 +1120,7 @@ const renderWorld = (world) => {
       });
     });
   });
-  // 사용자가 표시한 "맵 경계 쐐기형 검은 영역"은 1px seam이 아니라
-  // 경계에서 잘린 헥스 면적(수~수십 px)일 수 있어, 1px가 아닌 band 단위로 래핑한다.
-  // source/destination이 겹치지 않도록 스냅샷 캔버스를 소스로 사용한다.
-  textureSnapshotCanvas.width = mapPixelWidth;
-  textureSnapshotCanvas.height = mapPixelHeight;
-  textureSnapshotCtx.clearRect(0, 0, mapPixelWidth, mapPixelHeight);
-  textureSnapshotCtx.drawImage(worldTextureCanvas, 0, 0);
-  const edgeWrapBleedX = Math.min(
-    Math.max(2, Math.ceil(hexWidth * 0.75)),
-    Math.max(2, mapPixelWidth - 1)
-  );
-  const edgeWrapBleedY = Math.min(
-    Math.max(2, Math.ceil(hexHeight * 0.75)),
-    Math.max(2, mapPixelHeight - 1)
-  );
-  // 좌우 경계 래핑 (band)
-  worldTextureCtx.drawImage(textureSnapshotCanvas, mapPixelWidth - edgeWrapBleedX, 0, edgeWrapBleedX, mapPixelHeight, 0, 0, edgeWrapBleedX, mapPixelHeight);
-  worldTextureCtx.drawImage(textureSnapshotCanvas, 0, 0, edgeWrapBleedX, mapPixelHeight, mapPixelWidth - edgeWrapBleedX, 0, edgeWrapBleedX, mapPixelHeight);
-  // 상하 경계 래핑 (band)
-  worldTextureCtx.drawImage(textureSnapshotCanvas, 0, mapPixelHeight - edgeWrapBleedY, mapPixelWidth, edgeWrapBleedY, 0, 0, mapPixelWidth, edgeWrapBleedY);
-  worldTextureCtx.drawImage(textureSnapshotCanvas, 0, 0, mapPixelWidth, edgeWrapBleedY, 0, mapPixelHeight - edgeWrapBleedY, mapPixelWidth, edgeWrapBleedY);
-  // 코너 band 래핑
-  worldTextureCtx.drawImage(textureSnapshotCanvas, mapPixelWidth - edgeWrapBleedX, mapPixelHeight - edgeWrapBleedY, edgeWrapBleedX, edgeWrapBleedY, 0, 0, edgeWrapBleedX, edgeWrapBleedY);
-  worldTextureCtx.drawImage(textureSnapshotCanvas, 0, mapPixelHeight - edgeWrapBleedY, edgeWrapBleedX, edgeWrapBleedY, mapPixelWidth - edgeWrapBleedX, 0, edgeWrapBleedX, edgeWrapBleedY);
-  worldTextureCtx.drawImage(textureSnapshotCanvas, mapPixelWidth - edgeWrapBleedX, 0, edgeWrapBleedX, edgeWrapBleedY, 0, mapPixelHeight - edgeWrapBleedY, edgeWrapBleedX, edgeWrapBleedY);
-  worldTextureCtx.drawImage(textureSnapshotCanvas, 0, 0, edgeWrapBleedX, edgeWrapBleedY, mapPixelWidth - edgeWrapBleedX, mapPixelHeight - edgeWrapBleedY, edgeWrapBleedX, edgeWrapBleedY);
+  // ver.0.3.21 롤백: 엣지 복사 후처리는 제거하고, 순수 반복 텍스처 렌더를 사용한다.
 
   // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
   //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.

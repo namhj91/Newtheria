@@ -24,6 +24,7 @@ const HEX_CONFIG = {
   ridgeDetailFrequency: 0.023,
   ridgeStrength: 0.24,
   riverBudgetScale: 1,
+  landmassBias: 0,
   biomePatchFrequency: 0.054,
   biomePatchStrength: 0.12,
   terrains: {
@@ -86,6 +87,11 @@ const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
 const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
 const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
 const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+const landmassBiasInput = document.getElementById('landmassBiasInput');
+const landmassBiasValue = document.getElementById('landmassBiasValue');
+const worldBuildCardFan = document.getElementById('worldBuildCardFan');
+const buildRoundLabel = document.getElementById('buildRoundLabel');
+const drawBuildCardsButton = document.getElementById('drawBuildCardsButton');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -97,12 +103,16 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let worldBuildRound = 0;
+const MAX_WORLD_BUILD_ROUND = 6;
+const WORLD_BUILD_CARD_OPTIONS = 4;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
 
 const createSeed = () => Math.floor(Math.random() * 4294967295);
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (a, b, t) => a + (b - a) * t;
 const quintic = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 const updateCalendarMeta = () => {
@@ -299,11 +309,13 @@ const applyRerollSettings = () => {
   const warpStrength = Number.parseFloat(warpStrengthInput?.value ?? `${HEX_CONFIG.warpStrength}`);
   const ridgeStrength = Number.parseFloat(ridgeStrengthInput?.value ?? `${HEX_CONFIG.ridgeStrength}`);
   const riverBudgetScale = Number.parseFloat(riverBudgetScaleInput?.value ?? `${HEX_CONFIG.riverBudgetScale}`);
+  const landmassBias = Number.parseFloat(landmassBiasInput?.value ?? `${HEX_CONFIG.landmassBias}`);
   HEX_CONFIG.seaLevelRatio = Number.isFinite(seaLevelRatio) ? seaLevelRatio : HEX_CONFIG.seaLevelRatio;
   HEX_CONFIG.elevationScale = Number.isFinite(elevationScale) ? elevationScale : HEX_CONFIG.elevationScale;
   HEX_CONFIG.warpStrength = Number.isFinite(warpStrength) ? warpStrength : HEX_CONFIG.warpStrength;
   HEX_CONFIG.ridgeStrength = Number.isFinite(ridgeStrength) ? ridgeStrength : HEX_CONFIG.ridgeStrength;
   HEX_CONFIG.riverBudgetScale = Number.isFinite(riverBudgetScale) ? riverBudgetScale : HEX_CONFIG.riverBudgetScale;
+  HEX_CONFIG.landmassBias = Number.isFinite(landmassBias) ? landmassBias : HEX_CONFIG.landmassBias;
 };
 
 const updateRerollLabels = () => {
@@ -322,6 +334,89 @@ const updateRerollLabels = () => {
   if (riverBudgetScaleValue) {
     riverBudgetScaleValue.textContent = `${HEX_CONFIG.riverBudgetScale.toFixed(2)}x`;
   }
+  if (landmassBiasValue) {
+    if (HEX_CONFIG.landmassBias > 0.08) {
+      landmassBiasValue.textContent = `대륙형 +${HEX_CONFIG.landmassBias.toFixed(2)}`;
+    } else if (HEX_CONFIG.landmassBias < -0.08) {
+      landmassBiasValue.textContent = `다도해 ${HEX_CONFIG.landmassBias.toFixed(2)}`;
+    } else {
+      landmassBiasValue.textContent = '중립';
+    }
+  }
+};
+
+const pickMany = (pool, size = 4) => {
+  const cloned = [...pool];
+  for (let i = cloned.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+  }
+  return cloned.slice(0, size);
+};
+
+const WORLD_BUILD_CARD_POOL = [
+  { route: 'elevation_up', icon: '⛰️', label: '고도 +', desc: '산악 지형을 더 거칠게 만든다.', key: 'elevationScale', delta: 0.14 },
+  { route: 'elevation_down', icon: '🪨', label: '고도 -', desc: '평탄 지형을 크게 늘린다.', key: 'elevationScale', delta: -0.14 },
+  { route: 'sea_up', icon: '🌊', label: '해양 +', desc: '바다/해안 비중을 크게 늘린다.', key: 'seaLevelRatio', delta: 0.08 },
+  { route: 'sea_down', icon: '🏞️', label: '해양 -', desc: '육지 면적을 크게 늘린다.', key: 'seaLevelRatio', delta: -0.08 },
+  { route: 'river_up', icon: '💧', label: '강 +', desc: '강 생성 밀도를 높인다.', key: 'riverBudgetScale', delta: 0.25 },
+  { route: 'river_down', icon: '🏜️', label: '강 -', desc: '강 생성 밀도를 낮춘다.', key: 'riverBudgetScale', delta: -0.25 },
+  { route: 'ridge_up', icon: '🧱', label: '산맥 +', desc: '능선이 더 강조된다.', key: 'ridgeStrength', delta: 0.05 },
+  { route: 'ridge_down', icon: '🛤️', label: '산맥 -', desc: '능선 강조를 줄인다.', key: 'ridgeStrength', delta: -0.05 },
+  { route: 'warp_up', icon: '🌀', label: '워프 +', desc: '경계가 더 뒤틀리고 파편화된다.', key: 'warpStrength', delta: 3 },
+  { route: 'warp_down', icon: '📏', label: '워프 -', desc: '지형 경계가 더 매끈해진다.', key: 'warpStrength', delta: -3 },
+  { route: 'landmass_islands', icon: '🧭', label: '다도해 +', desc: '큰 대륙보다 섬 군집을 선호한다.', key: 'landmassBias', delta: -0.22 },
+  { route: 'landmass_continent', icon: '🗺️', label: '대륙형 +', desc: '연결된 큰 육괴를 선호한다.', key: 'landmassBias', delta: 0.22 }
+];
+
+const WORLD_BUILD_LIMITS = {
+  seaLevelRatio: { min: -0.2, max: 1.25, input: seaLevelRatioInput },
+  elevationScale: { min: 0.2, max: 2.4, input: elevationScaleInput },
+  warpStrength: { min: 0, max: 64, input: warpStrengthInput },
+  ridgeStrength: { min: -0.15, max: 0.8, input: ridgeStrengthInput },
+  riverBudgetScale: { min: 0, max: 4.2, input: riverBudgetScaleInput },
+  landmassBias: { min: -1.2, max: 1.2, input: landmassBiasInput }
+};
+
+const applyWorldBuildCardDelta = (cardMeta) => {
+  const limits = WORLD_BUILD_LIMITS[cardMeta.key];
+  if (!limits) return;
+  const nextValue = clamp((HEX_CONFIG[cardMeta.key] ?? 0) + cardMeta.delta, limits.min, limits.max);
+  HEX_CONFIG[cardMeta.key] = nextValue;
+  if (limits.input) limits.input.value = `${nextValue}`;
+  updateRerollLabels();
+};
+
+const updateWorldBuildRoundLabel = () => {
+  if (!buildRoundLabel) return;
+  buildRoundLabel.textContent = `빌드 라운드 · ${worldBuildRound} / ${MAX_WORLD_BUILD_ROUND}`;
+};
+
+const drawWorldBuildCards = () => {
+  if (!worldBuildCardFan || !window.NewtheriaCardTemplates) return;
+  if (worldBuildRound >= MAX_WORLD_BUILD_ROUND) {
+    updateWorldBuildRoundLabel();
+    return;
+  }
+  const cardDefs = pickMany(WORLD_BUILD_CARD_POOL, WORLD_BUILD_CARD_OPTIONS).map((card) => ({
+    ...card,
+    meta: card
+  }));
+  const cards = window.NewtheriaCardTemplates.renderCardFanCards(worldBuildCardFan, cardDefs);
+  const behavior = window.NewtheriaCardTemplates.createCardFanBehavior({ menu: worldBuildCardFan, cards });
+  behavior.bindInteractions({
+    onCardSelected: (card) => {
+      const selected = cardDefs.find((entry) => entry.route === card.dataset.route);
+      if (!selected?.meta) return;
+      applyWorldBuildCardDelta(selected.meta);
+      worldBuildRound += 1;
+      updateWorldBuildRoundLabel();
+      if (worldBuildRound < MAX_WORLD_BUILD_ROUND) drawWorldBuildCards();
+      else generateAndRender();
+    }
+  });
+  behavior.layoutCards();
+  updateWorldBuildRoundLabel();
 };
 
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
@@ -792,14 +887,22 @@ const buildScalarFields = (width, height, noiseContext) => {
         0.58
       );
 
+      // 다도해(-)~대륙형(+) 축: 저주파 지형 강도를 조절해 육괴 연결성을 크게 바꾼다.
+      const landmassBias = HEX_CONFIG.landmassBias;
+      const macroWeight = clamp(0.56 + landmassBias * 0.28, 0.18, 0.9);
+      const regionalWeight = clamp(0.24 + landmassBias * 0.08, 0.05, 0.42);
+      const microWeight = clamp(0.12 - landmassBias * 0.08, 0.03, 0.24);
+      const ruggedWeight = clamp(0.08 - landmassBias * 0.05, 0.02, 0.18);
+      const oceanScatterWeight = clamp(0.09 + (-landmassBias) * 0.09, 0.02, 0.22);
+
       const elevation = clamp01(
-        ((macroElevation * 0.5 + 0.5) * 0.56
-        + (regionalElevation * 0.5 + 0.5) * 0.24
-        + (microElevation * 0.5 + 0.5) * 0.12
-        + ruggedNoise * 0.08
+        ((macroElevation * 0.5 + 0.5) * macroWeight
+        + (regionalElevation * 0.5 + 0.5) * regionalWeight
+        + (microElevation * 0.5 + 0.5) * microWeight
+        + ruggedNoise * ruggedWeight
         + macroRidge * HEX_CONFIG.ridgeStrength
         + detailRidge * HEX_CONFIG.ridgeStrength * 0.34)
-        - (oceanScatter * 0.5 + 0.5) * 0.09
+        - (oceanScatter * 0.5 + 0.5) * oceanScatterWeight
         + biomePatch * HEX_CONFIG.biomePatchStrength
       ) ** HEX_CONFIG.elevationScale;
       elevations[idx] = elevation;
@@ -1015,7 +1118,8 @@ const renderWorld = (world) => {
     `시드 · ${seed}`,
     `헥스 크기 · ${width}x${height} (${tiles.length.toLocaleString()} 타일)`,
     `지형 분포 · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`,
-    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`
+    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`,
+    `지형 형태 축 · ${HEX_CONFIG.landmassBias.toFixed(2)}`
   ].join('\n');
 };
 
@@ -1156,8 +1260,16 @@ riverBudgetScaleInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();
 });
+landmassBiasInput?.addEventListener('input', () => {
+  applyRerollSettings();
+  updateRerollLabels();
+});
+drawBuildCardsButton?.addEventListener('click', () => {
+  drawWorldBuildCards();
+});
 applyRerollSettings();
 updateRerollLabels();
 updateVersionTag();
+drawWorldBuildCards();
 
 generateAndRender();

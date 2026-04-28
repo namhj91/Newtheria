@@ -66,9 +66,6 @@ const HEX_CONFIG = {
 };
 const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
-// 반복 텍스처 방식 렌더링을 위한 오프스크린 캔버스.
-const worldTextureCanvas = document.createElement('canvas');
-const worldTextureCtx = worldTextureCanvas.getContext('2d');
 const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
@@ -1092,11 +1089,9 @@ const renderWorld = (world) => {
   canvas.height = canvasHeight;
   worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
 
-  // 1) 원본 맵 1주기 텍스처를 먼저 만든다.
-  //    각 타일을 ±1주기까지 함께 그려 경계 바깥으로 튀어나간 헥스 면이 반대편에도 정확히 채워지게 한다.
-  worldTextureCanvas.width = mapPixelWidth;
-  worldTextureCanvas.height = mapPixelHeight;
-  worldTextureCtx.clearRect(0, 0, mapPixelWidth, mapPixelHeight);
+  // 1) 텍스처 repeat를 쓰지 않고, 메인 캔버스(3x3)에 헥스를 직접 반복 렌더링한다.
+  //    이렇게 하면 pattern 샘플링 경계에서 생길 수 있는 seam을 줄일 수 있다.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   const repeatOffsetsX = [-mapPixelWidth, 0, mapPixelWidth];
   const repeatOffsetsY = [-mapPixelHeight, 0, mapPixelHeight];
   tiles.forEach((tile) => {
@@ -1104,32 +1099,24 @@ const renderWorld = (world) => {
     const color = getTileColorByLayer(tile, activeLayer);
     repeatOffsetsY.forEach((oy) => {
       repeatOffsetsX.forEach((ox) => {
-        worldTextureCtx.beginPath();
+        // 중앙 블록(1,1)을 기준으로 주변 8개 블록까지 동일 타일을 그려 토러스 경계를 시각적으로 연결한다.
+        const baseX = x + mapPixelWidth + ox;
+        const baseY = y + mapPixelHeight + oy;
+        ctx.beginPath();
         for (let i = 0; i < 6; i += 1) {
           const angle = (Math.PI / 180) * (60 * i - 30);
-          // ver.0.3.21 롤백: 육각형을 기본 반지름(size)으로만 렌더링한다.
-          // (겹침 렌더/엣지 복사 후처리 제거)
-          const px = x + ox + HEX_CONFIG.size * Math.cos(angle);
-          const py = y + oy + HEX_CONFIG.size * Math.sin(angle);
-          if (i === 0) worldTextureCtx.moveTo(px, py);
-          else worldTextureCtx.lineTo(px, py);
+          const px = baseX + HEX_CONFIG.size * Math.cos(angle);
+          const py = baseY + HEX_CONFIG.size * Math.sin(angle);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
         }
-        worldTextureCtx.closePath();
-        worldTextureCtx.fillStyle = color;
-        worldTextureCtx.fill();
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
       });
     });
   });
-  // ver.0.3.21 롤백: 엣지 복사 후처리는 제거하고, 순수 반복 텍스처 렌더를 사용한다.
-
-  // 2) 메인 캔버스는 텍스처를 repeat 패턴으로 채운다.
-  //    타일 경계를 반복 렌더링하는 방식이라 블록 seam 보정 패스가 필요 없다.
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const repeatingPattern = ctx.createPattern(worldTextureCanvas, 'repeat');
-  if (repeatingPattern) {
-    ctx.fillStyle = repeatingPattern;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
+  // 2) 스크롤 워프(recenter)로 중앙 블록을 유지해, 사용자는 무한 반복처럼 탐색한다.
 
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;

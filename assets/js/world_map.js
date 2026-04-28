@@ -1102,10 +1102,14 @@ const renderWorld = (world) => {
         // 이렇게 하면 (max index)와 (0 index) 경계가 동일 규칙으로 정확히 이어진다.
         // odd-r 좌표계에서 세로 주기를 홀수 줄 수만큼 이동하면 행 홀짝이 뒤집히고,
         // 이때 "홀수 y행 색상만 x=-1로 밀려 보이는" 현상이 생길 수 있다.
-        // 세로 주기 홀짝 반전이 있을 때 홀수 행은 q를 +1 보정해 색상/형상이 같은 타일로 맞춘다.
+        // 세로 주기 홀짝 반전(높이 홀수)에서는 odd-r 행 패리티가 뒤집히므로
+        // 홀수 행 q를 -1 보정해 행 간 상대 정렬을 유지한다.
         const hasVerticalParityFlip = Math.abs((dy * height) % 2) === 1;
-        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? 1 : 0;
-        const repeatedQ = tile.coord.x + dx * width + oddRowQShift;
+        const oddRowQShift = (hasVerticalParityFlip && (tile.coord.y % 2 !== 0)) ? -1 : 0;
+        // dy 부호에 따라 세로 반복 블록의 기준 x가 반 칸(±hexWidth/2) 달라진다.
+        // 이를 q의 전역 +1(=+hexWidth)로 치환해 "위쪽 블록(+0.5칸), 아래쪽 블록(-0.5칸)"을 맞춘다.
+        const verticalDirectionQShift = (hasVerticalParityFlip && dy < 0) ? 1 : 0;
+        const repeatedQ = tile.coord.x + dx * width + oddRowQShift + verticalDirectionQShift;
         const repeatedR = tile.coord.y + dy * height;
         const { x, y } = hexToPixel(repeatedQ, repeatedR, HEX_CONFIG.size);
         // 중앙 블록(1,1)이 기본 시야가 되도록 +1주기만큼 평행 이동한다.
@@ -1182,8 +1186,13 @@ const maintainWrappedScroll = () => {
 
   if (nextTop < topMin) {
     nextTop += mapPixelHeight;
+    // 위 경계를 넘어 아래 블록(dy=+1)으로 이동할 때는 블록이 왼쪽(-0.5칸)으로 정렬되므로
+    // 화면 연속성을 위해 scrollLeft도 동일하게 -0.5칸 보정한다.
+    nextLeft -= verticalWrapParityShift;
   } else if (nextTop > topMax) {
     nextTop -= mapPixelHeight;
+    // 아래 경계를 넘어 위 블록(dy=-1)으로 이동할 때는 반대로 +0.5칸 보정한다.
+    nextLeft += verticalWrapParityShift;
   }
 
   if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {

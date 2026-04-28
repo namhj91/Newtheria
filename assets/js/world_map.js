@@ -1075,11 +1075,10 @@ const renderWorld = (world) => {
   const { tiles, seed, width, height, riverBudget } = world;
 
   const hexWidth = SQRT3 * HEX_CONFIG.size;
-  const hexHeight = HEX_CONFIG.size * 2;
-  // 경계 이음새(검은 선)를 없애기 위해 반복 주기를 "순수 맵 크기"로 맞춘다.
-  // 기존 +16 여백은 블록 사이에 빈 띠를 만들어 seam처럼 보이는 원인이었다.
-  const mapPixelWidth = Math.round(hexWidth * (width + 0.5));
-  const mapPixelHeight = Math.round(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight);
+  // 토러스 반복 주기는 "타일 인덱스 1주기"와 동일해야 한다.
+  // 즉 (199,x) 다음이 (0,x)처럼 붙도록 가로/세로 오프셋을 타일 개수 기준으로 계산한다.
+  const mapPixelWidth = Math.round(hexWidth * width);
+  const mapPixelHeight = Math.round(HEX_CONFIG.size * 1.5 * height);
   // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
   // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
   const canvasWidth = mapPixelWidth * 3;
@@ -1090,18 +1089,21 @@ const renderWorld = (world) => {
   worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
 
   // 1) 텍스처 repeat를 쓰지 않고, 메인 캔버스(3x3)에 헥스를 직접 반복 렌더링한다.
-  //    이렇게 하면 pattern 샘플링 경계에서 생길 수 있는 seam을 줄일 수 있다.
+  //    핵심은 픽셀 오프셋 복사가 아니라 "좌표 1주기(width/height) 이동"으로 타일을 재배치하는 것이다.
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const repeatOffsetsX = [-mapPixelWidth, 0, mapPixelWidth];
-  const repeatOffsetsY = [-mapPixelHeight, 0, mapPixelHeight];
+  const repeatSteps = [-1, 0, 1];
   tiles.forEach((tile) => {
-    const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
     const color = getTileColorByLayer(tile, activeLayer);
-    repeatOffsetsY.forEach((oy) => {
-      repeatOffsetsX.forEach((ox) => {
-        // 중앙 블록(1,1)을 기준으로 주변 8개 블록까지 동일 타일을 그려 토러스 경계를 시각적으로 연결한다.
-        const baseX = x + mapPixelWidth + ox;
-        const baseY = y + mapPixelHeight + oy;
+    repeatSteps.forEach((dy) => {
+      repeatSteps.forEach((dx) => {
+        // tile.coord를 월드 1주기(width/height)만큼 이동해 3x3 반복 배치를 만든다.
+        // 이렇게 하면 (max index)와 (0 index) 경계가 동일 규칙으로 정확히 이어진다.
+        const repeatedQ = tile.coord.x + dx * width;
+        const repeatedR = tile.coord.y + dy * height;
+        const { x, y } = hexToPixel(repeatedQ, repeatedR, HEX_CONFIG.size);
+        // 중앙 블록(1,1)이 기본 시야가 되도록 +1주기만큼 평행 이동한다.
+        const baseX = x + mapPixelWidth;
+        const baseY = y + mapPixelHeight;
         ctx.beginPath();
         for (let i = 0; i < 6; i += 1) {
           const angle = (Math.PI / 180) * (60 * i - 30);

@@ -1165,6 +1165,10 @@ const maintainWrappedScroll = () => {
   if (!worldMapViewport || isRecenteringViewport) return;
   const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
   if (!mapPixelWidth || !mapPixelHeight) return;
+  const hexWidth = SQRT3 * HEX_CONFIG.size;
+  // odd-r 오프셋 좌표계에서는 "세로 1주기 이동" 시 행 개수가 홀수면 좌우 반 칸 보정이 필요하다.
+  // (짝수 행 높이에서는 보정량 0)
+  const verticalWrapParityShift = (HEX_CONFIG.rows % 2 === 0) ? 0 : (hexWidth / 2);
 
   let nextLeft = worldMapViewport.scrollLeft;
   let nextTop = worldMapViewport.scrollTop;

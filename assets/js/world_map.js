@@ -67,6 +67,7 @@ const HEX_CONFIG = {
 
 const canvas = document.getElementById('worldMapCanvas');
 const ctx = canvas.getContext('2d');
+const worldMapViewport = document.getElementById('worldMapViewport');
 const regenButton = document.getElementById('regenButton');
 const mapMeta = document.getElementById('mapMeta');
 const calendarMeta = document.getElementById('calendarMeta');
@@ -97,6 +98,8 @@ const LAYER_MODE = {
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
+let worldCanvasMetrics = { mapPixelWidth: 0, mapPixelHeight: 0 };
+let isRecenteringViewport = false;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -325,8 +328,31 @@ const updateRerollLabels = () => {
 };
 
 const inBounds = (x, y, width, height) => x >= 0 && y >= 0 && x < width && y < height;
+// 월드맵을 토러스(루프) 구조로 다루기 위한 좌표 래핑 유틸.
+// 음수/초과 좌표도 항상 0..(size-1) 범위로 되돌린다.
+const wrapCoord = (value, size) => {
+  if (!Number.isFinite(size) || size <= 0) return 0;
+  return ((value % size) + size) % size;
+};
 
 const getNeighbors = (x, y, width, height) => {
+  // 홀짝 행에 따라 헥스 이웃 방향이 다르므로 오프셋을 분리한다.
+  // 이후 모든 이웃을 wrapCoord로 감싸 좌우/상하 경계가 연결되게 만든다.
+  const offsets = y % 2 === 0
+    ? [
+      [-1, -1], [0, -1],
+      [-1, 0], [1, 0],
+      [-1, 1], [0, 1]
+    ]
+    : [
+      [0, -1], [1, -1],
+      [-1, 0], [1, 0],
+      [0, 1], [1, 1]
+    ];
+  return offsets.map(([dx, dy]) => [wrapCoord(x + dx, width), wrapCoord(y + dy, height)]);
+};
+
+const getNeighborsBounded = (x, y, width, height) => {
   if (y % 2 === 0) {
     return [
       [x - 1, y - 1], [x, y - 1],
@@ -602,7 +628,7 @@ const assignTerrainResources = (tiles, random) => {
 
 const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220) => {
   const visited = new Set();
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -619,7 +645,9 @@ const convertSmallWaterBodiesToLakes = (tiles, width, height, maxLakeSize = 220)
         const current = get(cx, cy);
         body.push(current);
 
-        for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
+        // 호수 판정은 실제로 연결된 바다를 보호해야 하므로,
+        // 루프 이웃이 아닌 "화면 경계 기준 연결"으로 물 덩어리를 계산한다.
+        for (const [nx, ny] of getNeighborsBounded(cx, cy, width, height)) {
           const nKey = `${nx},${ny}`;
           const neighbor = get(nx, ny);
           if (!visited.has(nKey) && isWaterTerrain(neighbor.terrainType)) {
@@ -704,7 +732,7 @@ const placeMythicLandmarks = (tiles, random, width, height) => {
 };
 
 const carveRivers = (tiles, random, levels, width, height, riverBudget) => {
-  const get = (x, y) => tiles[y * width + x];
+  const get = (x, y) => tiles[wrapCoord(y, height) * width + wrapCoord(x, width)];
   let sources = tiles.filter((tile) => tile.elevation > 0.69 && tile.moisture > 0.44);
 
   if (sources.length < 30) {
@@ -989,17 +1017,28 @@ const renderWorld = (world) => {
 
   const hexWidth = SQRT3 * HEX_CONFIG.size;
   const hexHeight = HEX_CONFIG.size * 2;
-  const canvasWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
-  const canvasHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  const mapPixelWidth = Math.ceil(hexWidth * (width + 0.5) + 16);
+  const mapPixelHeight = Math.ceil(HEX_CONFIG.size * 1.5 * (height - 1) + hexHeight + 16);
+  // 3x3 타일 캔버스를 사용해 스크롤이 경계를 지나도 동일 패턴이 반복되게 렌더링한다.
+  // 중앙(1,1) 블록을 기본 시점으로 사용하고, 스크롤이 가장자리로 가면 다시 중앙으로 보정한다.
+  const canvasWidth = mapPixelWidth * 3;
+  const canvasHeight = mapPixelHeight * 3;
 
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
+  worldCanvasMetrics = { mapPixelWidth, mapPixelHeight };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  tiles.forEach((tile) => {
-    const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
-    drawHex(x + 8, y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
-  });
+  for (let ty = 0; ty < 3; ty += 1) {
+    for (let tx = 0; tx < 3; tx += 1) {
+      const offsetX = tx * mapPixelWidth;
+      const offsetY = ty * mapPixelHeight;
+      tiles.forEach((tile) => {
+        const { x, y } = hexToPixel(tile.coord.x, tile.coord.y, HEX_CONFIG.size);
+        drawHex(offsetX + x + 8, offsetY + y + 8, HEX_CONFIG.size, getTileColorByLayer(tile, activeLayer));
+      });
+    }
+  }
 
   const terrainStat = tiles.reduce((acc, tile) => {
     acc[tile.terrainType] = (acc[tile.terrainType] || 0) + 1;
@@ -1019,6 +1058,47 @@ const renderWorld = (world) => {
   ].join('\n');
 };
 
+const recenterViewportToMiddle = (force = false) => {
+  if (!worldMapViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+  const targetLeft = mapPixelWidth;
+  const targetTop = mapPixelHeight;
+  // 첫 렌더 또는 강제 이동 시 중앙 블록으로 스크롤을 옮긴다.
+  if (force
+    || (worldMapViewport.scrollLeft === 0 && worldMapViewport.scrollTop === 0)) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = targetLeft;
+    worldMapViewport.scrollTop = targetTop;
+    isRecenteringViewport = false;
+  }
+};
+
+const maintainWrappedScroll = () => {
+  if (!worldMapViewport || isRecenteringViewport) return;
+  const { mapPixelWidth, mapPixelHeight } = worldCanvasMetrics;
+  if (!mapPixelWidth || !mapPixelHeight) return;
+
+  let nextLeft = worldMapViewport.scrollLeft;
+  let nextTop = worldMapViewport.scrollTop;
+  const leftMin = mapPixelWidth * 0.5;
+  const leftMax = mapPixelWidth * 1.5;
+  const topMin = mapPixelHeight * 0.5;
+  const topMax = mapPixelHeight * 1.5;
+
+  if (nextLeft < leftMin) nextLeft += mapPixelWidth;
+  else if (nextLeft > leftMax) nextLeft -= mapPixelWidth;
+  if (nextTop < topMin) nextTop += mapPixelHeight;
+  else if (nextTop > topMax) nextTop -= mapPixelHeight;
+
+  if (nextLeft !== worldMapViewport.scrollLeft || nextTop !== worldMapViewport.scrollTop) {
+    isRecenteringViewport = true;
+    worldMapViewport.scrollLeft = nextLeft;
+    worldMapViewport.scrollTop = nextTop;
+    isRecenteringViewport = false;
+  }
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1026,6 +1106,7 @@ const generateAndRender = () => {
   currentWorld = world;
   tilePopup.hidden = true;
   renderWorld(world);
+  recenterViewportToMiddle(true);
 };
 
 const updateVersionTag = async () => {
@@ -1106,12 +1187,11 @@ canvas.addEventListener('click', (event) => {
   if (!currentWorld) return;
   const { offsetX, offsetY } = event;
   const target = pixelToHexCoord(offsetX, offsetY, HEX_CONFIG.size);
-  if (!inBounds(target.x, target.y, currentWorld.width, currentWorld.height)) {
-    tilePopup.hidden = true;
-    return;
-  }
+  // 클릭 좌표도 동일한 루프 규칙을 따르도록 경계 바깥 좌표를 반대편으로 보정한다.
+  const wrappedX = wrapCoord(target.x, currentWorld.width);
+  const wrappedY = wrapCoord(target.y, currentWorld.height);
 
-  const tile = currentWorld.tiles[target.y * currentWorld.width + target.x];
+  const tile = currentWorld.tiles[wrappedY * currentWorld.width + wrappedX];
   if (!tile) {
     tilePopup.hidden = true;
     return;
@@ -1136,6 +1216,7 @@ worldInfoDialog?.addEventListener('close', () => {
 
 updateCalendarMeta();
 regenButton.addEventListener('click', generateAndRender);
+worldMapViewport?.addEventListener('scroll', maintainWrappedScroll, { passive: true });
 seaLevelRatioInput?.addEventListener('input', () => {
   applyRerollSettings();
   updateRerollLabels();

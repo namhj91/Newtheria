@@ -109,6 +109,21 @@ body {
   margin-top: 12px;
 }
 
+.world-map-stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.world-map-stage-controls select {
+  border: 1px solid rgba(166, 193, 255, 0.55);
+  background: rgba(16, 28, 50, 0.85);
+  color: #e6eeff;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
 .layer-button {
   border: 1px solid rgba(166, 193, 255, 0.55);
   background: rgba(16, 28, 50, 0.85);

@@ -24,6 +24,7 @@
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
   const worldBuildResult = document.getElementById('worldBuildResult');
+  const regenWorldMapButton = document.getElementById('regenButton');
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -41,6 +42,14 @@
 
     if (viewId === DIALOGUE_VIEW_ID) {
       dialogueController.ensureMounted();
+    }
+
+    if (viewId === WORLDMAP_VIEW_ID) {
+      // 월드맵 뷰가 처음엔 숨김(display:none) 상태였다가 열리므로,
+      // 진입 직후 한 번 재생성 트리거를 보내 캔버스가 항상 보이게 보정한다.
+      global.setTimeout(() => {
+        regenWorldMapButton?.click();
+      }, 30);
     }
 
   };

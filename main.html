@@ -213,7 +213,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.58(260429-월드맵테스트생성로직통합)
+    ver.0.3.59(260429-월드맵뷰재생성트리거보강)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -255,21 +255,6 @@
             월드맵 제작 시작
           </button>
           <pre id="worldBuildResult" class="world-build-result" aria-live="polite">아직 생성된 월드맵이 없습니다.</pre>
-        </section>
-      </div>
-    </section>
-
-    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
-    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
-      <header class="view__header">
-        <h2 class="view__title">월드맵 뷰</h2>
-        <span class="view__badge">World Map</span>
-      </header>
-      <div class="view__body" style="display:block; overflow:auto; text-align:left;">
-        <!-- 월드맵 테스트 창(world_map.html)에서 사용한 동일한 템플릿 구조를 메인 뷰에 재사용한다. -->
-        <section id="worldMapViewport" class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
-          <canvas id="worldMapCanvas" width="1400" height="1250"></canvas>
-          <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
         </section>
         <div class="world-map-actions">
           <button id="regenButton" type="button">맵 다시 생성</button>
@@ -321,6 +306,55 @@
       <div class="view__body">
         월드맵 제작이 완료되었습니다.<br />
         이제 탐험, 이동, 정착지 진입 루트를 이 뷰에서 표시합니다.
+      </div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body" style="display:block; overflow:auto; text-align:left;">
+        <!-- 월드맵 테스트 창(world_map.html)에서 사용한 동일한 템플릿 구조를 메인 뷰에 재사용한다. -->
+        <section id="worldMapViewport" class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
+          <canvas id="worldMapCanvas" width="1400" height="1250"></canvas>
+          <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
+        </section>
+        <div class="world-map-actions">
+          <button id="regenButton" type="button">맵 다시 생성</button>
+          <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
+        </div>
+        <p id="worldMapVersion" class="meta version"></p>
+        <p id="calendarMeta" class="meta" aria-live="polite"></p>
+        <p id="mapMeta" class="meta" aria-live="polite"></p>
+        <div hidden>
+          <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" /><span id="seaLevelRatioValue"></span>
+          <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" /><span id="elevationScaleValue"></span>
+          <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" /><span id="warpStrengthValue"></span>
+          <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" /><span id="ridgeStrengthValue"></span>
+          <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" /><span id="riverBudgetScaleValue"></span>
+          <select id="generationStageSelect"><option value="final" selected>최종 지형</option><option value="height">고도</option><option value="climate">기후</option><option value="biome">바이옴</option><option value="post">후처리</option></select>
+          <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
+          <button type="button" class="layer-button" data-layer="elevation">고도</button>
+          <button type="button" class="layer-button" data-layer="moisture">습도</button>
+          <button type="button" class="layer-button" data-layer="heat">온도</button>
+          <button type="button" class="layer-button" data-layer="scenic">절경</button>
+        </div>
+        
+        <dialog id="worldInfoDialog" class="world-info-dialog" aria-label="월드 정보">
+          <div class="world-info-dialog-inner">
+            <p class="world-info-kicker">WORLD BRIEFING</p>
+            <h2>월드 정보</h2>
+            <p class="world-info-subtitle">현재 생성된 세계의 핵심 데이터를 한눈에 확인하세요.</p>
+            <section class="world-info-grid">
+              <article class="world-info-card"><h3>지도 요약</h3><p id="mapMetaDialog" class="meta"></p></article>
+              <article class="world-info-card"><h3>달력 요약</h3><p id="calendarMetaDialog" class="meta"></p></article>
+            </section>
+            <div class="world-info-actions"><button id="metaCloseButton" type="button">닫기</button></div>
+          </div>
+        </dialog>
+
       </div>
     </section>
 

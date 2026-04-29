@@ -93,8 +93,10 @@ const LAYER_MODE = {
   TERRAIN: 'terrain',
   ELEVATION: 'elevation',
   MOISTURE: 'moisture',
-  HEAT: 'heat'
+  HEAT: 'heat',
+  SCENIC: 'scenic'
 };
+const SCENIC_TIER_COLOR = { small: '#f59e0b', medium: '#f97316', large: '#ef4444' };
 
 let activeLayer = LAYER_MODE.TERRAIN;
 let activeGenerationStage = 'final';
@@ -1021,6 +1023,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
     * HEX_CONFIG.riverBudgetScale));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
+  applyScenicCatalog(tiles, width, height);
 
   return {
     seed,
@@ -1169,6 +1172,75 @@ const getStageTileColor = (world, tileIndex) => {
   return null;
 };
 
+const SCENIC_CATALOG = {
+  small: [
+    { id: 'S1', type: '폭포', minCluster: 4, maxCluster: 12, coreTerrains: ['강'] },
+    { id: 'S2', type: '암벽', minCluster: 8, maxCluster: 20, coreTerrains: ['바위산맥', '험준한산맥'] },
+    { id: 'S3', type: '동굴', minCluster: 6, maxCluster: 16, coreTerrains: ['바위산맥', '빙원', '만년설산'] },
+    { id: 'S4', type: '협곡문', minCluster: 8, maxCluster: 18, coreTerrains: ['붉은대협곡', '바위산맥'] },
+    { id: 'S5', type: '해식절벽', minCluster: 6, maxCluster: 16, coreTerrains: ['해안', '얕은해안', '산호해안'] },
+    { id: 'S6', type: '사구능선', minCluster: 10, maxCluster: 24, coreTerrains: ['건조사막', '구릉지'] },
+    { id: 'S7', type: '밀림연못', minCluster: 10, maxCluster: 22, coreTerrains: ['열대우림', '맹그로브습지'] },
+    { id: 'S8', type: '빙식분지', minCluster: 8, maxCluster: 18, coreTerrains: ['빙원', '빙하설산', '만년설산'] }
+  ],
+  medium: [
+    { id: 'M1', type: '폭포군', minCluster: 10, maxCluster: 24, coreTerrains: ['강', '험준한산맥', '바위산맥'] },
+    { id: 'M2', type: '암벽지대', minCluster: 16, maxCluster: 34, coreTerrains: ['험준한산맥', '바위산맥'] },
+    { id: 'M3', type: '동굴군', minCluster: 14, maxCluster: 28, coreTerrains: ['바위산맥', '빙원', '만년설산'] },
+    { id: 'M4', type: '산호만', minCluster: 18, maxCluster: 42, coreTerrains: ['산호해안', '얕은해안', '해안'] },
+    { id: 'M5', type: '운무분지', minCluster: 14, maxCluster: 30, coreTerrains: ['고산운무림', '운무고원림'] },
+    { id: 'M6', type: '오아시스권', minCluster: 20, maxCluster: 42, coreTerrains: ['건조사막', '사막오아시스'] }
+  ],
+  large: [
+    { id: 'L1', type: '대산맥', minCluster: 30, maxCluster: 1000, coreTerrains: ['험준한산맥', '바위산맥', '만년설산'] },
+    { id: 'L2', type: '대협곡', minCluster: 24, maxCluster: 1000, coreTerrains: ['붉은대협곡', '화산지대', '붉은고원'] },
+    { id: 'L3', type: '대호수', minCluster: 40, maxCluster: 180, coreTerrains: ['호수'] },
+    { id: 'L4', type: '빙하장벽', minCluster: 22, maxCluster: 1000, coreTerrains: ['빙하설산', '만년설산', '빙원'] }
+  ]
+};
+
+const applyScenicCatalog = (tiles, width, height) => {
+  tiles.forEach((tile) => { tile.scenic = null; });
+  const visitConnected = (x, y, terrainSet, visited) => {
+    const stack = [[x, y]];
+    const group = [];
+    visited.add(`${x},${y}`);
+    while (stack.length) {
+      const [cx, cy] = stack.pop();
+      const tile = tiles[cy * width + cx];
+      if (!tile || !terrainSet.has(tile.terrainType)) continue;
+      group.push(tile);
+      for (const [nx, ny] of getNeighbors(cx, cy, width, height)) {
+        const key = `${nx},${ny}`;
+        if (visited.has(key)) continue;
+        const next = tiles[ny * width + nx];
+        if (!next || !terrainSet.has(next.terrainType)) continue;
+        visited.add(key);
+        stack.push([nx, ny]);
+      }
+    }
+    return group;
+  };
+  Object.entries(SCENIC_CATALOG).forEach(([tier, defs]) => {
+    defs.forEach((def) => {
+      const terrainSet = new Set(def.coreTerrains);
+      const visited = new Set();
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const key = `${x},${y}`;
+          const tile = tiles[y * width + x];
+          if (visited.has(key) || !tile || !terrainSet.has(tile.terrainType)) continue;
+          const group = visitConnected(x, y, terrainSet, visited);
+          if (group.length < def.minCluster || group.length > def.maxCluster) continue;
+          group.forEach((item) => {
+            if (!item.scenic) item.scenic = { id: def.id, type: def.type, tier };
+          });
+        }
+      }
+    });
+  });
+};
+
 const renderWorld = (world) => {
   const { tiles, seed, width, height, riverBudget } = world;
 
@@ -1214,6 +1286,13 @@ const renderWorld = (world) => {
       const stageColor = getStageTileColor(world, tileIndex);
       ctx.fillStyle = stageColor || getTileColorByLayer(tile, activeLayer);
       ctx.fill();
+      if (activeLayer === LAYER_MODE.SCENIC && tile.scenic) {
+        // 내부 인셋 선을 사용해 경계선이 이웃 타일을 침범하지 않게 그린다.
+        drawHexPath(screenX, screenY, radius * 0.78);
+        ctx.lineWidth = Math.max(1, radius * 0.2);
+        ctx.strokeStyle = SCENIC_TIER_COLOR[tile.scenic.tier] || '#ffffff';
+        ctx.stroke();
+      }
     }
   }
 
@@ -1227,11 +1306,13 @@ const renderWorld = (world) => {
     .reduce((sum, [, count]) => sum + count, 0);
 
   const riverCount = terrainStat.강 || 0;
+  const scenicCount = tiles.filter((tile) => tile.scenic).length;
   mapMeta.textContent = [
     `시드 · ${seed}`,
     `헥스 크기 · ${width}x${height} (${tiles.length.toLocaleString()} 타일)`,
     `지형 분포 · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`,
     `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`,
+    `절경 타일 · ${scenicCount.toLocaleString()}`,
     `생성 단계 보기 · ${activeGenerationStage}`
   ].join('\n');
 };

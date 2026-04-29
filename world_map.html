@@ -45,6 +45,16 @@
           <span id="riverBudgetScaleValue">1.00x</span>
         </label>
       </form>
+      <div class="world-map-stage-controls" role="group" aria-label="월드 생성 단계 보기">
+        <label for="generationStageSelect">생성 단계</label>
+        <select id="generationStageSelect">
+          <option value="final" selected>최종 지형</option>
+          <option value="height">1단계 · 고도 필드</option>
+          <option value="climate">2단계 · 기후 필드</option>
+          <option value="biome">3단계 · 바이옴 분류</option>
+          <option value="post">4단계 · 후처리(랜드마크 전)</option>
+        </select>
+      </div>
       <div class="world-map-layer-controls" role="group" aria-label="기후 레이어 선택">
         <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
         <button type="button" class="layer-button" data-layer="elevation">고도</button>

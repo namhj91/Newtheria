@@ -233,7 +233,8 @@
 
       this.instance = global.NewtheriaDialogueTemplate.createDialogueTemplate({
         mount,
-        csvUrl: './assets/data/dialogue_sample.asdf',
+        // 메인 게임 프롤로그는 전용 데이터셋(dialogue_main.asdf)을 사용한다.
+        csvUrl: './assets/data/dialogue_main.asdf',
         eventId: DIALOGUE_ENTRY.eventId,
         sceneId: DIALOGUE_ENTRY.sceneId,
         anchor: DIALOGUE_ENTRY.anchor,

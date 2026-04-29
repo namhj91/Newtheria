@@ -3,6 +3,7 @@
 
   const DIALOGUE_VIEW_ID = 'view-dialogue';
   const DEFAULT_VIEW_ID = 'view-default';
+  const WORLDBUILD_VIEW_ID = 'view-worldbuild';
   const WORLDMAP_VIEW_ID = 'view-worldmap';
   const DIALOGUE_MOUNT_ID = 'dialogueMount';
   const STORAGE_KEYS = Object.freeze({
@@ -22,6 +23,35 @@
   const worldBuildStatus = document.getElementById('worldBuildStatus');
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
+  const worldBuildResult = document.getElementById('worldBuildResult');
+  const regenWorldMapButton = document.getElementById('regenButton');
+  const worldMapCanvas = document.getElementById('worldMapCanvas');
+  const SESSION_KEYS = Object.freeze({
+    worldMapSnapshot: 'newtheria.session.worldMapSnapshot'
+  });
+
+  const drawSnapshotToCanvas = (dataUrl) => {
+    if (!worldMapCanvas || !dataUrl) return;
+    const ctx = worldMapCanvas.getContext('2d');
+    if (!ctx) return;
+    const image = new Image();
+    image.onload = () => {
+      ctx.clearRect(0, 0, worldMapCanvas.width, worldMapCanvas.height);
+      ctx.drawImage(image, 0, 0, worldMapCanvas.width, worldMapCanvas.height);
+    };
+    image.src = dataUrl;
+  };
+
+  const cacheCurrentWorldMapSnapshot = () => {
+    if (!worldMapCanvas) return;
+    try {
+      const snapshot = worldMapCanvas.toDataURL('image/png');
+      global.sessionStorage?.setItem(SESSION_KEYS.worldMapSnapshot, snapshot);
+    } catch (error) {
+      console.warn('[MainViewRouter] 월드맵 스냅샷 캐시에 실패했습니다.', error);
+    }
+  };
+
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -40,14 +70,29 @@
     if (viewId === DIALOGUE_VIEW_ID) {
       dialogueController.ensureMounted();
     }
+
+    if (viewId === WORLDMAP_VIEW_ID) {
+      const cachedSnapshot = global.sessionStorage?.getItem(SESSION_KEYS.worldMapSnapshot) || '';
+      if (cachedSnapshot) {
+        // 새로 만들기 전까지는 세션 스냅샷을 재사용한다.
+        drawSnapshotToCanvas(cachedSnapshot);
+        return;
+      }
+
+      // 세션 캐시가 없을 때만 실제 월드맵 재생성을 트리거한다.
+      global.setTimeout(() => {
+        regenWorldMapButton?.click();
+        global.setTimeout(cacheCurrentWorldMapSnapshot, 360);
+      }, 30);
+    }
+
   };
 
   // 대화창을 닫을 때는 기본 뷰로 복귀한다.
   const closeDialogueView = () => {
     // 다음 진입 시 이전 포인터/trace가 남지 않도록 상태를 가볍게 초기화한다.
     dialogueController.resetProgress();
-    activateView(WORLDMAP_VIEW_ID);
-    queueWorldBuildSequence();
+    activateView(WORLDBUILD_VIEW_ID);
   };
 
   const clearWorldBuildTimer = () => {
@@ -67,6 +112,11 @@
     target.dataset.state = state;
   };
 
+  const renderWorldBuildResult = (summaryText) => {
+    if (!worldBuildResult) return;
+    worldBuildResult.textContent = summaryText || '아직 생성된 월드맵이 없습니다.';
+  };
+
   const queueWorldBuildSequence = () => {
     if (!worldBuildSteps.length || worldBuildStarted) return;
     worldBuildStarted = true;
@@ -78,8 +128,19 @@
 
     const runAt = (index) => {
       if (index >= worldBuildSteps.length) {
-        setWorldBuildStatus('월드맵 제작 완료. 탐험 준비가 끝났습니다.');
+        // 실제 맵 생성/렌더링은 월드맵 테스트 창에서 검증한 world_map.js 로직을 그대로 사용한다.
+        // 여기서는 제작 단계 완료만 처리하고, 월드맵 뷰로 전환해 해당 로직이 렌더링하도록 연결한다.
+        try {
+          global.sessionStorage?.removeItem(SESSION_KEYS.worldMapSnapshot);
+        } catch (error) {
+          console.warn('[MainViewRouter] 월드맵 세션 캐시 초기화에 실패했습니다.', error);
+        }
+        renderWorldBuildResult('월드맵 생성 파이프라인 완료: world_map.js 렌더러를 사용합니다.');
+        setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰를 엽니다.');
         clearWorldBuildTimer();
+        global.setTimeout(() => {
+          activateView(WORLDMAP_VIEW_ID);
+        }, 420);
         return;
       }
       markWorldBuildStep(index, 'running');
@@ -248,6 +309,9 @@
     };
     activateView(DEFAULT_VIEW_ID);
   }
+
+  // 새 진입마다 제작 결과를 화면에서만 보여준다. (영속 저장 없음)
+  renderWorldBuildResult('');
 
   startWorldBuildButton?.addEventListener('click', () => {
     queueWorldBuildSequence();

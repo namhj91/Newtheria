@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./assets/css/dialogue_template.css" />
   <!-- 카드형 선택지 렌더에 필요한 공용 카드 템플릿 스타일 -->
   <link rel="stylesheet" href="./assets/css/card_templates.css" />
+  <link rel="stylesheet" href="./assets/css/world_map.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -184,6 +185,19 @@
       color: #98f5bf;
     }
 
+
+
+    .world-build-result {
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(4, 8, 22, 0.55);
+      color: #d6e4ff;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
     .world-build-sequence__action {
       justify-self: start;
       border: 1px solid var(--accent);
@@ -194,12 +208,75 @@
       font-weight: 700;
       cursor: pointer;
     }
+
+    
+    .worldmap-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 12px;
+      align-items: start;
+      justify-items: start;
+      width: 100%;
+      height: min(calc(100vh - 230px), 980px);
+      margin: 0;
+    }
+
+    .worldmap-square-wrap {
+      width: min(100%, calc(100vh - 230px));
+      aspect-ratio: 1 / 1;
+      max-width: 100%;
+      max-height: 100%;
+      justify-self: start;
+    }
+
+    .worldmap-square-wrap .world-map-viewport {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    .worldmap-side-reserved {
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      min-height: 180px;
+      padding: 12px;
+      color: var(--muted);
+      width: 100%;
+    }
+
+    /* 월드맵 뷰에서는 스크롤 없이 최대한 크게 보이도록 여백/오버플로를 제한한다. */
+    #view-worldmap {
+      padding: 12px 12px 10px;
+    }
+
+    #view-worldmap .view__body {
+      overflow: hidden;
+      padding: 8px;
+    }
+
+    /* 월드맵 메타 텍스트는 숨겨 스크롤을 유발하지 않게 한다. */
+    .worldmap-meta-hidden {
+      display: none;
+    }
+
+    @media (max-width: 1024px) {
+      .worldmap-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .worldmap-square-wrap {
+        width: min(100%, calc(100vw - 44px));
+        max-height: none;
+      }
+    }
+
   </style>
 </head>
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.53(260429-여정빌더월드맵제작뷰구축)
+    ver.0.3.63(260429-메인대사데이터분리)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -220,11 +297,11 @@
       <div id="dialogueMount" aria-label="대화 템플릿 마운트"></div>
     </section>
 
-    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
-    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+    <!-- 월드맵 제작 뷰: 프롤로그 이후 실제 월드맵 생성 파이프라인 -->
+    <section id="view-worldbuild" class="view" data-active="false" aria-label="월드맵 제작 뷰">
       <header class="view__header">
-        <h2 class="view__title">월드맵 뷰</h2>
-        <span class="view__badge">World Map</span>
+        <h2 class="view__title">월드맵 제작 뷰</h2>
+        <span class="view__badge">World Build</span>
       </header>
       <div class="view__body">
         <section class="world-build-sequence" aria-label="월드맵 제작 시퀀스">
@@ -240,8 +317,70 @@
           <button id="startWorldBuildButton" class="world-build-sequence__action" type="button">
             월드맵 제작 시작
           </button>
+          <pre id="worldBuildResult" class="world-build-result" aria-live="polite">아직 생성된 월드맵이 없습니다.</pre>
         </section>
       </div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body" style="display:block; overflow:auto; text-align:left;">
+        <!--
+          월드맵 표시 영역은 정사각형으로 유지하고,
+          우측은 추후 버튼/패널 UI를 위한 예약 공간으로 남겨둔다.
+        -->
+        <section class="worldmap-layout" aria-label="월드맵 레이아웃">
+          <div class="worldmap-square-wrap">
+            <section id="worldMapViewport" class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
+              <canvas id="worldMapCanvas" width="1250" height="1250"></canvas>
+              <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
+            </section>
+          </div>
+          <aside class="worldmap-side-reserved" aria-label="월드맵 우측 예약 UI 영역">
+            우측 UI 예약 영역<br />
+            (추후 버튼, 필터, 정보 패널 배치)
+          </aside>
+        </section>
+
+        <!-- 월드맵 메타 표시는 유지하되, 뷰에서는 액션 버튼을 숨긴다. -->
+        <p id="worldMapVersion" class="meta version worldmap-meta-hidden"></p>
+        <p id="calendarMeta" class="meta worldmap-meta-hidden" aria-live="polite"></p>
+        <p id="mapMeta" class="meta worldmap-meta-hidden" aria-live="polite"></p>
+
+        <!-- world_map.js 부트 조건 충족용 요소(뷰에서는 숨김 처리). -->
+        <div hidden>
+          <button id="regenButton" type="button">맵 다시 생성</button>
+          <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
+          <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" /><span id="seaLevelRatioValue"></span>
+          <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" /><span id="elevationScaleValue"></span>
+          <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" /><span id="warpStrengthValue"></span>
+          <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" /><span id="ridgeStrengthValue"></span>
+          <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" /><span id="riverBudgetScaleValue"></span>
+          <select id="generationStageSelect"><option value="final" selected>최종 지형</option><option value="height">고도</option><option value="climate">기후</option><option value="biome">바이옴</option><option value="post">후처리</option></select>
+          <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
+          <button type="button" class="layer-button" data-layer="elevation">고도</button>
+          <button type="button" class="layer-button" data-layer="moisture">습도</button>
+          <button type="button" class="layer-button" data-layer="heat">온도</button>
+          <button type="button" class="layer-button" data-layer="scenic">절경</button>
+        </div>
+
+        <dialog id="worldInfoDialog" class="world-info-dialog" aria-label="월드 정보">
+          <div class="world-info-dialog-inner">
+            <p class="world-info-kicker">WORLD BRIEFING</p>
+            <h2>월드 정보</h2>
+            <p class="world-info-subtitle">현재 생성된 세계의 핵심 데이터를 한눈에 확인하세요.</p>
+            <section class="world-info-grid">
+              <article class="world-info-card"><h3>지도 요약</h3><p id="mapMetaDialog" class="meta"></p></article>
+              <article class="world-info-card"><h3>달력 요약</h3><p id="calendarMetaDialog" class="meta"></p></article>
+            </section>
+            <div class="world-info-actions"><button id="metaCloseButton" type="button">닫기</button></div>
+          </div>
+        </dialog>
+      </div></div>
     </section>
 
     <!-- 전투창 뷰: 턴 기반/실시간 전투 UI 공통 베이스 -->
@@ -259,6 +398,7 @@
     <nav class="dev-nav" aria-label="개발용 뷰 전환">
       <button type="button" data-view="view-default">기본</button>
       <button type="button" data-view="view-dialogue">대화</button>
+      <button type="button" data-view="view-worldbuild">맵제작</button>
       <button type="button" data-view="view-worldmap">월드맵</button>
       <button type="button" data-view="view-battle">전투</button>
     </nav>
@@ -268,5 +408,7 @@
   <script src="./assets/js/game_state_store.js"></script>
   <script src="./assets/js/dialogue_template.js"></script>
   <script src="./assets/js/main_view_router.js"></script>
+  <script src="./assets/js/calendar.js"></script>
+  <script src="./assets/js/world_map.js"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
 
   const DIALOGUE_VIEW_ID = 'view-dialogue';
   const DEFAULT_VIEW_ID = 'view-default';
+  const WORLDBUILD_VIEW_ID = 'view-worldbuild';
   const WORLDMAP_VIEW_ID = 'view-worldmap';
   const DIALOGUE_MOUNT_ID = 'dialogueMount';
   const STORAGE_KEYS = Object.freeze({
@@ -22,6 +23,14 @@
   const worldBuildStatus = document.getElementById('worldBuildStatus');
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
+  const worldBuildResult = document.getElementById('worldBuildResult');
+  const regenWorldMapButton = document.getElementById('regenButton');
+  const SESSION_KEYS = Object.freeze({
+    worldMapCamera: 'newtheria.session.worldMapCamera'
+  });
+
+  let activeViewId = '';
+
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -32,6 +41,18 @@
 
   // 지정한 id의 뷰만 활성화하고 나머지는 비활성화한다.
   const activateView = (viewId) => {
+    // 월드맵에서 다른 뷰로 나갈 때 현재 카메라 상태를 세션에 저장한다.
+    if (activeViewId === WORLDMAP_VIEW_ID && viewId !== WORLDMAP_VIEW_ID) {
+      try {
+        const cameraState = global.NewtheriaWorldMapRuntime?.getCameraState?.();
+        if (cameraState) {
+          global.sessionStorage?.setItem(SESSION_KEYS.worldMapCamera, JSON.stringify(cameraState));
+        }
+      } catch (error) {
+        console.warn('[MainViewRouter] 월드맵 카메라 상태 저장에 실패했습니다.', error);
+      }
+    }
+
     views.forEach((view) => {
       const isActive = view.id === viewId;
       view.dataset.active = isActive ? 'true' : 'false';
@@ -40,14 +61,37 @@
     if (viewId === DIALOGUE_VIEW_ID) {
       dialogueController.ensureMounted();
     }
+
+    if (viewId === WORLDMAP_VIEW_ID) {
+      const shouldRegen = Boolean(global.__NEWTHERIA_FORCE_REGEN_WORLD_MAP__);
+      if (shouldRegen) {
+        global.__NEWTHERIA_FORCE_REGEN_WORLD_MAP__ = false;
+        global.setTimeout(() => {
+          regenWorldMapButton?.click();
+        }, 30);
+      }
+
+      try {
+        const saved = global.sessionStorage?.getItem(SESSION_KEYS.worldMapCamera);
+        if (saved) {
+          const cameraState = JSON.parse(saved);
+          global.NewtheriaWorldMapRuntime?.setCameraState?.(cameraState);
+        } else {
+          global.NewtheriaWorldMapRuntime?.rerender?.();
+        }
+      } catch (error) {
+        console.warn('[MainViewRouter] 월드맵 카메라 상태 복원에 실패했습니다.', error);
+      }
+    }
+
+    activeViewId = viewId;
   };
 
   // 대화창을 닫을 때는 기본 뷰로 복귀한다.
   const closeDialogueView = () => {
     // 다음 진입 시 이전 포인터/trace가 남지 않도록 상태를 가볍게 초기화한다.
     dialogueController.resetProgress();
-    activateView(WORLDMAP_VIEW_ID);
-    queueWorldBuildSequence();
+    activateView(WORLDBUILD_VIEW_ID);
   };
 
   const clearWorldBuildTimer = () => {
@@ -67,6 +111,11 @@
     target.dataset.state = state;
   };
 
+  const renderWorldBuildResult = (summaryText) => {
+    if (!worldBuildResult) return;
+    worldBuildResult.textContent = summaryText || '아직 생성된 월드맵이 없습니다.';
+  };
+
   const queueWorldBuildSequence = () => {
     if (!worldBuildSteps.length || worldBuildStarted) return;
     worldBuildStarted = true;
@@ -78,8 +127,16 @@
 
     const runAt = (index) => {
       if (index >= worldBuildSteps.length) {
-        setWorldBuildStatus('월드맵 제작 완료. 탐험 준비가 끝났습니다.');
+        // 실제 맵 생성/렌더링은 월드맵 테스트 창에서 검증한 world_map.js 로직을 그대로 사용한다.
+        // 여기서는 제작 단계 완료만 처리하고, 월드맵 뷰로 전환해 해당 로직이 렌더링하도록 연결한다.
+        // 월드맵 제작을 다시 수행했다면, 다음 월드맵 진입에서 1회 재생성한다.
+        global.__NEWTHERIA_FORCE_REGEN_WORLD_MAP__ = true;
+        renderWorldBuildResult('월드맵 생성 파이프라인 완료: world_map.js 렌더러를 사용합니다.');
+        setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰를 엽니다.');
         clearWorldBuildTimer();
+        global.setTimeout(() => {
+          activateView(WORLDMAP_VIEW_ID);
+        }, 420);
         return;
       }
       markWorldBuildStep(index, 'running');
@@ -176,7 +233,8 @@
 
       this.instance = global.NewtheriaDialogueTemplate.createDialogueTemplate({
         mount,
-        csvUrl: './assets/data/dialogue_sample.asdf',
+        // 메인 게임 프롤로그는 전용 데이터셋(dialogue_main.asdf)을 사용한다.
+        csvUrl: './assets/data/dialogue_main.asdf',
         eventId: DIALOGUE_ENTRY.eventId,
         sceneId: DIALOGUE_ENTRY.sceneId,
         anchor: DIALOGUE_ENTRY.anchor,
@@ -248,6 +306,9 @@
     };
     activateView(DEFAULT_VIEW_ID);
   }
+
+  // 새 진입마다 제작 결과를 화면에서만 보여준다. (영속 저장 없음)
+  renderWorldBuildResult('');
 
   startWorldBuildButton?.addEventListener('click', () => {
     queueWorldBuildSequence();

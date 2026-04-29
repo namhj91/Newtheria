@@ -8,6 +8,7 @@ const worldSeedInput = document.getElementById('worldSeedInput');
 const worldToneSelect = document.getElementById('worldToneSelect');
 const worldGenerateBtn = document.getElementById('worldGenerateBtn');
 const worldSummary = document.getElementById('worldSummary');
+const worldMapPreview = document.getElementById('worldMapPreview');
 const historySimulateBtn = document.getElementById('historySimulateBtn');
 const historyTimeline = document.getElementById('historyTimeline');
 const characterNameInput = document.getElementById('characterNameInput');
@@ -20,6 +21,7 @@ const journeyResult = document.getElementById('journeyResult');
 const state = {
   currentStep: 1,
   world: null,
+  worldTiles: [],
   history: [],
   character: null
 };
@@ -55,6 +57,62 @@ const runPrologue = () => {
   setStep(2);
 };
 
+
+
+// 월드맵 미리보기 렌더러
+// - 임베드/라우팅 없이 이 뷰 안에서 생성 결과를 즉시 확인한다.
+// - 육각형(odd-r 오프셋) 타일을 간단 색상 규칙으로 렌더해 생성 단계를 가시화한다.
+const renderWorldMapPreview = () => {
+  if (!worldMapPreview || !state.world || state.worldTiles.length === 0) return;
+
+  const ctx = worldMapPreview.getContext('2d');
+  if (!ctx) return;
+
+  const canvasWidth = worldMapPreview.width;
+  const canvasHeight = worldMapPreview.height;
+  const cols = state.world.cols;
+  const rows = state.world.rows;
+  const size = Math.min(canvasWidth / (cols * 1.75), canvasHeight / (rows * 1.4));
+  const hexWidth = size * Math.sqrt(3);
+  const hexHeight = size * 2;
+
+  const colors = {
+    ocean: '#2563eb',
+    coast: '#38bdf8',
+    plains: '#84cc16',
+    forest: '#22c55e',
+    mountain: '#a1a1aa'
+  };
+
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  const drawHex = (centerX, centerY, radius, fillStyle) => {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI / 180) * (60 * i - 30);
+      const px = centerX + radius * Math.cos(angle);
+      const py = centerY + radius * Math.sin(angle);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  };
+
+  state.worldTiles.forEach((tile) => {
+    const offsetX = tile.row % 2 ? hexWidth / 2 : 0;
+    const x = 24 + tile.col * hexWidth + offsetX;
+    const y = 24 + tile.row * (hexHeight * 0.75);
+    drawHex(x, y, size - 1.2, colors[tile.terrain] || '#475569');
+  });
+};
+
 const generateWorld = () => {
   const worldName = worldNameInput.value.trim() || '이름 없는 신생 대륙';
   const fallbackSeed = Math.floor(Date.now() % 999999) + 1;
@@ -62,18 +120,41 @@ const generateWorld = () => {
   const tone = worldToneSelect.value;
   const random = createSeededRandom(seed);
 
+  // 월드맵 제작 뷰 전용 해상도(헥스 그리드)
+  const cols = 24;
+  const rows = 14;
+
   const temperature = Math.floor(20 + random() * 35);
   const danger = Math.floor(25 + random() * 70);
   const manaDensity = Math.floor(15 + random() * 80);
 
-  state.world = { worldName, seed, tone, temperature, danger, manaDensity };
+  state.world = { worldName, seed, tone, temperature, danger, manaDensity, cols, rows };
+
+  // 실제 월드맵 제네레이션 단계
+  // 1) 고도 노이즈 생성 → 2) 대륙 성향별 임계치 보정 → 3) 타일 지형 결정
+  const toneBias = tone === 'wild' ? 0.06 : tone === 'arcane' ? -0.04 : 0;
+  state.worldTiles = Array.from({ length: rows * cols }, (_, index) => {
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const elevation = random() + toneBias + (random() - 0.5) * 0.24;
+
+    let terrain = 'ocean';
+    if (elevation > 0.74) terrain = 'mountain';
+    else if (elevation > 0.58) terrain = 'forest';
+    else if (elevation > 0.45) terrain = 'plains';
+    else if (elevation > 0.38) terrain = 'coast';
+
+    return { col, row, elevation, terrain };
+  });
 
   worldSummary.innerHTML = `
-    <p><strong>${worldName}</strong> 생성 완료</p>
+    <p><strong>${worldName}</strong> 월드맵 제작 완료</p>
     <p>시드: ${seed} / 대륙 성향: ${tone}</p>
     <p>평균 기온: ${temperature}°C · 위험도: ${danger} · 마력 농도: ${manaDensity}</p>
+    <p>헥스 크기: ${cols} × ${rows} (${cols * rows} 타일)</p>
   `;
 
+  renderWorldMapPreview();
   setStep(3);
 };
 

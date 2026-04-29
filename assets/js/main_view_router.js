@@ -25,6 +25,33 @@
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
   const worldBuildResult = document.getElementById('worldBuildResult');
   const regenWorldMapButton = document.getElementById('regenButton');
+  const worldMapCanvas = document.getElementById('worldMapCanvas');
+  const SESSION_KEYS = Object.freeze({
+    worldMapSnapshot: 'newtheria.session.worldMapSnapshot'
+  });
+
+  const drawSnapshotToCanvas = (dataUrl) => {
+    if (!worldMapCanvas || !dataUrl) return;
+    const ctx = worldMapCanvas.getContext('2d');
+    if (!ctx) return;
+    const image = new Image();
+    image.onload = () => {
+      ctx.clearRect(0, 0, worldMapCanvas.width, worldMapCanvas.height);
+      ctx.drawImage(image, 0, 0, worldMapCanvas.width, worldMapCanvas.height);
+    };
+    image.src = dataUrl;
+  };
+
+  const cacheCurrentWorldMapSnapshot = () => {
+    if (!worldMapCanvas) return;
+    try {
+      const snapshot = worldMapCanvas.toDataURL('image/png');
+      global.sessionStorage?.setItem(SESSION_KEYS.worldMapSnapshot, snapshot);
+    } catch (error) {
+      console.warn('[MainViewRouter] 월드맵 스냅샷 캐시에 실패했습니다.', error);
+    }
+  };
+
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -45,10 +72,17 @@
     }
 
     if (viewId === WORLDMAP_VIEW_ID) {
-      // 월드맵 뷰가 처음엔 숨김(display:none) 상태였다가 열리므로,
-      // 진입 직후 한 번 재생성 트리거를 보내 캔버스가 항상 보이게 보정한다.
+      const cachedSnapshot = global.sessionStorage?.getItem(SESSION_KEYS.worldMapSnapshot) || '';
+      if (cachedSnapshot) {
+        // 새로 만들기 전까지는 세션 스냅샷을 재사용한다.
+        drawSnapshotToCanvas(cachedSnapshot);
+        return;
+      }
+
+      // 세션 캐시가 없을 때만 실제 월드맵 재생성을 트리거한다.
       global.setTimeout(() => {
         regenWorldMapButton?.click();
+        global.setTimeout(cacheCurrentWorldMapSnapshot, 360);
       }, 30);
     }
 
@@ -96,6 +130,11 @@
       if (index >= worldBuildSteps.length) {
         // 실제 맵 생성/렌더링은 월드맵 테스트 창에서 검증한 world_map.js 로직을 그대로 사용한다.
         // 여기서는 제작 단계 완료만 처리하고, 월드맵 뷰로 전환해 해당 로직이 렌더링하도록 연결한다.
+        try {
+          global.sessionStorage?.removeItem(SESSION_KEYS.worldMapSnapshot);
+        } catch (error) {
+          console.warn('[MainViewRouter] 월드맵 세션 캐시 초기화에 실패했습니다.', error);
+        }
         renderWorldBuildResult('월드맵 생성 파이프라인 완료: world_map.js 렌더러를 사용합니다.');
         setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰를 엽니다.');
         clearWorldBuildTimer();

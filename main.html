@@ -294,6 +294,36 @@
       </div>
     </section>
 
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body" style="place-items:stretch; text-align:left;">
+        <!--
+          임베드/외부 라우팅 없이 메인 뷰 내부에서 직접 월드맵을 렌더링한다.
+          월드맵 제작 완료 시 main_view_router가 아래 캔버스에 타일을 그린다.
+        -->
+        <section class="worldmap-runtime" aria-label="월드맵 실시간 렌더 영역">
+          <p id="worldMapRuntimeMeta" class="world-build-sequence__status">아직 렌더링된 월드맵이 없습니다.</p>
+          <canvas id="worldMapRuntimeCanvas" width="1080" height="620" style="width:100%;height:100%;min-height:420px;border:1px solid var(--line);border-radius:12px;background:#0a0f1f;"></canvas>
+        </section>
+      </div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body">
+        월드맵 제작이 완료되었습니다.<br />
+        이제 탐험, 이동, 정착지 진입 루트를 이 뷰에서 표시합니다.
+      </div>
+    </section>
+
     <!-- 전투창 뷰: 턴 기반/실시간 전투 UI 공통 베이스 -->
     <section id="view-battle" class="view" data-active="false" aria-label="전투창 뷰">
       <header class="view__header">

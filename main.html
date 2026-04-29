@@ -149,80 +149,6 @@
       border-color: var(--accent);
       color: var(--accent);
     }
-    .dev-nav.dev-nav--embedded {
-      position: static;
-      right: auto;
-      bottom: auto;
-      z-index: auto;
-    }
-
-    /* DEBUGMODE=on 전용 플로팅 디버그 메뉴 */
-    .debug-float {
-      position: fixed;
-      right: 12px;
-      bottom: 12px;
-      z-index: 240;
-      user-select: none;
-      touch-action: none;
-    }
-    .debug-float__fab {
-      width: 48px;
-      height: 48px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(26, 31, 52, 0.94);
-      color: #eaf7ff;
-      font-size: 1.2rem;
-      cursor: pointer;
-    }
-    .debug-float__panel {
-      display: none;
-      width: min(92vw, 340px);
-      margin-top: 8px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(7, 12, 26, 0.95);
-      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
-      padding: 10px;
-      gap: 10px;
-    }
-    .debug-float[data-state="expanded"] .debug-float__panel {
-      display: grid;
-    }
-    .debug-float__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: move;
-      padding: 4px 2px;
-      color: #d4ebff;
-    }
-    .debug-float__collapse {
-      border: 0;
-      border-radius: 8px;
-      background: rgba(44, 57, 92, 0.9);
-      color: #dff1ff;
-      width: 28px;
-      height: 28px;
-      cursor: pointer;
-    }
-    .debug-float__tabs {
-      display: flex;
-      gap: 6px;
-    }
-    .debug-float__tab {
-      border: 1px solid var(--line);
-      background: rgba(29, 35, 58, 0.82);
-      color: #d8e5ff;
-      border-radius: 8px;
-      min-height: 28px;
-      padding: 0 8px;
-      cursor: pointer;
-    }
-    .debug-float__tab.is-active {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
 
     /* 월드맵 제작 시퀀스 패널 */
     .world-build-sequence {
@@ -350,7 +276,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.65(260429-debug플로팅메뉴뷰포인트탭)
+    ver.0.3.64(260429-점프이벤트스코프강제)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">

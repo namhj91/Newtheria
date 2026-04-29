@@ -186,72 +186,7 @@
     const params = new URLSearchParams(global.location?.search || '');
     const entry = cleanText(params.get('entry'), 'new').toLowerCase();
     const slotId = cleanText(params.get('slot'));
-    const debugMode = cleanText(params.get('DEBUGMODE')).toLowerCase() === 'on';
-    return { entry, slotId, debugMode };
-  };
-
-  // DEBUGMODE=on일 때만 플로팅 디버그 메뉴를 주입한다.
-  const mountDebugFloatingMenu = () => {
-    const host = document.createElement('aside');
-    host.className = 'debug-float';
-    host.dataset.state = 'collapsed';
-    host.setAttribute('aria-label', '디버그 플로팅 메뉴');
-
-    host.innerHTML = `
-      <button type="button" class="debug-float__fab" aria-expanded="false" aria-label="디버그 메뉴 열기">⚙️</button>
-      <section class="debug-float__panel" aria-hidden="true">
-        <header class="debug-float__header">
-          <strong>DEBUG MENU</strong>
-          <button type="button" class="debug-float__collapse" aria-label="디버그 메뉴 닫기">—</button>
-        </header>
-        <div class="debug-float__tabs" role="tablist" aria-label="디버그 탭">
-          <button type="button" class="debug-float__tab is-active" role="tab" data-tab="viewport">뷰포인트</button>
-        </div>
-        <div class="debug-float__content">
-          <section class="debug-float__tab-panel is-active" data-panel="viewport"></section>
-        </div>
-      </section>
-    `;
-    document.body.appendChild(host);
-
-    const fab = host.querySelector('.debug-float__fab');
-    const panel = host.querySelector('.debug-float__panel');
-    const collapseButton = host.querySelector('.debug-float__collapse');
-    const viewportPanel = host.querySelector('[data-panel="viewport"]');
-    if (viewportPanel && nav) viewportPanel.appendChild(nav);
-    nav.classList.add('dev-nav--embedded');
-
-    const setExpanded = (expanded) => {
-      host.dataset.state = expanded ? 'expanded' : 'collapsed';
-      fab?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      panel?.setAttribute('aria-hidden', expanded ? 'false' : 'true');
-    };
-    fab?.addEventListener('click', () => setExpanded(host.dataset.state !== 'expanded'));
-    collapseButton?.addEventListener('click', () => setExpanded(false));
-
-    const dragTarget = host;
-    const dragHandle = host.querySelector('.debug-float__header');
-    let dragState = null;
-    const beginDrag = (pointerId, clientX, clientY) => {
-      const rect = dragTarget.getBoundingClientRect();
-      dragState = { pointerId, offsetX: clientX - rect.left, offsetY: clientY - rect.top };
-      dragHandle?.setPointerCapture?.(pointerId);
-    };
-    const moveDrag = (clientX, clientY) => {
-      if (!dragState) return;
-      const maxLeft = Math.max(8, window.innerWidth - dragTarget.offsetWidth - 8);
-      const maxTop = Math.max(8, window.innerHeight - dragTarget.offsetHeight - 8);
-      const nextLeft = Math.min(maxLeft, Math.max(8, clientX - dragState.offsetX));
-      const nextTop = Math.min(maxTop, Math.max(8, clientY - dragState.offsetY));
-      dragTarget.style.left = `${nextLeft}px`;
-      dragTarget.style.top = `${nextTop}px`;
-      dragTarget.style.right = 'auto';
-      dragTarget.style.bottom = 'auto';
-    };
-    dragHandle?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY));
-    dragHandle?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
-    dragHandle?.addEventListener('pointerup', () => { dragState = null; });
-    dragHandle?.addEventListener('pointercancel', () => { dragState = null; });
+    return { entry, slotId };
   };
 
   const loadSaveSlotContext = (requestedSlotId = '') => {
@@ -342,9 +277,6 @@
   });
 
   const entryContext = parseEntryContext();
-  if (entryContext.debugMode) {
-    mountDebugFloatingMenu();
-  }
   const shouldStartWithPrologue = entryContext.entry !== 'load';
 
   if (shouldStartWithPrologue) {

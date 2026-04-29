@@ -3,6 +3,7 @@
 
   const DIALOGUE_VIEW_ID = 'view-dialogue';
   const DEFAULT_VIEW_ID = 'view-default';
+  const WORLDBUILD_VIEW_ID = 'view-worldbuild';
   const WORLDMAP_VIEW_ID = 'view-worldmap';
   const DIALOGUE_MOUNT_ID = 'dialogueMount';
   const STORAGE_KEYS = Object.freeze({
@@ -22,6 +23,7 @@
   const worldBuildStatus = document.getElementById('worldBuildStatus');
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
+  const worldBuildResult = document.getElementById('worldBuildResult');
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -46,8 +48,7 @@
   const closeDialogueView = () => {
     // 다음 진입 시 이전 포인터/trace가 남지 않도록 상태를 가볍게 초기화한다.
     dialogueController.resetProgress();
-    activateView(WORLDMAP_VIEW_ID);
-    queueWorldBuildSequence();
+    activateView(WORLDBUILD_VIEW_ID);
   };
 
   const clearWorldBuildTimer = () => {
@@ -67,6 +68,63 @@
     target.dataset.state = state;
   };
 
+  const createSeededRandom = (seed) => {
+    let state = seed >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  };
+
+  // 월드맵 초안 데이터를 실제로 생성해 월드맵 진입 전 결과를 확정한다.
+  const generateWorldMapDraft = () => {
+    const width = 36;
+    const height = 20;
+    const seed = Math.floor(global.Math.random() * 4294967295);
+    const random = createSeededRandom(seed);
+    const terrainKinds = ['SEA', 'PLAIN', 'FOREST', 'MOUNTAIN'];
+    const tileRows = [];
+    const counts = { SEA: 0, PLAIN: 0, FOREST: 0, MOUNTAIN: 0 };
+
+    for (let y = 0; y < height; y += 1) {
+      const row = [];
+      for (let x = 0; x < width; x += 1) {
+        const noise = random();
+        let terrain = terrainKinds[0];
+        if (noise >= 0.8) terrain = 'MOUNTAIN';
+        else if (noise >= 0.55) terrain = 'FOREST';
+        else if (noise >= 0.35) terrain = 'PLAIN';
+        row.push(terrain);
+        counts[terrain] += 1;
+      }
+      tileRows.push(row);
+    }
+
+    return {
+      seed,
+      width,
+      height,
+      generatedAt: new Date().toISOString(),
+      counts,
+      tiles: tileRows
+    };
+  };
+
+  const renderWorldBuildResult = (draft) => {
+    if (!worldBuildResult) return;
+    if (!draft) {
+      worldBuildResult.textContent = '아직 생성된 월드맵이 없습니다.';
+      return;
+    }
+    worldBuildResult.textContent = [
+      `seed: ${draft.seed}`,
+      `size: ${draft.width} x ${draft.height}`,
+      `SEA: ${draft.counts.SEA} / PLAIN: ${draft.counts.PLAIN}`,
+      `FOREST: ${draft.counts.FOREST} / MOUNTAIN: ${draft.counts.MOUNTAIN}`,
+      `generatedAt: ${draft.generatedAt}`
+    ].join('\n');
+  };
+
   const queueWorldBuildSequence = () => {
     if (!worldBuildSteps.length || worldBuildStarted) return;
     worldBuildStarted = true;
@@ -78,8 +136,15 @@
 
     const runAt = (index) => {
       if (index >= worldBuildSteps.length) {
-        setWorldBuildStatus('월드맵 제작 완료. 탐험 준비가 끝났습니다.');
+        const generatedDraft = generateWorldMapDraft();
+        // 월드맵 저장은 아직 구현하지 않는다.
+        // 추후 슬롯 저장 시스템과 함께 게임 전반 상태를 통합 저장할 계획이다.
+        renderWorldBuildResult(generatedDraft);
+        setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰로 이동합니다.');
         clearWorldBuildTimer();
+        global.setTimeout(() => {
+          activateView(WORLDMAP_VIEW_ID);
+        }, 420);
         return;
       }
       markWorldBuildStep(index, 'running');
@@ -248,6 +313,9 @@
     };
     activateView(DEFAULT_VIEW_ID);
   }
+
+  // 새 진입마다 제작 결과를 화면에서만 보여준다. (영속 저장 없음)
+  renderWorldBuildResult(null);
 
   startWorldBuildButton?.addEventListener('click', () => {
     queueWorldBuildSequence();

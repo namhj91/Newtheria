@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./assets/css/dialogue_template.css" />
   <!-- 카드형 선택지 렌더에 필요한 공용 카드 템플릿 스타일 -->
   <link rel="stylesheet" href="./assets/css/card_templates.css" />
+  <link rel="stylesheet" href="./assets/css/world_map.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -212,7 +213,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.57(260429-메인내월드맵직접렌더)
+    ver.0.3.58(260429-월드맵테스트생성로직통합)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -255,6 +256,41 @@
           </button>
           <pre id="worldBuildResult" class="world-build-result" aria-live="polite">아직 생성된 월드맵이 없습니다.</pre>
         </section>
+      </div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body" style="display:block; overflow:auto; text-align:left;">
+        <!-- 월드맵 테스트 창(world_map.html)에서 사용한 동일한 템플릿 구조를 메인 뷰에 재사용한다. -->
+        <section id="worldMapViewport" class="world-map-viewport" aria-label="헥스 월드맵 미리보기">
+          <canvas id="worldMapCanvas" width="1400" height="1250"></canvas>
+          <article id="tilePopup" class="tile-popup" aria-live="polite" hidden></article>
+        </section>
+        <div class="world-map-actions">
+          <button id="regenButton" type="button">맵 다시 생성</button>
+          <button id="metaToggleButton" type="button" aria-controls="worldInfoDialog" aria-expanded="false">월드 정보 보기</button>
+        </div>
+        <p id="worldMapVersion" class="meta version"></p>
+        <p id="calendarMeta" class="meta" aria-live="polite"></p>
+        <p id="mapMeta" class="meta" aria-live="polite"></p>
+        <div hidden>
+          <input id="seaLevelRatioInput" type="range" min="0.35" max="0.8" step="0.01" value="0.58" /><span id="seaLevelRatioValue"></span>
+          <input id="elevationScaleInput" type="range" min="0.75" max="1.35" step="0.01" value="1" /><span id="elevationScaleValue"></span>
+          <input id="warpStrengthInput" type="range" min="6" max="32" step="1" value="18" /><span id="warpStrengthValue"></span>
+          <input id="ridgeStrengthInput" type="range" min="0.08" max="0.42" step="0.01" value="0.24" /><span id="ridgeStrengthValue"></span>
+          <input id="riverBudgetScaleInput" type="range" min="0.4" max="2" step="0.05" value="1" /><span id="riverBudgetScaleValue"></span>
+          <select id="generationStageSelect"><option value="final" selected>최종 지형</option><option value="height">고도</option><option value="climate">기후</option><option value="biome">바이옴</option><option value="post">후처리</option></select>
+          <button type="button" class="layer-button is-active" data-layer="terrain">지형</button>
+          <button type="button" class="layer-button" data-layer="elevation">고도</button>
+          <button type="button" class="layer-button" data-layer="moisture">습도</button>
+          <button type="button" class="layer-button" data-layer="heat">온도</button>
+          <button type="button" class="layer-button" data-layer="scenic">절경</button>
+        </div>
       </div>
     </section>
 
@@ -313,5 +349,7 @@
   <script src="./assets/js/game_state_store.js"></script>
   <script src="./assets/js/dialogue_template.js"></script>
   <script src="./assets/js/main_view_router.js"></script>
+  <script src="./assets/js/calendar.js"></script>
+  <script src="./assets/js/world_map.js"></script>
 </body>
 </html>

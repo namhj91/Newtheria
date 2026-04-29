@@ -24,9 +24,6 @@
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
   const worldBuildResult = document.getElementById('worldBuildResult');
-  const worldMapRuntimeCanvas = document.getElementById('worldMapRuntimeCanvas');
-  const worldMapRuntimeMeta = document.getElementById('worldMapRuntimeMeta');
-  let latestWorldDraft = null;
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
@@ -46,9 +43,6 @@
       dialogueController.ensureMounted();
     }
 
-    if (viewId === WORLDMAP_VIEW_ID) {
-      renderRuntimeWorldMap(latestWorldDraft);
-    }
   };
 
   // 대화창을 닫을 때는 기본 뷰로 복귀한다.
@@ -75,95 +69,9 @@
     target.dataset.state = state;
   };
 
-  const createSeededRandom = (seed) => {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  };
-
-  // 월드맵 초안 데이터를 실제로 생성해 월드맵 진입 전 결과를 확정한다.
-  const generateWorldMapDraft = () => {
-    const width = 36;
-    const height = 20;
-    const seed = Math.floor(global.Math.random() * 4294967295);
-    const random = createSeededRandom(seed);
-    const terrainKinds = ['SEA', 'PLAIN', 'FOREST', 'MOUNTAIN'];
-    const tileRows = [];
-    const counts = { SEA: 0, PLAIN: 0, FOREST: 0, MOUNTAIN: 0 };
-
-    for (let y = 0; y < height; y += 1) {
-      const row = [];
-      for (let x = 0; x < width; x += 1) {
-        const noise = random();
-        let terrain = terrainKinds[0];
-        if (noise >= 0.8) terrain = 'MOUNTAIN';
-        else if (noise >= 0.55) terrain = 'FOREST';
-        else if (noise >= 0.35) terrain = 'PLAIN';
-        row.push(terrain);
-        counts[terrain] += 1;
-      }
-      tileRows.push(row);
-    }
-
-    return {
-      seed,
-      width,
-      height,
-      generatedAt: new Date().toISOString(),
-      counts,
-      tiles: tileRows
-    };
-  };
-
-  const renderWorldBuildResult = (draft) => {
+  const renderWorldBuildResult = (summaryText) => {
     if (!worldBuildResult) return;
-    if (!draft) {
-      worldBuildResult.textContent = '아직 생성된 월드맵이 없습니다.';
-      return;
-    }
-    worldBuildResult.textContent = [
-      `seed: ${draft.seed}`,
-      `size: ${draft.width} x ${draft.height}`,
-      `SEA: ${draft.counts.SEA} / PLAIN: ${draft.counts.PLAIN}`,
-      `FOREST: ${draft.counts.FOREST} / MOUNTAIN: ${draft.counts.MOUNTAIN}`,
-      `generatedAt: ${draft.generatedAt}`
-    ].join('\n');
-  };
-
-
-  // 생성된 월드 드래프트를 월드맵 캔버스에 직접 렌더링한다.
-  const renderRuntimeWorldMap = (draft) => {
-    if (!worldMapRuntimeCanvas || !worldMapRuntimeMeta) return;
-    const ctx = worldMapRuntimeCanvas.getContext('2d');
-    if (!ctx) return;
-
-    if (!draft) {
-      ctx.clearRect(0, 0, worldMapRuntimeCanvas.width, worldMapRuntimeCanvas.height);
-      worldMapRuntimeMeta.textContent = '아직 렌더링된 월드맵이 없습니다.';
-      return;
-    }
-
-    const colorByTerrain = {
-      SEA: '#2d6cdf',
-      PLAIN: '#77c06a',
-      FOREST: '#2d8c4a',
-      MOUNTAIN: '#8a8f9d'
-    };
-    const tileW = worldMapRuntimeCanvas.width / draft.width;
-    const tileH = worldMapRuntimeCanvas.height / draft.height;
-
-    ctx.clearRect(0, 0, worldMapRuntimeCanvas.width, worldMapRuntimeCanvas.height);
-    for (let y = 0; y < draft.height; y += 1) {
-      for (let x = 0; x < draft.width; x += 1) {
-        const terrain = draft.tiles[y][x];
-        ctx.fillStyle = colorByTerrain[terrain] || '#444';
-        ctx.fillRect(x * tileW, y * tileH, tileW + 0.4, tileH + 0.4);
-      }
-    }
-
-    worldMapRuntimeMeta.textContent = `seed ${draft.seed} · ${draft.width}x${draft.height} · sea ${draft.counts.SEA}`;
+    worldBuildResult.textContent = summaryText || '아직 생성된 월드맵이 없습니다.';
   };
 
   const queueWorldBuildSequence = () => {
@@ -177,12 +85,10 @@
 
     const runAt = (index) => {
       if (index >= worldBuildSteps.length) {
-        const generatedDraft = generateWorldMapDraft();
-        latestWorldDraft = generatedDraft;
-        // 월드맵 저장은 아직 구현하지 않는다.
-        // 추후 슬롯 저장 시스템과 함께 게임 전반 상태를 통합 저장할 계획이다.
-        renderWorldBuildResult(generatedDraft);
-        setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰로 이동합니다.');
+        // 실제 맵 생성/렌더링은 월드맵 테스트 창에서 검증한 world_map.js 로직을 그대로 사용한다.
+        // 여기서는 제작 단계 완료만 처리하고, 월드맵 뷰로 전환해 해당 로직이 렌더링하도록 연결한다.
+        renderWorldBuildResult('월드맵 생성 파이프라인 완료: world_map.js 렌더러를 사용합니다.');
+        setWorldBuildStatus('월드맵 제작 완료. 월드맵 뷰를 엽니다.');
         clearWorldBuildTimer();
         global.setTimeout(() => {
           activateView(WORLDMAP_VIEW_ID);
@@ -357,8 +263,7 @@
   }
 
   // 새 진입마다 제작 결과를 화면에서만 보여준다. (영속 저장 없음)
-  renderWorldBuildResult(null);
-  renderRuntimeWorldMap(null);
+  renderWorldBuildResult('');
 
   startWorldBuildButton?.addEventListener('click', () => {
     queueWorldBuildSequence();

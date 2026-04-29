@@ -1223,6 +1223,7 @@ const applyScenicCatalog = (tiles, width, height) => {
     }
     return group;
   };
+  const scenicCandidates = [];
   Object.entries(SCENIC_CATALOG).forEach(([tier, defs]) => {
     defs.forEach((def) => {
       const terrainSet = new Set(def.coreTerrains);
@@ -1234,11 +1235,29 @@ const applyScenicCatalog = (tiles, width, height) => {
           if (visited.has(key) || !tile || !terrainSet.has(tile.terrainType)) continue;
           const group = visitConnected(x, y, terrainSet, visited);
           if (group.length < def.minCluster || group.length > def.maxCluster) continue;
-          group.forEach((item) => {
-            if (!item.scenic) item.scenic = { id: def.id, type: def.type, tier, scenicKey: `${def.id}:${group[0].coord.x},${group[0].coord.y}` };
-          });
+          const avgElevation = group.reduce((sum, t) => sum + t.elevation, 0) / group.length;
+          const avgMoisture = group.reduce((sum, t) => sum + t.moisture, 0) / group.length;
+          const avgHeat = group.reduce((sum, t) => sum + t.heat, 0) / group.length;
+          const scenicScore = group.length * 0.55 + Math.abs(avgElevation - 0.5) * 18 + Math.abs(avgMoisture - 0.5) * 12 + Math.abs(avgHeat - 0.5) * 10;
+          scenicCandidates.push({ tier, def, group, scenicScore, scenicKey: `${def.id}:${group[0].coord.x},${group[0].coord.y}` });
         }
       }
+    });
+  });
+  // 조건을 만족한 모든 군집을 절경으로 만들지 않고, 각 타입별 상위 후보만 승격한다.
+  const LIMIT_BY_TIER = { small: 8, medium: 5, large: 3 };
+  const chosen = new Set();
+  Object.keys(SCENIC_CATALOG).forEach((tier) => {
+    const byTier = scenicCandidates
+      .filter((candidate) => candidate.tier === tier)
+      .sort((a, b) => b.scenicScore - a.scenicScore)
+      .slice(0, LIMIT_BY_TIER[tier] || 0);
+    byTier.forEach((candidate) => chosen.add(candidate.scenicKey));
+  });
+  scenicCandidates.forEach((candidate) => {
+    if (!chosen.has(candidate.scenicKey)) return;
+    candidate.group.forEach((item) => {
+      if (!item.scenic) item.scenic = { id: candidate.def.id, type: candidate.def.type, tier: candidate.tier, scenicKey: candidate.scenicKey };
     });
   });
 };
@@ -1331,6 +1350,42 @@ const renderWorld = (world) => {
         const screenY = (y - VIEWPORT_CAMERA.offsetY) * VIEWPORT_CAMERA.zoom;
         const radius = HEX_CONFIG.size * VIEWPORT_CAMERA.zoom * 0.86;
         const isSelected = selectedScenicKey && tile.scenic.scenicKey === selectedScenicKey;
+        for (let i = 0; i < offsets.length; i += 1) {
+          const [dx, dy] = offsets[i];
+          const nx = wrapCoord(wrappedQ + dx, width);
+          const ny = wrapCoord(wrappedR + dy, height);
+          const neighbor = tiles[ny * width + nx];
+          if (neighbor?.scenic?.scenicKey === tile.scenic.scenicKey) continue;
+          const a1 = (Math.PI / 180) * edgeAngles[i];
+          const a2 = (Math.PI / 180) * edgeAngles[(i + 1) % 6];
+          ctx.beginPath();
+          ctx.moveTo(screenX + radius * Math.cos(a1), screenY + radius * Math.sin(a1));
+          ctx.lineTo(screenX + radius * Math.cos(a2), screenY + radius * Math.sin(a2));
+          ctx.lineWidth = isSelected ? Math.max(2, radius * 0.28) : Math.max(1, radius * 0.18);
+          ctx.strokeStyle = isSelected ? '#fde68a' : (SCENIC_TIER_COLOR[tile.scenic.tier] || '#ffffff');
+          ctx.stroke();
+        }
+      }
+    }
+  }
+  if (activeLayer === LAYER_MODE.SCENIC) {
+    // odd-r 이웃 순서에 맞춘 edge 대응표를 사용해 "실제 외곽선"만 그린다.
+    const edgeNeighborOffsets = (row) => ((row & 1) === 0
+      ? [[1, 0], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1]]
+      : [[1, 0], [1, 1], [0, 1], [-1, 0], [0, -1], [1, -1]]);
+    const edgeAngles = [-30, 30, 90, 150, 210, 270];
+    for (let r = minR; r <= maxR; r += 1) {
+      for (let q = minQ; q <= maxQ; q += 1) {
+        const wrappedQ = wrapCoord(q, width);
+        const wrappedR = wrapCoord(r, height);
+        const tile = tiles[wrappedR * width + wrappedQ];
+        if (!tile?.scenic) continue;
+        const { x, y } = hexToPixel(q, r, HEX_CONFIG.size);
+        const screenX = (x - VIEWPORT_CAMERA.offsetX) * VIEWPORT_CAMERA.zoom;
+        const screenY = (y - VIEWPORT_CAMERA.offsetY) * VIEWPORT_CAMERA.zoom;
+        const radius = HEX_CONFIG.size * VIEWPORT_CAMERA.zoom * 0.86;
+        const isSelected = selectedScenicKey && tile.scenic.scenicKey === selectedScenicKey;
+        const offsets = edgeNeighborOffsets(wrappedR);
         for (let i = 0; i < offsets.length; i += 1) {
           const [dx, dy] = offsets[i];
           const nx = wrapCoord(wrappedQ + dx, width);

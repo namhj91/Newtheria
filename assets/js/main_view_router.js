@@ -3,6 +3,7 @@
 
   const DIALOGUE_VIEW_ID = 'view-dialogue';
   const DEFAULT_VIEW_ID = 'view-default';
+  const WORLDMAP_VIEW_ID = 'view-worldmap';
   const DIALOGUE_MOUNT_ID = 'dialogueMount';
   const STORAGE_KEYS = Object.freeze({
     saveSlotsMeta: 'newtheria.saveSlots.meta',
@@ -18,6 +19,11 @@
 
   const views = Array.from(document.querySelectorAll('.view'));
   const nav = document.querySelector('.dev-nav');
+  const worldBuildStatus = document.getElementById('worldBuildStatus');
+  const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
+  const startWorldBuildButton = document.getElementById('startWorldBuildButton');
+  let worldBuildStarted = false;
+  let worldBuildTimer = null;
 
   if (!views.length || !nav) {
     console.warn('[MainViewRouter] 초기화에 필요한 DOM을 찾지 못했습니다.');
@@ -40,7 +46,50 @@
   const closeDialogueView = () => {
     // 다음 진입 시 이전 포인터/trace가 남지 않도록 상태를 가볍게 초기화한다.
     dialogueController.resetProgress();
-    activateView(DEFAULT_VIEW_ID);
+    activateView(WORLDMAP_VIEW_ID);
+    queueWorldBuildSequence();
+  };
+
+  const clearWorldBuildTimer = () => {
+    if (!worldBuildTimer) return;
+    global.clearTimeout(worldBuildTimer);
+    worldBuildTimer = null;
+  };
+
+  const setWorldBuildStatus = (text) => {
+    if (!worldBuildStatus) return;
+    worldBuildStatus.textContent = text;
+  };
+
+  const markWorldBuildStep = (index, state) => {
+    const target = worldBuildSteps[index];
+    if (!target) return;
+    target.dataset.state = state;
+  };
+
+  const queueWorldBuildSequence = () => {
+    if (!worldBuildSteps.length || worldBuildStarted) return;
+    worldBuildStarted = true;
+    startWorldBuildButton?.setAttribute('disabled', 'true');
+    startWorldBuildButton?.setAttribute('aria-disabled', 'true');
+    setWorldBuildStatus('월드맵 제작을 시작합니다...');
+
+    worldBuildSteps.forEach((_, index) => markWorldBuildStep(index, 'pending'));
+
+    const runAt = (index) => {
+      if (index >= worldBuildSteps.length) {
+        setWorldBuildStatus('월드맵 제작 완료. 탐험 준비가 끝났습니다.');
+        clearWorldBuildTimer();
+        return;
+      }
+      markWorldBuildStep(index, 'running');
+      worldBuildTimer = global.setTimeout(() => {
+        markWorldBuildStep(index, 'done');
+        runAt(index + 1);
+      }, 620);
+    };
+
+    runAt(0);
   };
 
   const isDialogueEndTrace = (trace) => (
@@ -199,4 +248,12 @@
     };
     activateView(DEFAULT_VIEW_ID);
   }
+
+  startWorldBuildButton?.addEventListener('click', () => {
+    queueWorldBuildSequence();
+  });
+
+  global.addEventListener('beforeunload', () => {
+    clearWorldBuildTimer();
+  });
 })(window);

@@ -148,12 +148,58 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+
+    /* 월드맵 제작 시퀀스 패널 */
+    .world-build-sequence {
+      width: min(860px, 100%);
+      display: grid;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .world-build-sequence__status {
+      margin: 0;
+      font-weight: 700;
+      color: #d2e8ff;
+    }
+
+    .world-build-sequence__steps {
+      margin: 0;
+      padding-left: 22px;
+      display: grid;
+      gap: 8px;
+      color: #dce5ff;
+    }
+
+    .world-build-sequence__steps li[data-state="pending"] {
+      opacity: 0.72;
+    }
+
+    .world-build-sequence__steps li[data-state="running"] {
+      color: #87e6ff;
+      font-weight: 700;
+    }
+
+    .world-build-sequence__steps li[data-state="done"] {
+      color: #98f5bf;
+    }
+
+    .world-build-sequence__action {
+      justify-self: start;
+      border: 1px solid var(--accent);
+      background: rgba(17, 67, 86, 0.45);
+      color: #dff8ff;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.8(260428-진입경로별프롤로그로드분기)
+    ver.0.3.52(260429-프롤로그후월드맵제작시퀀스)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -181,7 +227,20 @@
         <span class="view__badge">World Map</span>
       </header>
       <div class="view__body">
-        월드 노드, 경로, 목적지 정보를 시각화할 예정입니다.
+        <section class="world-build-sequence" aria-label="월드맵 제작 시퀀스">
+          <p id="worldBuildStatus" class="world-build-sequence__status">
+            프롤로그 종료 후 월드맵 제작을 시작할 수 있습니다.
+          </p>
+          <ol id="worldBuildSteps" class="world-build-sequence__steps">
+            <li data-state="pending">시드 각인: 이번 여정의 세계 시드를 확정합니다.</li>
+            <li data-state="pending">지형 직조: 대륙/바다/산맥 초안을 생성합니다.</li>
+            <li data-state="pending">생태 주입: 기후·지형군·절경 메타를 배치합니다.</li>
+            <li data-state="pending">경로 봉인: 이동 가능한 초반 루트를 개방합니다.</li>
+          </ol>
+          <button id="startWorldBuildButton" class="world-build-sequence__action" type="button">
+            월드맵 제작 시작
+          </button>
+        </section>
       </div>
     </section>
 

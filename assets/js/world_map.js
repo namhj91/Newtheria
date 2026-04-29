@@ -86,6 +86,7 @@ const ridgeStrengthInput = document.getElementById('ridgeStrengthInput');
 const ridgeStrengthValue = document.getElementById('ridgeStrengthValue');
 const riverBudgetScaleInput = document.getElementById('riverBudgetScaleInput');
 const riverBudgetScaleValue = document.getElementById('riverBudgetScaleValue');
+const generationStageSelect = document.getElementById('generationStageSelect');
 
 const SQRT3 = Math.sqrt(3);
 const LAYER_MODE = {
@@ -96,9 +97,11 @@ const LAYER_MODE = {
 };
 
 let activeLayer = LAYER_MODE.TERRAIN;
+let activeGenerationStage = 'final';
 let currentWorld = null;
 let rafRenderId = 0;
 let isRenderQueued = false;
+let generationPlaybackToken = 0;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1002,8 +1005,10 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
   const waterDist = distanceToWater(rawFields.elevations, levels, width, height);
 
   const tiles = buildTiles(width, height, rawFields, levels, waterDist, random);
+  const biomeStageTiles = tiles.map((tile) => ({ ...tile }));
   clusterAridTiles(tiles, width, height, levels);
   convertSmallWaterBodiesToLakes(tiles, width, height, 200);
+  const postStageTiles = tiles.map((tile) => ({ ...tile }));
   assignTerrainResources(tiles, random);
   placeMythicLandmarks(tiles, random, width, height);
 
@@ -1022,7 +1027,12 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
     height,
     levels,
     riverBudget,
-    tiles
+    tiles,
+    debugStages: {
+      rawFields,
+      biomeTiles: biomeStageTiles,
+      postTiles: postStageTiles
+    }
   };
 }
 
@@ -1137,6 +1147,27 @@ const getTileColorByLayer = (tile, layer) => {
   ]);
 };
 
+const getStageTileColor = (world, tileIndex) => {
+  if (!world?.debugStages) return null;
+  if (activeGenerationStage === 'height') {
+    return valueToGradient(world.debugStages.rawFields.elevations[tileIndex], [
+      { value: 0, color: [17, 24, 39] }, { value: 0.3, color: [30, 64, 175] }, { value: 0.58, color: [74, 222, 128] }, { value: 1, color: [250, 250, 250] }
+    ]);
+  }
+  if (activeGenerationStage === 'climate') {
+    const moisture = world.debugStages.rawFields.moistures[tileIndex];
+    const heat = world.debugStages.rawFields.heats[tileIndex];
+    return blendHex(
+      valueToGradient(moisture, [{ value: 0, color: [120, 53, 15] }, { value: 1, color: [8, 145, 178] }]),
+      valueToGradient(heat, [{ value: 0, color: [59, 130, 246] }, { value: 1, color: [239, 68, 68] }]),
+      0.5
+    );
+  }
+  if (activeGenerationStage === 'biome') return world.debugStages.biomeTiles[tileIndex]?.color || null;
+  if (activeGenerationStage === 'post') return world.debugStages.postTiles[tileIndex]?.color || null;
+  return null;
+};
+
 const renderWorld = (world) => {
   const { tiles, seed, width, height, riverBudget } = world;
 
@@ -1178,7 +1209,9 @@ const renderWorld = (world) => {
         continue;
       }
       drawHexPath(screenX, screenY, radius);
-      ctx.fillStyle = getTileColorByLayer(tile, activeLayer);
+      const tileIndex = wrappedR * width + wrappedQ;
+      const stageColor = getStageTileColor(world, tileIndex);
+      ctx.fillStyle = stageColor || getTileColorByLayer(tile, activeLayer);
       ctx.fill();
     }
   }
@@ -1197,7 +1230,8 @@ const renderWorld = (world) => {
     `시드 · ${seed}`,
     `헥스 크기 · ${width}x${height} (${tiles.length.toLocaleString()} 타일)`,
     `지형 분포 · 육지 ${landCount.toLocaleString()} / 해양 ${(tiles.length - landCount).toLocaleString()}`,
-    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`
+    `하천 정보 · 강 ${riverCount.toLocaleString()} / riverBudget ${riverBudget}`,
+    `생성 단계 보기 · ${activeGenerationStage}`
   ].join('\n');
 };
 
@@ -1223,6 +1257,26 @@ const cancelScheduledRender = () => {
   isRenderQueued = false;
 };
 
+// 맵 재생성 직후 "대륙이 만들어지는 느낌"을 전달하기 위해
+// 생성 중간 단계를 짧은 간격으로 자동 재생한다.
+const playGenerationStages = (world) => {
+  if (!world) return;
+  generationPlaybackToken += 1;
+  const token = generationPlaybackToken;
+  const stageSequence = ['height', 'climate', 'biome', 'post', 'final'];
+  const stageDelayMs = 320;
+
+  stageSequence.forEach((stage, index) => {
+    window.setTimeout(() => {
+      // 새 월드가 다시 생성되면 이전 재생은 중단한다.
+      if (token !== generationPlaybackToken) return;
+      activeGenerationStage = stage;
+      if (generationStageSelect) generationStageSelect.value = stage;
+      scheduleRender(world);
+    }, index * stageDelayMs);
+  });
+};
+
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1232,8 +1286,8 @@ const generateAndRender = () => {
   // 새 월드가 생성되면 카메라는 0,0부터 시작하되, 토러스 래핑으로 자연스럽게 순환한다.
   VIEWPORT_CAMERA.offsetX = 0;
   VIEWPORT_CAMERA.offsetY = 0;
-  // 새 월드 생성 직후에도 즉시 draw 대신 rAF 스케줄로 정렬해 렌더 타이밍을 통일한다.
-  scheduleRender(world);
+  // 새 월드 생성 직후 단계 재생을 통해 유저에게 생성 과정을 보여준다.
+  playGenerationStages(world);
 };
 
 const updateVersionTag = async () => {
@@ -1436,3 +1490,9 @@ if (canBootWorldMapScreen) {
 
   generateAndRender();
 }
+  if (generationStageSelect) {
+    generationStageSelect.addEventListener('change', () => {
+      activeGenerationStage = generationStageSelect.value;
+      scheduleRender(currentWorld);
+    });
+  }

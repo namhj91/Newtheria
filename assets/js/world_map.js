@@ -99,6 +99,8 @@ let activeLayer = LAYER_MODE.TERRAIN;
 let currentWorld = null;
 let rafRenderId = 0;
 let isRenderQueued = false;
+const activePointers = new Map();
+let pinchState = null;
 const calendarApi = window.NewtheriaCalendar;
 const worldDate = calendarApi?.createDefaultDate?.() || { year: 1, month: 1, week: 1 };
 const worldTurnMode = calendarApi?.TURN_MODE?.WEEKLY || 'weekly';
@@ -1236,6 +1238,16 @@ const generateAndRender = () => {
   scheduleRender(world);
 };
 
+const applyZoomAtScreenPoint = (nextZoom, screenX, screenY) => {
+  const prevZoom = VIEWPORT_CAMERA.zoom;
+  VIEWPORT_CAMERA.zoom = Math.max(VIEWPORT_CAMERA.minZoom, Math.min(VIEWPORT_CAMERA.maxZoom, nextZoom));
+  const worldAtCursorX = VIEWPORT_CAMERA.offsetX + screenX / prevZoom;
+  const worldAtCursorY = VIEWPORT_CAMERA.offsetY + screenY / prevZoom;
+  VIEWPORT_CAMERA.offsetX = worldAtCursorX - screenX / VIEWPORT_CAMERA.zoom;
+  VIEWPORT_CAMERA.offsetY = worldAtCursorY - screenY / VIEWPORT_CAMERA.zoom;
+  wrapWorldPosition();
+};
+
 const updateVersionTag = async () => {
   let version = WORLD_VERSION_FALLBACK;
 
@@ -1325,23 +1337,33 @@ canvas?.addEventListener('wheel', (event) => {
   if (!currentWorld) return;
   event.preventDefault();
   const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-  const prevZoom = VIEWPORT_CAMERA.zoom;
-  const nextZoom = clamp01((prevZoom * zoomFactor) / VIEWPORT_CAMERA.maxZoom) * VIEWPORT_CAMERA.maxZoom;
-  VIEWPORT_CAMERA.zoom = Math.max(VIEWPORT_CAMERA.minZoom, Math.min(VIEWPORT_CAMERA.maxZoom, nextZoom));
+  const nextZoom = clamp01((VIEWPORT_CAMERA.zoom * zoomFactor) / VIEWPORT_CAMERA.maxZoom) * VIEWPORT_CAMERA.maxZoom;
 
   // 줌 기준점을 마우스 위치에 고정해 "마우스 기준 확대/축소" 체감을 제공한다.
   const rect = canvas.getBoundingClientRect();
   const screenX = event.clientX - rect.left;
   const screenY = event.clientY - rect.top;
-  const worldAtCursorX = VIEWPORT_CAMERA.offsetX + screenX / prevZoom;
-  const worldAtCursorY = VIEWPORT_CAMERA.offsetY + screenY / prevZoom;
-  VIEWPORT_CAMERA.offsetX = worldAtCursorX - screenX / VIEWPORT_CAMERA.zoom;
-  VIEWPORT_CAMERA.offsetY = worldAtCursorY - screenY / VIEWPORT_CAMERA.zoom;
-  wrapWorldPosition();
+  applyZoomAtScreenPoint(nextZoom, screenX, screenY);
   scheduleRender();
 }, { passive: false });
 
 canvas?.addEventListener('pointerdown', (event) => {
+  if (!canvas) return;
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (activePointers.size === 2) {
+    // 멀티터치가 시작되면 핀치 상태를 초기화하고 드래그 클릭 판정을 비활성화한다.
+    const points = [...activePointers.values()];
+    const centerX = (points[0].x + points[1].x) / 2;
+    const centerY = (points[0].y + points[1].y) / 2;
+    pinchState = {
+      distance: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y),
+      centerX,
+      centerY
+    };
+    VIEWPORT_CAMERA.isDragging = false;
+    VIEWPORT_CAMERA.dragged = true;
+  }
+  if (activePointers.size > 1) return;
   VIEWPORT_CAMERA.isDragging = true;
   VIEWPORT_CAMERA.dragged = false;
   VIEWPORT_CAMERA.dragStartX = event.clientX;
@@ -1352,7 +1374,27 @@ canvas?.addEventListener('pointerdown', (event) => {
 });
 
 canvas?.addEventListener('pointermove', (event) => {
-  if (!VIEWPORT_CAMERA.isDragging || !currentWorld) return;
+  if (!currentWorld || !canvas) return;
+  if (activePointers.has(event.pointerId)) {
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+  if (activePointers.size === 2 && pinchState) {
+    const points = [...activePointers.values()];
+    const nextDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+    const centerX = (points[0].x + points[1].x) / 2;
+    const centerY = (points[0].y + points[1].y) / 2;
+    if (pinchState.distance > 0) {
+      const scale = nextDistance / pinchState.distance;
+      const rect = canvas.getBoundingClientRect();
+      const screenX = centerX - rect.left;
+      const screenY = centerY - rect.top;
+      applyZoomAtScreenPoint(VIEWPORT_CAMERA.zoom * scale, screenX, screenY);
+      scheduleRender();
+    }
+    pinchState = { distance: Math.max(1, nextDistance), centerX, centerY };
+    return;
+  }
+  if (!VIEWPORT_CAMERA.isDragging) return;
   const dx = event.clientX - VIEWPORT_CAMERA.dragStartX;
   const dy = event.clientY - VIEWPORT_CAMERA.dragStartY;
   if (Math.abs(dx) + Math.abs(dy) > 4) VIEWPORT_CAMERA.dragged = true;
@@ -1365,6 +1407,8 @@ canvas?.addEventListener('pointermove', (event) => {
 
 canvas?.addEventListener('pointerup', (event) => {
   if (!currentWorld) return;
+  activePointers.delete(event.pointerId);
+  if (activePointers.size < 2) pinchState = null;
   const wasDragged = VIEWPORT_CAMERA.dragged;
   VIEWPORT_CAMERA.isDragging = false;
   VIEWPORT_CAMERA.dragged = false;
@@ -1383,6 +1427,8 @@ canvas?.addEventListener('pointerup', (event) => {
 canvas?.addEventListener('pointercancel', () => {
   VIEWPORT_CAMERA.isDragging = false;
   VIEWPORT_CAMERA.dragged = false;
+  activePointers.clear();
+  pinchState = null;
 });
 
 metaToggleButton?.addEventListener('click', () => {

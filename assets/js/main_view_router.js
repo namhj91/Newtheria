@@ -242,13 +242,26 @@
     const dragHandle = host.querySelector('.debug-float__header');
     const dragFab = host.querySelector('.debug-float__fab');
     let dragState = null;
-    const beginDrag = (pointerId, clientX, clientY) => {
+    const beginDrag = (pointerId, clientX, clientY, captureEl = null) => {
       const rect = dragTarget.getBoundingClientRect();
-      dragState = { pointerId, offsetX: clientX - rect.left, offsetY: clientY - rect.top };
-      dragHandle?.setPointerCapture?.(pointerId);
+      dragState = {
+        pointerId,
+        offsetX: clientX - rect.left,
+        offsetY: clientY - rect.top,
+        startX: clientX,
+        startY: clientY,
+        moved: false,
+        captureEl
+      };
+      captureEl?.setPointerCapture?.(pointerId);
     };
     const moveDrag = (clientX, clientY) => {
       if (!dragState) return;
+      const movedX = Math.abs(clientX - dragState.startX);
+      const movedY = Math.abs(clientY - dragState.startY);
+      // 데스크톱 클릭과 드래그를 구분하기 위해 작은 이동(4px 이하)은 클릭으로 취급한다.
+      if (!dragState.moved && movedX + movedY < 4) return;
+      dragState.moved = true;
       const maxLeft = Math.max(8, window.innerWidth - dragTarget.offsetWidth - 8);
       const maxTop = Math.max(8, window.innerHeight - dragTarget.offsetHeight - 8);
       const nextLeft = Math.min(maxLeft, Math.max(8, clientX - dragState.offsetX));
@@ -258,15 +271,19 @@
       dragTarget.style.right = 'auto';
       dragTarget.style.bottom = 'auto';
     };
-    dragHandle?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY));
+    const endDrag = () => {
+      dragState?.captureEl?.releasePointerCapture?.(dragState.pointerId);
+      dragState = null;
+    };
+    dragHandle?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY, dragHandle));
     dragHandle?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
-    dragHandle?.addEventListener('pointerup', () => { dragState = null; });
-    dragHandle?.addEventListener('pointercancel', () => { dragState = null; });
+    dragHandle?.addEventListener('pointerup', endDrag);
+    dragHandle?.addEventListener('pointercancel', endDrag);
     // 축소 상태(⚙️만 보이는 상태)에서도 이동할 수 있도록 FAB 자체도 드래그 핸들로 허용한다.
-    dragFab?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY));
+    dragFab?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY, dragFab));
     dragFab?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
-    dragFab?.addEventListener('pointerup', () => { dragState = null; });
-    dragFab?.addEventListener('pointercancel', () => { dragState = null; });
+    dragFab?.addEventListener('pointerup', endDrag);
+    dragFab?.addEventListener('pointercancel', endDrag);
 
     host.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-view]');

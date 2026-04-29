@@ -1024,7 +1024,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
     * HEX_CONFIG.riverBudgetScale));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
-  applyScenicCatalog(tiles, width, height);
+  applyScenicCatalog(tiles, width, height, random);
 
   return {
     seed,
@@ -1201,7 +1201,7 @@ const SCENIC_CATALOG = {
   ]
 };
 
-const applyScenicCatalog = (tiles, width, height) => {
+const applyScenicCatalog = (tiles, width, height, random = Math.random) => {
   tiles.forEach((tile) => { tile.scenic = null; });
   const visitConnected = (x, y, terrainSet, visited) => {
     const stack = [[x, y]];
@@ -1235,10 +1235,8 @@ const applyScenicCatalog = (tiles, width, height) => {
           if (visited.has(key) || !tile || !terrainSet.has(tile.terrainType)) continue;
           const group = visitConnected(x, y, terrainSet, visited);
           if (group.length < def.minCluster || group.length > def.maxCluster) continue;
-          const avgElevation = group.reduce((sum, t) => sum + t.elevation, 0) / group.length;
-          const avgMoisture = group.reduce((sum, t) => sum + t.moisture, 0) / group.length;
-          const avgHeat = group.reduce((sum, t) => sum + t.heat, 0) / group.length;
-          const scenicScore = group.length * 0.55 + Math.abs(avgElevation - 0.5) * 18 + Math.abs(avgMoisture - 0.5) * 12 + Math.abs(avgHeat - 0.5) * 10;
+          // 절경 승격 점수는 지형/기후 극단치가 아니라 완전 랜덤으로 부여한다.
+          const scenicScore = random();
           scenicCandidates.push({ tier, def, group, scenicScore, scenicKey: `${def.id}:${group[0].coord.x},${group[0].coord.y}` });
         }
       }

@@ -1776,6 +1776,28 @@ worldInfoDialog?.addEventListener('close', () => {
   metaToggleButton?.setAttribute('aria-expanded', 'false');
 });
 
+
+// 메인 라우터에서 뷰 전환 시 카메라 상태를 보존/복원할 수 있도록 최소 API를 노출한다.
+window.NewtheriaWorldMapRuntime = {
+  getCameraState: () => ({
+    zoom: VIEWPORT_CAMERA.zoom,
+    offsetX: VIEWPORT_CAMERA.offsetX,
+    offsetY: VIEWPORT_CAMERA.offsetY
+  }),
+  setCameraState: (nextState = {}) => {
+    const zoom = Number(nextState.zoom);
+    const offsetX = Number(nextState.offsetX);
+    const offsetY = Number(nextState.offsetY);
+    if (Number.isFinite(zoom)) {
+      VIEWPORT_CAMERA.zoom = Math.max(VIEWPORT_CAMERA.minZoom, Math.min(VIEWPORT_CAMERA.maxZoom, zoom));
+    }
+    if (Number.isFinite(offsetX)) VIEWPORT_CAMERA.offsetX = offsetX;
+    if (Number.isFinite(offsetY)) VIEWPORT_CAMERA.offsetY = offsetY;
+    constrainCameraToWorld(currentWorld);
+    queueRender(currentWorld);
+  },
+  rerender: () => queueRender(currentWorld)
+};
 const canBootWorldMapScreen = Boolean(canvas && worldMapViewport && regenButton && mapMeta && calendarMeta && versionTag && tilePopup);
 
 if (canBootWorldMapScreen) {

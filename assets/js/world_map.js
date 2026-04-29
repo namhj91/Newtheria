@@ -1527,26 +1527,6 @@ const cancelScheduledRender = () => {
   isRenderQueued = false;
 };
 
-// 맵 재생성 직후 "대륙이 만들어지는 느낌"을 전달하기 위해
-// 생성 중간 단계를 짧은 간격으로 자동 재생한다.
-const playGenerationStages = (world) => {
-  if (!world) return;
-  generationPlaybackToken += 1;
-  const token = generationPlaybackToken;
-  const stageSequence = ['height', 'climate', 'biome', 'post', 'final'];
-  const stageDelayMs = 320;
-
-  stageSequence.forEach((stage, index) => {
-    window.setTimeout(() => {
-      // 새 월드가 다시 생성되면 이전 재생은 중단한다.
-      if (token !== generationPlaybackToken) return;
-      activeGenerationStage = stage;
-      if (generationStageSelect) generationStageSelect.value = stage;
-      scheduleRender(world);
-    }, index * stageDelayMs);
-  });
-};
-
 const generateAndRender = () => {
   applyRerollSettings();
   updateRerollLabels();
@@ -1557,8 +1537,10 @@ const generateAndRender = () => {
   // 새 월드가 생성되면 카메라는 0,0부터 시작하되, 토러스 래핑으로 자연스럽게 순환한다.
   VIEWPORT_CAMERA.offsetX = 0;
   VIEWPORT_CAMERA.offsetY = 0;
-  // 새 월드 생성 직후 단계 재생을 통해 유저에게 생성 과정을 보여준다.
-  playGenerationStages(world);
+  // 초기 진입/재생성 직후 즉시 1회 렌더해, 사용자 상호작용 이전에도 맵이 보이도록 고정한다.
+  activeGenerationStage = 'final';
+  if (generationStageSelect) generationStageSelect.value = 'final';
+  scheduleRender(world);
 };
 
 const applyZoomAtScreenPoint = (nextZoom, screenX, screenY) => {
@@ -1829,10 +1811,10 @@ if (canBootWorldMapScreen) {
   updateVersionTag();
 
   generateAndRender();
-}
   if (generationStageSelect) {
     generationStageSelect.addEventListener('change', () => {
       activeGenerationStage = generationStageSelect.value;
       scheduleRender(currentWorld);
     });
   }
+}

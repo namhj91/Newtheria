@@ -6,7 +6,9 @@
 <scene#0>
 {}
 <block:무>
-{}
+{
+screen_blackout = 20000
+}
 ---
 <event:별바다_재기동_의식>
 <scene#0:깊은우주_기동>

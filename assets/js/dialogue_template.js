@@ -583,8 +583,8 @@
     eventList.forEach((event) => {
       event.scenes.forEach((scene) => {
         scene.blocks.forEach((block) => {
-          if (block.jump && !anchorMap.has(block.jump)) {
-            errors.push(`jump 타겟 미존재: ${block.jump}`);
+          if (block.jump && !resolveJumpPointer({ eventMap: new Map(eventList.map((eventItem) => [eventItem.id, eventItem])), anchorMap }, block.eventId, block.jump)) {
+            errors.push(`jump 타겟 미존재/문법오류: ${block.jump} (규칙: 같은 event는 anchor, 다른 event는 event:anchor)`);
           }
           block.choices.forEach((choice) => {
             if (!anchorMap.has(choice.targetAnchor)) {
@@ -637,6 +637,36 @@
       sceneIndex: firstEvent?.scenes[0]?.sceneIndex || 0,
       order: 0
     };
+  };
+
+
+  // jump 문법 규칙
+  // - jump = anchor              -> 같은 event 내부에서만 탐색
+  // - jump = eventId:anchor      -> 지정 event의 anchor로 점프
+  const resolveJumpPointer = (model, sourceEventId = '', jumpExpr = '') => {
+    const raw = cleanText(jumpExpr);
+    if (!raw) return null;
+
+    const separatorIndex = raw.indexOf(':');
+    if (separatorIndex > 0) {
+      const targetEventId = cleanText(raw.slice(0, separatorIndex));
+      const targetAnchor = cleanText(raw.slice(separatorIndex + 1));
+      if (!targetEventId || !targetAnchor) return null;
+      const target = model.anchorMap.get(targetAnchor);
+      if (!target) return null;
+      return target.eventId === targetEventId ? target : null;
+    }
+
+    const sameEvent = model.eventMap.get(sourceEventId);
+    if (!sameEvent) return null;
+    for (let i = 0; i < sameEvent.scenes.length; i += 1) {
+      const scene = sameEvent.scenes[i];
+      const hit = scene.blocks.find((block) => block.anchor === raw);
+      if (hit) {
+        return { eventId: hit.eventId, sceneIndex: hit.sceneIndex, order: hit.order };
+      }
+    }
+    return null;
   };
 
   const getBlockByPointer = (model, pointer) => {
@@ -1725,7 +1755,7 @@
 
         let nextPtr = null;
         if (block.jump) {
-          nextPtr = model.anchorMap.get(block.jump) || null;
+          nextPtr = resolveJumpPointer(model, cursor.eventId, block.jump) || null;
           if (!nextPtr) return cursor;
         } else if (scene.blocks[cursor.order + 1]) {
           nextPtr = { eventId: cursor.eventId, sceneIndex: cursor.sceneIndex, order: cursor.order + 1 };
@@ -1796,9 +1826,9 @@
       }
 
       if (block.jump) {
-        const target = model.anchorMap.get(block.jump);
+        const target = resolveJumpPointer(model, pointer.eventId, block.jump);
         if (!target) {
-          reportError(new Error(`jump 대상 anchor를 찾지 못했습니다: ${block.jump}`));
+          reportError(new Error(`jump 대상(anchor 또는 event:anchor)을 찾지 못했습니다: ${block.jump}`));
           return;
         }
         goToPointer(target);

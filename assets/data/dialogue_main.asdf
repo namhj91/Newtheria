@@ -1,0 +1,352 @@
+; Aetheria Script Data File
+; UTF-8
+; 샘플 목적: 기존 샘플 대사를 삭제하고, 요청된 원문 내용을 로어 친화형 아스테리아/순례자 대화로 재구성한다.
+; 문법 시연 목적: scene 캐스팅, 블록 대사, 배경/포커스/스탠딩/파티클/화면효과(번쩍임/암전)/자동 넘김(wait)/선택지(choice, hidden_choice)/점프(jump)/종료(end)를 모두 포함한다.
+
+<event:별바다_재기동_의식>
+<scene#0:깊은우주_기동>
+{
+; scene 기본 캐스팅
+actor = goddess
+actor = pilgrim
+slot_left = goddess
+slot_right = pilgrim
+focus = goddess
+; 최소 cast_json 예시(파서 문법 시연용)
+cast_json = {"actors":[{"id":"goddess","name":"아스테리아","layers":["assets/img/goddess.png"]},{"id":"pilgrim","name":"순례자","layers":["assets/img/player.png"]}]}
+}
+---
+
+<block:배경_기술>
+{
+; 배경 설명 블록(화자 없이 내레이션성 연출)
+bg = assets/img/background.jpg
+particle = snow
+particle_count = 24
+particle_duration = 3400
+wait = 2000
+}
+---
+
+<block:아스테리아_기상>
+{
+actor = goddess
+speaker = 아스테리아
+focus = goddess
+move_left = goddess
+move_right = pilgrim
+; 액터별 지정 예시: 현재 slot_left/slot_right 배치와 무관하게 actor id 기준으로 매칭된다.
+standing_animation_actor = goddess:float,pilgrim:fade
+type_speed = 21
+line = 어라, 드디어 눈을 떴네? 안녕, 나의 작은 [[glitch:□□□□□]]. 기분은 좀 어때?
+}
+---
+
+<block:순례자_혼란>
+{
+actor = pilgrim
+speaker = [[glitch:□□□□□]]
+focus = pilgrim
+; 인라인 actor 지정 예시(동일 문법): 순례자만 shake, 여신은 float 유지
+standing_animation = goddess:float,pilgrim:shake
+type_speed = 23
+line = …뭐? 윽, 머리야… 여긴 또 어디야. 나 방금 전까지 분명히…
+}
+---
+
+<block:아스테리아_적응안내>
+{
+actor = goddess
+focus = goddess
+type_speed = 21
+line = 쉿, 너무 애써서 기억하려고 하지 마. 데이터 로딩… 아, 아니. 영혼이 이 공간의 주파수에 적응하려면 시간이 좀 걸리거든. 갑자기 무리하면 머리만 더 아플 테니까 진정해.
+}
+---
+
+<block:순례자_반발>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 데이터? 영혼? 장난해? 지금 내 눈앞에 홀로그램 같은 게 둥둥 떠다니는데 진정이 되겠냐고. 넌 대체 누군데 날 아는 것처럼 말해?
+}
+---
+
+<block:아스테리아_자기소개>
+{
+actor = goddess
+speaker = 아스테리아
+focus = goddess
+set_layers = goddess:assets/img/goddess.png
+; 좌/우 슬롯 키 + actor 키를 함께 사용할 수 있다.
+standing_animation_left = zoom-in
+standing_animation_actor = goddess:zoom-in,pilgrim:fade
+particle = ember
+particle_count = 12
+particle_duration = 2800
+skip_lock = on
+type_speed = 20
+line = 나? 나는 아스테리아. 이 끝없이 펼쳐진 별바다를 관리하는 별의 여신이랄까? 뭐, 네 입장에선 새로운 시작 지점에서 안내를 돕는 꽤 친절한 튜토리얼 NPC라고 생각해도 좋아. 아, 스킵 버튼 같은 건 없으니까 내 말 잘 들어야 해?
+}
+---
+
+<block:순례자_귀환요청>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 여신? NPC? 대체 무슨 미친 소리를 하는 거야… 스킵은 무슨, 지금 당장 여기서 내보내 달라고! 나 집에 가야 해.
+}
+---
+
+<block:아스테리아_노란빛지시>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 집? 흐음… 유감스럽지만 거기로 돌아가는 길은 이미 끊어졌어. 자, 진정하고 내 손끝이 가리키는 곳을 한 번 볼래?
+}
+---
+
+<block:손끝_연출>
+{
+screen_flash = 260,140
+line = (아스테리아가 길고 하얀 손가락을 들어 우주의 한구석을 가리킨다. 수만 개의 은하수 너머, 유독 눈이 시리도록 샛노랗게 타오르는 작은 빛이 일렁인다.)
+}
+---
+
+<block:순례자_노란빛반응>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 저건… 뭔데? 쳐다보고 있으니까 왠지 가슴이 꽉 막힌 것처럼 답답해져. 기분이 이상해.
+}
+---
+
+<block:아스테리아_원세계고지>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 당연히 그렇겠지. 수많은 별들이 태어나고 져서 흘러가는 이 별바다에서도, 저긴 유독 눈에 띄는 곳이거든. 넌 저 수많은 별빛들 중에서도 가장 샛노랗게 반짝이던 곳에서 왔어. 아주 작고 위태롭지만, 치열하게 타오르던 네가 살던 세계란다.
+}
+---
+
+<block:순례자_죽음질문>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 저 노란 빛에서… 내가 왔다고? 그럼 나, 죽은 거야? 진짜로?
+choice = 죽음을 인정한다 -> 아스테리아_대기실비유
+choice = 현실을 부정한다 -> 아스테리아_대기실비유
+hidden_choice = 오히려 좋아.이세계 전생 -> 아스테리아_이세계전생
+}
+---
+<block:아스테리아_이세계전생>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 오히려 좋다니, 너 역시 뭘 좀 아는 녀석이구나?
+}
+
+<block:순례자_난거기가싫어>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 20
+line = 나는 그곳이 뼈에 사무치게 싫어.
+jump = 아스테리아_빼돌림고백
+}
+---
+<block:아스테리아_대기실비유>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = '죽음'이라는 단어는 너무 극단적이고 칙칙하잖아? 그냥 잠시 전원이 꺼진 상태, 혹은 본 서버에서 로그아웃하고 다음 패치를 기다리는 대기실에 온 거라고 생각해 봐요. 꽤 낭만적인 뷰 아냐?
+jump = 순례자_분노
+}
+---
+
+<block:순례자_분노>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+standing_animation_actor = pilgrim:shake
+type_speed = 23
+line = 말장난하지 마! 내가 어떻게 살았는데… 거기엔 아직 내가 해야 할 일들이 산더미처럼 남아있었단 말이야!
+}
+---
+
+<block:아스테리아_빼돌림고백>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+screen_blackout = 900,300
+line = 알아, 네가 그곳에서 얼마나 발버둥 쳤는지. 네 영혼의 데이터에 다 기록되어 있거든. 제법 무겁고, 여기저기 긁혀서 상처투성이지만… 그래도 꽤 따뜻한 온기가 남아있네. 그래서 내가 널 이쪽으로 빼돌린 거야. 원래라면 저 별바다의 파도에 휩쓸려 우주의 먼지로 초기화됐어야 할 운명이지만.
+}
+---
+
+<block:순례자_의문>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 빼돌려? 나한테 대체 뭘 바라는데? 나 가진 거 아무것도 없어. 돈도, 힘도.
+}
+---
+
+<block:아스테리아_제안>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 하핫! 그렇게 날 세우고 경계할 필요 없어요. 난 그저 네가 가진 그 샛노란 별의 끈질긴 반짝임이 마음에 들었을 뿐이야. 그래서 너에게 특별한 제안을 하나 하려고.
+}
+---
+
+<block:순례자_되묻기>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 제안?
+}
+---
+
+<block:아스테리아_VIP환생>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 응. 한 번 더 기회를 줄게. 완전히 새로운 차원의 별에서, 새로운 삶을 살아볼 수 있는 VIP 환생 티켓이랄까? 물론 선택은 네 몫이야. 여기서 이대로 영원히 우주의 미아로 둥둥 떠다녀도 되고.
+}
+---
+
+<block:순례자_체념>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 하… 새로운 삶? 내 의사는 묻지도 않고 마음대로 죽여놓고선, 이제 와서 선심 쓰는 척하는 거야? 어차피 선택지 같은 건 애초에 없었잖아. 여신인지 NPC인지, 네가 하라는 대로 해야 하는 분위기인데.
+}
+---
+
+<block:아스테리아_계약확정>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 정답! 역시 눈치가 빠르네. 진행이 수월해서 아주 마음에 들어. 이래서 내가 샛노란 별 출신들을 좋아한다니까? 자, 그럼 잔말 말고 계약 성립인 걸로 할게요. 짐 챙길 건 없지? 어차피 레벨 1부터, 인벤토리 텅텅 비운 맨몸으로 시작해야 하니까.
+}
+---
+
+<block:순례자_준비요청>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+type_speed = 23
+line = 야, 잠깐만! 아직 마음의 준비가 안 됐다고! 그리고 거기가 대체 어떤 곳인지, 내가 가서 뭘 해야 하는지는 알려주고 보내야 할 거 아냐!
+}
+---
+
+<block:아스테리아_스포금지>
+{
+actor = goddess
+focus = goddess
+type_speed = 20
+line = 미리 다 알면 재미없지. 스포일러는 절대 금지야![[스포:궁금해도 안가르쳐 줄거야!]] 규칙은 간단해. 그냥 네가 숨 쉬고, 걷고, 부딪히며 직접 알아가면 돼. 그게 새로운 삶의 묘미 아니겠어?
+}
+---
+
+<block:빛의소용돌이_연출>
+{
+particle = snow
+particle_count = 32
+particle_duration = 4200
+line = (아스테리아의 발끝에서부터 거대한 빛의 소용돌이가 일며 순례자의 몸을 감싸기 시작한다. 순례자의 몸이 서서히 반투명해진다.)
+}
+---
+
+<block:순례자_소멸직전>
+{
+actor = pilgrim
+focus = pilgrim
+speaker = [[glitch:□□□□□]]
+hide = left
+type_speed = 24
+line = 야! 아스테리아!! 내 말 아직 안 끝났… 윽, 눈부셔…!
+}
+---
+
+<block:순례자_번쩍임>
+{
+screen_flash = 1800
+}
+---
+
+<block:아스테리아_튜토리얼종료>
+{
+actor = goddess
+focus = goddess
+move_left = goddess
+move_right = pilgrim
+; all 키워드는 양 슬롯 공통 적용, actor 지정이 있으면 actor 지정이 우선한다.
+standing_animation = all:fade
+standing_animation_actor = goddess:float,pilgrim:fade
+particle = off
+type_speed = 20
+line = 자, 튜토리얼은 여기까지. 이제 네가 그곳에서도 예전처럼, 아니 예전보다 훨씬 더 눈부시게 빛날 수 있을지 지켜보고 있을게요.
+}
+---
+
+<scene#1:전송직전_속삭임>
+{
+actor = goddess
+actor = pilgrim
+slot_left = goddess
+slot_right = pilgrim
+focus = goddess
+}
+---
+
+<block:마지막_배경>
+{
+bg = assets/img/background.jpg
+line = (빛이 순례자를 완전히 집어삼키기 직전, 아스테리아가 장난스러운 미소를 거두고 다정하게 속삭인다.)
+}
+---
+
+<block:아스테리아_최종축복>
+{
+actor = goddess
+speaker = 아스테리아
+focus = goddess
+; 최종 축복 장면: 여신만 zoom-in, 순례자는 잔잔한 float
+standing_animation_actor = goddess:zoom-in,pilgrim:float
+type_speed = 15
+line = 잘 가, 나의 작은 [[glitch:□□□□□]]. 부디 새로운 별에서는 덜 아프고, 더 많이 웃으며… 그렇게 잘 살아봐요. 당신의 새로운 여행에 별빛의 축복이 함께하길.
+}
+
+<block:아스테리아_블랙아웃>
+{
+
+screen_blackout = 20000,1000
+end =true
+}
+
+---

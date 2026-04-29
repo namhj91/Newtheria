@@ -1327,44 +1327,11 @@ const renderWorld = (world) => {
       const stageColor = getStageTileColor(world, tileIndex);
       ctx.fillStyle = stageColor || getTileColorByLayer(tile, activeLayer);
       ctx.fill();
-      if (activeLayer === LAYER_MODE.SCENIC && tile.scenic) {
-        // 내부 인셋 선을 사용해 경계선이 이웃 타일을 침범하지 않게 그린다.
-        drawHexPath(screenX, screenY, radius * 0.78);
-        ctx.lineWidth = Math.max(1, radius * 0.2);
-        ctx.strokeStyle = SCENIC_TIER_COLOR[tile.scenic.tier] || '#ffffff';
-        ctx.stroke();
-      }
-    }
-  }
-  if (activeLayer === LAYER_MODE.SCENIC) {
-    const offsets = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
-    const edgeAngles = [-30, 30, 90, 150, 210, 270];
-    for (let r = minR; r <= maxR; r += 1) {
-      for (let q = minQ; q <= maxQ; q += 1) {
-        const wrappedQ = wrapCoord(q, width);
-        const wrappedR = wrapCoord(r, height);
-        const tile = tiles[wrappedR * width + wrappedQ];
-        if (!tile?.scenic) continue;
-        const { x, y } = hexToPixel(q, r, HEX_CONFIG.size);
-        const screenX = (x - VIEWPORT_CAMERA.offsetX) * VIEWPORT_CAMERA.zoom;
-        const screenY = (y - VIEWPORT_CAMERA.offsetY) * VIEWPORT_CAMERA.zoom;
-        const radius = HEX_CONFIG.size * VIEWPORT_CAMERA.zoom * 0.86;
-        const isSelected = selectedScenicKey && tile.scenic.scenicKey === selectedScenicKey;
-        for (let i = 0; i < offsets.length; i += 1) {
-          const [dx, dy] = offsets[i];
-          const nx = wrapCoord(wrappedQ + dx, width);
-          const ny = wrapCoord(wrappedR + dy, height);
-          const neighbor = tiles[ny * width + nx];
-          if (neighbor?.scenic?.scenicKey === tile.scenic.scenicKey) continue;
-          const a1 = (Math.PI / 180) * edgeAngles[i];
-          const a2 = (Math.PI / 180) * edgeAngles[(i + 1) % 6];
-          ctx.beginPath();
-          ctx.moveTo(screenX + radius * Math.cos(a1), screenY + radius * Math.sin(a1));
-          ctx.lineTo(screenX + radius * Math.cos(a2), screenY + radius * Math.sin(a2));
-          ctx.lineWidth = isSelected ? Math.max(2, radius * 0.28) : Math.max(1, radius * 0.18);
-          ctx.strokeStyle = isSelected ? '#fde68a' : (SCENIC_TIER_COLOR[tile.scenic.tier] || '#ffffff');
-          ctx.stroke();
-        }
+      if (activeLayer === LAYER_MODE.SCENIC && tile.scenic && selectedScenicKey && tile.scenic.scenicKey === selectedScenicKey) {
+        // 선택된 절경은 내부를 반투명 채움으로 표시해 외곽선과 역할을 분리한다.
+        drawHexPath(screenX, screenY, radius * 0.8);
+        ctx.fillStyle = '#fde68a66';
+        ctx.fill();
       }
     }
   }

@@ -19,7 +19,6 @@
   });
 
   const views = Array.from(document.querySelectorAll('.view'));
-  const nav = document.querySelector('.dev-nav');
   const worldBuildStatus = document.getElementById('worldBuildStatus');
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
@@ -34,7 +33,7 @@
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
-  if (!views.length || !nav) {
+  if (!views.length) {
     console.warn('[MainViewRouter] 초기화에 필요한 DOM을 찾지 못했습니다.');
     return;
   }
@@ -218,8 +217,18 @@
     const panel = host.querySelector('.debug-float__panel');
     const collapseButton = host.querySelector('.debug-float__collapse');
     const viewportPanel = host.querySelector('[data-panel="viewport"]');
-    if (viewportPanel && nav) viewportPanel.appendChild(nav);
-    nav.classList.add('dev-nav--embedded');
+    if (viewportPanel) {
+      const buttons = [
+        { id: DEFAULT_VIEW_ID, label: '기본' },
+        { id: DIALOGUE_VIEW_ID, label: '대화' },
+        { id: WORLDBUILD_VIEW_ID, label: '맵제작' },
+        { id: WORLDMAP_VIEW_ID, label: '월드맵' },
+        { id: 'view-battle', label: '전투' }
+      ];
+      viewportPanel.innerHTML = buttons
+        .map((item) => `<button type="button" class="debug-float__view-btn" data-view="${item.id}">${item.label}</button>`)
+        .join('');
+    }
 
     const setExpanded = (expanded) => {
       host.dataset.state = expanded ? 'expanded' : 'collapsed';
@@ -231,6 +240,7 @@
 
     const dragTarget = host;
     const dragHandle = host.querySelector('.debug-float__header');
+    const dragFab = host.querySelector('.debug-float__fab');
     let dragState = null;
     const beginDrag = (pointerId, clientX, clientY) => {
       const rect = dragTarget.getBoundingClientRect();
@@ -252,6 +262,17 @@
     dragHandle?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
     dragHandle?.addEventListener('pointerup', () => { dragState = null; });
     dragHandle?.addEventListener('pointercancel', () => { dragState = null; });
+    // 축소 상태(⚙️만 보이는 상태)에서도 이동할 수 있도록 FAB 자체도 드래그 핸들로 허용한다.
+    dragFab?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY));
+    dragFab?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
+    dragFab?.addEventListener('pointerup', () => { dragState = null; });
+    dragFab?.addEventListener('pointercancel', () => { dragState = null; });
+
+    host.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-view]');
+      if (!button) return;
+      activateView(button.dataset.view);
+    });
   };
 
   const loadSaveSlotContext = (requestedSlotId = '') => {
@@ -333,13 +354,6 @@
       this.lastTraceKey = '';
     }
   };
-
-  // 개발용 버튼 클릭 시 해당 뷰로 전환한다.
-  nav.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-view]');
-    if (!button) return;
-    activateView(button.dataset.view);
-  });
 
   const entryContext = parseEntryContext();
   if (entryContext.debugMode) {

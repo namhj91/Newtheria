@@ -11,12 +11,12 @@
     <header class="journey-header">
       <p class="journey-badge">NEW JOURNEY FLOW</p>
       <h1>새로운 여정</h1>
-      <p class="journey-subtitle">프롤로그 → 세계 생성 → 역사 시뮬레이션 → 캐릭터 메이킹을 한 페이지에서 진행합니다.</p>
+      <p class="journey-subtitle">프롤로그 → 월드맵 제작 → 역사 시뮬레이션 → 캐릭터 메이킹을 한 페이지에서 진행합니다.</p>
     </header>
 
     <ol class="journey-steps" aria-label="여정 생성 단계">
       <li class="journey-step is-active" data-step="1">1. 프롤로그</li>
-      <li class="journey-step" data-step="2">2. 세계 생성</li>
+      <li class="journey-step" data-step="2">2. 월드맵 제작</li>
       <li class="journey-step" data-step="3">3. 역사 시뮬레이션</li>
       <li class="journey-step" data-step="4">4. 캐릭터 메이킹</li>
     </ol>
@@ -28,8 +28,8 @@
       <button id="prologueStartBtn" class="primary-btn" type="button">프롤로그 시작</button>
     </section>
 
-    <section class="journey-panel" data-panel="2" aria-label="세계 생성">
-      <h2>세계 생성</h2>
+    <section class="journey-panel" data-panel="2" aria-label="월드맵 제작">
+      <h2>월드맵 제작 뷰</h2>
       <div class="form-grid">
         <label>세계 이름
           <input id="worldNameInput" type="text" maxlength="24" placeholder="예: 아스트라 대륙" />
@@ -45,8 +45,11 @@
           </select>
         </label>
       </div>
-      <button id="worldGenerateBtn" class="primary-btn" type="button">세계 만들기</button>
+      <button id="worldGenerateBtn" class="primary-btn" type="button">월드맵 제네레이션 시작</button>
       <article id="worldSummary" class="result-card" aria-live="polite"></article>
+      <section class="worldmap-build-view" aria-label="월드맵 제작 미리보기">
+        <canvas id="worldMapPreview" width="900" height="520"></canvas>
+      </section>
     </section>
 
     <section class="journey-panel" data-panel="3" aria-label="역사 시뮬레이션">

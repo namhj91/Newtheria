@@ -1,0 +1,30 @@
+{
+  "version": "ver.0.0.7(260429-절경18종스케일테이블)",
+  "namingRule": "surname_prefix2 + given_suffix2 + scenic_type",
+  "tiers": {
+    "small": [
+      { "id": "S1", "type": "폭포", "minCluster": 4, "maxCluster": 12, "coreTerrains": ["강"] },
+      { "id": "S2", "type": "암벽", "minCluster": 8, "maxCluster": 20, "coreTerrains": ["바위산맥", "험준한산맥"] },
+      { "id": "S3", "type": "동굴", "minCluster": 6, "maxCluster": 16, "coreTerrains": ["바위산맥", "빙원", "만년설산"] },
+      { "id": "S4", "type": "협곡문", "minCluster": 8, "maxCluster": 18, "coreTerrains": ["붉은대협곡", "바위산맥"] },
+      { "id": "S5", "type": "해식절벽", "minCluster": 6, "maxCluster": 16, "coreTerrains": ["해안", "얕은해안", "산호해안"] },
+      { "id": "S6", "type": "사구능선", "minCluster": 10, "maxCluster": 24, "coreTerrains": ["건조사막", "구릉지"] },
+      { "id": "S7", "type": "밀림연못", "minCluster": 10, "maxCluster": 22, "coreTerrains": ["열대우림", "맹그로브습지"] },
+      { "id": "S8", "type": "빙식분지", "minCluster": 8, "maxCluster": 18, "coreTerrains": ["빙원", "빙하설산", "만년설산"] }
+    ],
+    "medium": [
+      { "id": "M1", "type": "폭포군", "minCluster": 10, "maxCluster": 24, "coreTerrains": ["강", "험준한산맥", "바위산맥"] },
+      { "id": "M2", "type": "암벽지대", "minCluster": 16, "maxCluster": 34, "coreTerrains": ["험준한산맥", "바위산맥"] },
+      { "id": "M3", "type": "동굴군", "minCluster": 14, "maxCluster": 28, "coreTerrains": ["바위산맥", "빙원", "만년설산"] },
+      { "id": "M4", "type": "산호만", "minCluster": 18, "maxCluster": 42, "coreTerrains": ["산호해안", "얕은해안", "해안"] },
+      { "id": "M5", "type": "운무분지", "minCluster": 14, "maxCluster": 30, "coreTerrains": ["고산운무림", "운무고원림"] },
+      { "id": "M6", "type": "오아시스권", "minCluster": 20, "maxCluster": 42, "coreTerrains": ["건조사막", "사막오아시스"] }
+    ],
+    "large": [
+      { "id": "L1", "type": "대산맥", "minCluster": 30, "maxCluster": 1000, "coreTerrains": ["험준한산맥", "바위산맥", "만년설산"] },
+      { "id": "L2", "type": "대협곡", "minCluster": 24, "maxCluster": 1000, "coreTerrains": ["붉은대협곡", "화산지대", "붉은고원"] },
+      { "id": "L3", "type": "대호수", "minCluster": 40, "maxCluster": 180, "coreTerrains": ["호수"] },
+      { "id": "L4", "type": "빙하장벽", "minCluster": 22, "maxCluster": 1000, "coreTerrains": ["빙하설산", "만년설산", "빙원"] }
+    ]
+  }
+}

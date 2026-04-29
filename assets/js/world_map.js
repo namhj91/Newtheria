@@ -1308,6 +1308,13 @@ const renderWorld = (world) => {
       const stageColor = getStageTileColor(world, tileIndex);
       ctx.fillStyle = stageColor || getTileColorByLayer(tile, activeLayer);
       ctx.fill();
+      if (activeLayer === LAYER_MODE.SCENIC && tile.scenic) {
+        // 내부 인셋 선을 사용해 경계선이 이웃 타일을 침범하지 않게 그린다.
+        drawHexPath(screenX, screenY, radius * 0.78);
+        ctx.lineWidth = Math.max(1, radius * 0.2);
+        ctx.strokeStyle = SCENIC_TIER_COLOR[tile.scenic.tier] || '#ffffff';
+        ctx.stroke();
+      }
     }
   }
   if (activeLayer === LAYER_MODE.SCENIC) {

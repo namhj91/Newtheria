@@ -19,7 +19,6 @@
   });
 
   const views = Array.from(document.querySelectorAll('.view'));
-  const nav = document.querySelector('.dev-nav');
   const worldBuildStatus = document.getElementById('worldBuildStatus');
   const worldBuildSteps = Array.from(document.querySelectorAll('#worldBuildSteps li'));
   const startWorldBuildButton = document.getElementById('startWorldBuildButton');
@@ -34,7 +33,7 @@
   let worldBuildStarted = false;
   let worldBuildTimer = null;
 
-  if (!views.length || !nav) {
+  if (!views.length) {
     console.warn('[MainViewRouter] 초기화에 필요한 DOM을 찾지 못했습니다.');
     return;
   }
@@ -186,7 +185,111 @@
     const params = new URLSearchParams(global.location?.search || '');
     const entry = cleanText(params.get('entry'), 'new').toLowerCase();
     const slotId = cleanText(params.get('slot'));
-    return { entry, slotId };
+    const debugMode = cleanText(params.get('DEBUGMODE')).toLowerCase() === 'on';
+    return { entry, slotId, debugMode };
+  };
+
+  // DEBUGMODE=on일 때만 플로팅 디버그 메뉴를 주입한다.
+  const mountDebugFloatingMenu = () => {
+    const host = document.createElement('aside');
+    host.className = 'debug-float';
+    host.dataset.state = 'collapsed';
+    host.setAttribute('aria-label', '디버그 플로팅 메뉴');
+
+    host.innerHTML = `
+      <button type="button" class="debug-float__fab" aria-expanded="false" aria-label="디버그 메뉴 열기">⚙️</button>
+      <section class="debug-float__panel" aria-hidden="true">
+        <header class="debug-float__header">
+          <strong>DEBUG MENU</strong>
+          <button type="button" class="debug-float__collapse" aria-label="디버그 메뉴 닫기">—</button>
+        </header>
+        <div class="debug-float__tabs" role="tablist" aria-label="디버그 탭">
+          <button type="button" class="debug-float__tab is-active" role="tab" data-tab="viewport">뷰포인트</button>
+        </div>
+        <div class="debug-float__content">
+          <section class="debug-float__tab-panel is-active" data-panel="viewport"></section>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(host);
+
+    const fab = host.querySelector('.debug-float__fab');
+    const panel = host.querySelector('.debug-float__panel');
+    const collapseButton = host.querySelector('.debug-float__collapse');
+    const viewportPanel = host.querySelector('[data-panel="viewport"]');
+    if (viewportPanel) {
+      const buttons = [
+        { id: DEFAULT_VIEW_ID, label: '기본' },
+        { id: DIALOGUE_VIEW_ID, label: '대화' },
+        { id: WORLDBUILD_VIEW_ID, label: '맵제작' },
+        { id: WORLDMAP_VIEW_ID, label: '월드맵' },
+        { id: 'view-battle', label: '전투' }
+      ];
+      viewportPanel.innerHTML = buttons
+        .map((item) => `<button type="button" class="debug-float__view-btn" data-view="${item.id}">${item.label}</button>`)
+        .join('');
+    }
+
+    const setExpanded = (expanded) => {
+      host.dataset.state = expanded ? 'expanded' : 'collapsed';
+      fab?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      panel?.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+    };
+    fab?.addEventListener('click', () => setExpanded(host.dataset.state !== 'expanded'));
+    collapseButton?.addEventListener('click', () => setExpanded(false));
+
+    const dragTarget = host;
+    const dragHandle = host.querySelector('.debug-float__header');
+    const dragFab = host.querySelector('.debug-float__fab');
+    let dragState = null;
+    const beginDrag = (pointerId, clientX, clientY, captureEl = null) => {
+      const rect = dragTarget.getBoundingClientRect();
+      dragState = {
+        pointerId,
+        offsetX: clientX - rect.left,
+        offsetY: clientY - rect.top,
+        startX: clientX,
+        startY: clientY,
+        moved: false,
+        captureEl
+      };
+      captureEl?.setPointerCapture?.(pointerId);
+    };
+    const moveDrag = (clientX, clientY) => {
+      if (!dragState) return;
+      const movedX = Math.abs(clientX - dragState.startX);
+      const movedY = Math.abs(clientY - dragState.startY);
+      // 데스크톱 클릭과 드래그를 구분하기 위해 작은 이동(4px 이하)은 클릭으로 취급한다.
+      if (!dragState.moved && movedX + movedY < 4) return;
+      dragState.moved = true;
+      const maxLeft = Math.max(8, window.innerWidth - dragTarget.offsetWidth - 8);
+      const maxTop = Math.max(8, window.innerHeight - dragTarget.offsetHeight - 8);
+      const nextLeft = Math.min(maxLeft, Math.max(8, clientX - dragState.offsetX));
+      const nextTop = Math.min(maxTop, Math.max(8, clientY - dragState.offsetY));
+      dragTarget.style.left = `${nextLeft}px`;
+      dragTarget.style.top = `${nextTop}px`;
+      dragTarget.style.right = 'auto';
+      dragTarget.style.bottom = 'auto';
+    };
+    const endDrag = () => {
+      dragState?.captureEl?.releasePointerCapture?.(dragState.pointerId);
+      dragState = null;
+    };
+    dragHandle?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY, dragHandle));
+    dragHandle?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
+    dragHandle?.addEventListener('pointerup', endDrag);
+    dragHandle?.addEventListener('pointercancel', endDrag);
+    // 축소 상태(⚙️만 보이는 상태)에서도 이동할 수 있도록 FAB 자체도 드래그 핸들로 허용한다.
+    dragFab?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY, dragFab));
+    dragFab?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
+    dragFab?.addEventListener('pointerup', endDrag);
+    dragFab?.addEventListener('pointercancel', endDrag);
+
+    host.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-view]');
+      if (!button) return;
+      activateView(button.dataset.view);
+    });
   };
 
   const loadSaveSlotContext = (requestedSlotId = '') => {
@@ -269,14 +372,10 @@
     }
   };
 
-  // 개발용 버튼 클릭 시 해당 뷰로 전환한다.
-  nav.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-view]');
-    if (!button) return;
-    activateView(button.dataset.view);
-  });
-
   const entryContext = parseEntryContext();
+  if (entryContext.debugMode) {
+    mountDebugFloatingMenu();
+  }
   const shouldStartWithPrologue = entryContext.entry !== 'load';
 
   if (shouldStartWithPrologue) {

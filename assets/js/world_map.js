@@ -1024,7 +1024,7 @@ function generateWorldMap(width = MAP_SIZE, height = MAP_SIZE) {
     * HEX_CONFIG.riverBudgetScale));
 
   carveRivers(tiles, random, levels, width, height, riverBudget);
-  applyScenicCatalog(tiles, width, height);
+  applyScenicCatalog(tiles, width, height, random);
 
   return {
     seed,
@@ -1176,7 +1176,7 @@ const getStageTileColor = (world, tileIndex) => {
 
 const SCENIC_CATALOG = {
   small: [
-    { id: 'S1', type: '폭포', minCluster: 4, maxCluster: 12, coreTerrains: ['강'] },
+    { id: 'S1', type: '폭포', minCluster: 4, maxCluster: 20, coreTerrains: ['강'] },
     { id: 'S2', type: '암벽', minCluster: 8, maxCluster: 20, coreTerrains: ['바위산맥', '험준한산맥'] },
     { id: 'S3', type: '동굴', minCluster: 6, maxCluster: 16, coreTerrains: ['바위산맥', '빙원', '만년설산'] },
     { id: 'S4', type: '협곡문', minCluster: 8, maxCluster: 18, coreTerrains: ['붉은대협곡', '바위산맥'] },
@@ -1201,7 +1201,115 @@ const SCENIC_CATALOG = {
   ]
 };
 
-const applyScenicCatalog = (tiles, width, height) => {
+
+const MOUNTAIN_TERRAINS = new Set(['바위산맥', '험준한산맥', '만년설산', '빙하설산']);
+
+const countTerrainInGroup = (group, terrainSet) => group.reduce((count, tile) => (terrainSet.has(tile.terrainType) ? count + 1 : count), 0);
+
+const groupTouchesTerrain = (group, terrainSet, width, height, tiles) => group.some((tile) => getNeighbors(tile.coord.x, tile.coord.y, width, height)
+  .some(([nx, ny]) => terrainSet.has(tiles[ny * width + nx]?.terrainType)));
+
+const toCoordSet = (group) => new Set(group.map((tile) => `${tile.coord.x},${tile.coord.y}`));
+
+const countGroupBorderEdges = (group, width, height) => {
+  const coords = toCoordSet(group);
+  let borderEdges = 0;
+  group.forEach((tile) => {
+    getNeighbors(tile.coord.x, tile.coord.y, width, height).forEach(([nx, ny]) => {
+      if (!coords.has(`${nx},${ny}`)) borderEdges += 1;
+    });
+  });
+  return borderEdges;
+};
+
+const pickWaterfallScenicTile = (group, width, height, tiles) => {
+  // 여러 강 타일 군집 중 산맥과 인접한 단일 타일만 폭포 절경 타일로 뽑는다.
+  const adjacentMountainTiles = group.filter((tile) => getNeighbors(tile.coord.x, tile.coord.y, width, height)
+    .some(([nx, ny]) => MOUNTAIN_TERRAINS.has(tiles[ny * width + nx]?.terrainType)));
+  if (!adjacentMountainTiles.length) return null;
+  // 후보가 여러 개면 랜덤 점수로 재선정되므로 여기서는 첫 후보를 대표 타일로 고정한다.
+  return adjacentMountainTiles[0];
+};
+
+const isRealisticScenicGroup = (def, group, width, height, tiles) => {
+  if (!group.length) return false;
+
+  if (def.type === '폭포') {
+    // 폭포는 강 군집 내부에서 산맥에 인접한 타일을 최소 1개 포함해야 한다.
+    return Boolean(pickWaterfallScenicTile(group, width, height, tiles));
+  }
+
+  if (def.type === '동굴' || def.type === '동굴군') {
+    // 동굴 계열은 산악/빙설 지형 비중이 충분히 높을 때만 절경으로 인정한다.
+    const rockyRatio = countTerrainInGroup(group, new Set(['바위산맥', '험준한산맥', '만년설산', '빙하설산', '빙원'])) / group.length;
+    if (rockyRatio < 0.65) return false;
+  }
+
+  if (def.type === '산호만') {
+    // 산호만은 군집 내 산호해안 비율이 일정 수준 이상이어야 한다.
+    const coralRatio = countTerrainInGroup(group, new Set(['산호해안'])) / group.length;
+    if (coralRatio < 0.25) return false;
+  }
+
+  if (def.type === '오아시스권') {
+    // 오아시스권은 최소한 일부 오아시스 타일을 실제로 포함해야 한다.
+    const oasisCount = countTerrainInGroup(group, new Set(['사막오아시스']));
+    if (oasisCount < Math.max(2, Math.floor(group.length * 0.08))) return false;
+  }
+
+  if (def.type === '대호수') {
+    // 대호수는 해양과 직접 연결되지 않은 내륙 호수 덩어리만 허용한다.
+    const touchesSea = group.some((tile) => getNeighbors(tile.coord.x, tile.coord.y, width, height)
+      .some(([nx, ny]) => ['심해', '바다', '얕은해안', '산호해안', '해안'].includes(tiles[ny * width + nx]?.terrainType)));
+    if (touchesSea) return false;
+  }
+
+
+  if (def.type === '해식절벽') {
+    // 해식절벽은 내륙보다 실제 바다와 맞닿아야 한다.
+    if (!groupTouchesTerrain(group, new Set(['심해', '바다']), width, height, tiles)) return false;
+  }
+
+  if (def.type === '사구능선') {
+    // 사구능선은 건조 지형 중심(건조사막/구릉지 비율)이어야 한다.
+    const duneRatio = countTerrainInGroup(group, new Set(['건조사막', '구릉지'])) / group.length;
+    if (duneRatio < 0.85) return false;
+  }
+
+  if (def.type === '밀림연못') {
+    // 밀림연못은 물 지형(강/호수/해안)과 실제로 맞닿아 있어야 한다.
+    if (!groupTouchesTerrain(group, new Set(['강', '호수', '해안', '얕은해안', '산호해안']), width, height, tiles)) return false;
+  }
+
+  if (def.type === '빙식분지') {
+    // 빙식분지는 충분한 냉대(빙원/빙하설산/만년설산) 비중을 요구한다.
+    const coldRatio = countTerrainInGroup(group, new Set(['빙원', '빙하설산', '만년설산'])) / group.length;
+    if (coldRatio < 0.7) return false;
+  }
+
+  if (def.type === '협곡문' || def.type === '대협곡') {
+    // 협곡 계열은 경계(외곽 엣지)가 너무 둥글지 않고 길게 뻗는 형태를 요구한다.
+    const borderEdges = countGroupBorderEdges(group, width, height);
+    const compactness = group.length ? borderEdges / group.length : 0;
+    if (compactness < 2.6) return false;
+  }
+
+  if (def.type === '대산맥') {
+    // 대산맥은 바다와 직접 맞닿은 군집을 배제해 내륙 산악축 느낌을 유지한다.
+    if (groupTouchesTerrain(group, new Set(['심해', '바다', '얕은해안', '산호해안', '해안']), width, height, tiles)) return false;
+  }
+
+  if (def.type === '빙하장벽') {
+    // 빙하장벽은 해안 접촉 또는 냉대 비중 중 하나를 강하게 만족해야 한다.
+    const coldRatio = countTerrainInGroup(group, new Set(['빙원', '빙하설산', '만년설산'])) / group.length;
+    const touchesCoast = groupTouchesTerrain(group, new Set(['해안', '얕은해안', '산호해안']), width, height, tiles);
+    if (coldRatio < 0.78 && !touchesCoast) return false;
+  }
+
+  return true;
+};
+
+const applyScenicCatalog = (tiles, width, height, random = Math.random) => {
   tiles.forEach((tile) => { tile.scenic = null; });
   const visitConnected = (x, y, terrainSet, visited) => {
     const stack = [[x, y]];
@@ -1235,11 +1343,15 @@ const applyScenicCatalog = (tiles, width, height) => {
           if (visited.has(key) || !tile || !terrainSet.has(tile.terrainType)) continue;
           const group = visitConnected(x, y, terrainSet, visited);
           if (group.length < def.minCluster || group.length > def.maxCluster) continue;
-          const avgElevation = group.reduce((sum, t) => sum + t.elevation, 0) / group.length;
-          const avgMoisture = group.reduce((sum, t) => sum + t.moisture, 0) / group.length;
-          const avgHeat = group.reduce((sum, t) => sum + t.heat, 0) / group.length;
-          const scenicScore = group.length * 0.55 + Math.abs(avgElevation - 0.5) * 18 + Math.abs(avgMoisture - 0.5) * 12 + Math.abs(avgHeat - 0.5) * 10;
-          scenicCandidates.push({ tier, def, group, scenicScore, scenicKey: `${def.id}:${group[0].coord.x},${group[0].coord.y}` });
+          if (!isRealisticScenicGroup(def, group, width, height, tiles)) continue;
+          // 폭포는 강 군집 전체가 아니라, 조건을 만족한 단일 강 타일만 절경으로 승격한다.
+          const scenicGroup = def.type === '폭포'
+            ? [pickWaterfallScenicTile(group, width, height, tiles)].filter(Boolean)
+            : group;
+          if (!scenicGroup.length) continue;
+          // 절경 승격 점수는 지형/기후 극단치가 아니라 완전 랜덤으로 부여한다.
+          const scenicScore = random();
+          scenicCandidates.push({ tier, def, group: scenicGroup, scenicScore, scenicKey: `${def.id}:${scenicGroup[0].coord.x},${scenicGroup[0].coord.y}` });
         }
       }
     });

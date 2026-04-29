@@ -1,6 +1,6 @@
 // 문서 파싱 실패/네트워크 실패 시에는 고정 안내 문구를 표시한다.
 const WEBGL_MAP_VERSION_FALLBACK = 'version 불러오기 실패';
-const MAP_SIZE = 200;
+const WEBGL_MAP_SIZE = 200;
 
 const canvas = document.getElementById('webglWorldCanvas');
 const versionTag = document.getElementById('webglMapVersion');
@@ -232,7 +232,7 @@ const drawFrame = () => {
 
 const regenerateWorld = () => {
   worldGenApi.applyRerollSettingsFromValues(readRerollSettingsFromInputs());
-  const world = worldGenApi.generateWorldMap(MAP_SIZE, MAP_SIZE);
+  const world = worldGenApi.generateWorldMap(WEBGL_MAP_SIZE, WEBGL_MAP_SIZE);
   uploadWorldTexture(world);
 };
 

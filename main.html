@@ -184,6 +184,19 @@
       color: #98f5bf;
     }
 
+
+
+    .world-build-result {
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(4, 8, 22, 0.55);
+      color: #d6e4ff;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
     .world-build-sequence__action {
       justify-self: start;
       border: 1px solid var(--accent);
@@ -199,7 +212,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.53(260429-여정빌더월드맵제작뷰구축)
+    ver.0.3.55(260429-월드맵임시저장제외)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -220,11 +233,11 @@
       <div id="dialogueMount" aria-label="대화 템플릿 마운트"></div>
     </section>
 
-    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
-    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+    <!-- 월드맵 제작 뷰: 프롤로그 이후 실제 월드맵 생성 파이프라인 -->
+    <section id="view-worldbuild" class="view" data-active="false" aria-label="월드맵 제작 뷰">
       <header class="view__header">
-        <h2 class="view__title">월드맵 뷰</h2>
-        <span class="view__badge">World Map</span>
+        <h2 class="view__title">월드맵 제작 뷰</h2>
+        <span class="view__badge">World Build</span>
       </header>
       <div class="view__body">
         <section class="world-build-sequence" aria-label="월드맵 제작 시퀀스">
@@ -240,7 +253,20 @@
           <button id="startWorldBuildButton" class="world-build-sequence__action" type="button">
             월드맵 제작 시작
           </button>
+          <pre id="worldBuildResult" class="world-build-result" aria-live="polite">아직 생성된 월드맵이 없습니다.</pre>
         </section>
+      </div>
+    </section>
+
+    <!-- 월드맵 뷰: 지역 이동/탐험/노드 선택 -->
+    <section id="view-worldmap" class="view" data-active="false" aria-label="월드맵 뷰">
+      <header class="view__header">
+        <h2 class="view__title">월드맵 뷰</h2>
+        <span class="view__badge">World Map</span>
+      </header>
+      <div class="view__body">
+        월드맵 제작이 완료되었습니다.<br />
+        이제 탐험, 이동, 정착지 진입 루트를 이 뷰에서 표시합니다.
       </div>
     </section>
 
@@ -259,6 +285,7 @@
     <nav class="dev-nav" aria-label="개발용 뷰 전환">
       <button type="button" data-view="view-default">기본</button>
       <button type="button" data-view="view-dialogue">대화</button>
+      <button type="button" data-view="view-worldbuild">맵제작</button>
       <button type="button" data-view="view-worldmap">월드맵</button>
       <button type="button" data-view="view-battle">전투</button>
     </nav>

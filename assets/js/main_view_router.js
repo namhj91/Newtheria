@@ -206,10 +206,12 @@
         <div class="debug-float__tabs" role="tablist" aria-label="디버그 탭">
           <button type="button" class="debug-float__tab is-active" role="tab" data-tab="viewport">뷰포인트</button>
           <button type="button" class="debug-float__tab" role="tab" data-tab="states">스위치/변수</button>
+          <button type="button" class="debug-float__tab" role="tab" data-tab="characters">캐릭터</button>
         </div>
         <div class="debug-float__content">
           <section class="debug-float__tab-panel is-active" data-panel="viewport"></section>
           <section class="debug-float__tab-panel" data-panel="states" hidden></section>
+          <section class="debug-float__tab-panel" data-panel="characters" hidden></section>
         </div>
       </section>
     `;
@@ -220,6 +222,7 @@
     const collapseButton = host.querySelector('.debug-float__collapse');
     const viewportPanel = host.querySelector('[data-panel="viewport"]');
     const statesPanel = host.querySelector('[data-panel="states"]');
+    const charactersPanel = host.querySelector('[data-panel="characters"]');
     if (viewportPanel) {
       const buttons = [
         { id: DEFAULT_VIEW_ID, label: '기본' },
@@ -251,6 +254,16 @@
       `;
     }
 
+
+    // 캐릭터 탭: localStorage 캐릭터 카탈로그/세이브 슬롯 캐릭터를 한 번에 조회/수정한다.
+    if (charactersPanel) {
+      charactersPanel.innerHTML = `
+        <div class="debug-character-controls">
+          <button type="button" class="debug-character-reload">새로고침</button>
+        </div>
+        <div class="debug-character-list" aria-live="polite"></div>
+      `;
+    }
     const setExpanded = (expanded) => {
       host.dataset.state = expanded ? 'expanded' : 'collapsed';
       fab?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -274,7 +287,9 @@
       const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
       if (!activePanel) return;
       const contentHeight = Math.ceil(activePanel.scrollHeight + 74); // header + tabs + body 여백
-      const clamped = Math.max(172, Math.min(360, contentHeight));
+      // 화면 높이에 맞춘 동적 상한: 작은 화면에서는 패널이 뷰포트를 넘지 않도록 안전 여백을 확보한다.
+      const viewportMax = Math.max(220, Math.floor((global.innerHeight || window.innerHeight || 800) - 24));
+      const clamped = Math.max(172, Math.min(viewportMax, contentHeight));
       host.style.setProperty('--debug-panel-height', `${clamped}px`);
     };
     const setActiveTab = (tabKey = 'viewport') => {
@@ -352,6 +367,76 @@
       activateView(button.dataset.view);
     });
 
+
+    const readCharactersFromStorage = () => {
+      const parseJson = (key) => {
+        try {
+          const raw = global.localStorage?.getItem(key);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          return null;
+        }
+      };
+      // 슬롯별 분리 목록이 아니라, 현재 활성 슬롯의 모든 캐릭터 묶음을 단일 편집 대상으로 노출한다.
+      const root = parseJson(STORAGE_KEYS.saveSlotsData) || {};
+      const slots = root?.slots && typeof root.slots === 'object' ? root.slots : {};
+      const activeSlotId = cleanText(root?.activeSlotId, 'slot1') || 'slot1';
+      const activeSlotPayload = slots[activeSlotId] && typeof slots[activeSlotId] === 'object' ? slots[activeSlotId] : null;
+      const activeCharacters = activeSlotPayload?.characters && typeof activeSlotPayload.characters === 'object'
+        ? activeSlotPayload.characters
+        : null;
+      return {
+        activeSlotId,
+        activeCharacters,
+        localCatalog: parseJson('newtheria.character.catalog')
+      };
+    };
+
+    const persistCharactersToStorage = (targetKey, nextPayload, activeSlotId = 'slot1') => {
+      if (targetKey === 'local-catalog') {
+        global.localStorage?.setItem('newtheria.character.catalog', JSON.stringify(nextPayload));
+        return true;
+      }
+      if (targetKey !== 'active-slot-characters') return false;
+      const root = readJsonStorage(STORAGE_KEYS.saveSlotsData, {});
+      const slots = root?.slots && typeof root.slots === 'object' ? root.slots : {};
+      const slotPayload = slots[activeSlotId];
+      if (!slotPayload || typeof slotPayload !== 'object') return false;
+      slots[activeSlotId] = { ...slotPayload, characters: nextPayload };
+      return writeJsonStorage(STORAGE_KEYS.saveSlotsData, { ...root, slots });
+    };
+
+    const renderCharacterPanel = () => {
+      if (!charactersPanel) return;
+      const listEl = charactersPanel.querySelector('.debug-character-list');
+      if (!listEl) return;
+      const characterContext = readCharactersFromStorage();
+      const sections = [];
+      if (characterContext.activeCharacters) {
+        sections.push(`
+          <article class="debug-character-card">
+            <header><strong>활성 슬롯(${characterContext.activeSlotId}) 전체 캐릭터</strong></header>
+            <textarea data-char-key="active-slot-characters" data-slot-id="${characterContext.activeSlotId}" rows="10">${JSON.stringify(characterContext.activeCharacters, null, 2)}</textarea>
+            <button type="button" class="debug-character-save" data-char-key="active-slot-characters" data-slot-id="${characterContext.activeSlotId}">저장</button>
+          </article>
+        `);
+      }
+      if (characterContext.localCatalog && typeof characterContext.localCatalog === 'object') {
+        sections.push(`
+          <article class="debug-character-card">
+            <header><strong>로컬 캐릭터 카탈로그</strong></header>
+            <textarea data-char-key="local-catalog" rows="8">${JSON.stringify(characterContext.localCatalog, null, 2)}</textarea>
+            <button type="button" class="debug-character-save" data-char-key="local-catalog">저장</button>
+          </article>
+        `);
+      }
+      if (!sections.length) {
+        listEl.innerHTML = '<p class="debug-state-empty">표시할 캐릭터 데이터가 없습니다.</p>';
+        return;
+      }
+      listEl.innerHTML = sections.join('');
+    };
+
     const renderStatePanel = () => {
       if (!statesPanel) return;
       const store = global.NewtheriaGameStateStore?.getStore?.('global');
@@ -416,6 +501,31 @@
       global.requestAnimationFrame(() => syncPanelHeight());
     });
     renderStatePanel();
+
+    charactersPanel?.addEventListener('click', (event) => {
+      const reloadBtn = event.target.closest('.debug-character-reload');
+      if (reloadBtn) {
+        renderCharacterPanel();
+        global.requestAnimationFrame(() => syncPanelHeight());
+        return;
+      }
+      const saveBtn = event.target.closest('.debug-character-save');
+      if (!saveBtn) return;
+      const key = saveBtn.dataset.charKey || '';
+      const slotId = saveBtn.dataset.slotId || '';
+      const textarea = saveBtn.parentElement?.querySelector(`textarea[data-char-key="${key}"]`);
+      if (!(textarea instanceof HTMLTextAreaElement)) return;
+      try {
+        const parsed = JSON.parse(textarea.value);
+        const ok = persistCharactersToStorage(key, parsed, slotId);
+        if (!ok) throw new Error('저장 경로를 찾지 못했습니다.');
+        saveBtn.textContent = '저장됨';
+        global.setTimeout(() => { saveBtn.textContent = '저장'; }, 900);
+      } catch (error) {
+        global.alert?.(`캐릭터 JSON 저장 실패: ${error.message}`);
+      }
+    });
+    renderCharacterPanel();
   };
 
   const loadSaveSlotContext = (requestedSlotId = '') => {

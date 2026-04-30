@@ -295,12 +295,10 @@
     const syncPanelHeight = () => {
       const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
       if (!activePanel) return;
-      const contentHeight = Math.ceil(activePanel.scrollHeight + 96); // header + tabs + body 여백(하단 버튼 잘림 방지 보정 포함)
-      // 화면 높이에 맞춘 동적 상한: 작은 화면에서는 패널이 뷰포트를 넘지 않도록 안전 여백을 확보한다.
-      // 스크롤 없이 탭 콘텐츠를 최대한 수용하기 위해 안전 여백만 남기고 높이를 크게 확보한다.
-      const viewportMax = Math.max(240, Math.floor((global.innerHeight || window.innerHeight || 800) - 12));
-      const clamped = Math.max(172, Math.min(viewportMax, contentHeight));
-      host.style.setProperty('--debug-panel-height', `${clamped}px`);
+      // 상한 클램프를 제거하고, 탭 콘텐츠 실측 높이에 맞춰 패널을 직접 확장한다.
+      const contentHeight = Math.ceil(activePanel.scrollHeight + 96); // header + tabs + body 여백
+      const nextHeight = Math.max(172, contentHeight);
+      host.style.setProperty('--debug-panel-height', `${nextHeight}px`);
     };
     const setActiveTab = (tabKey = 'viewport') => {
       const tabs = Array.from(host.querySelectorAll('.debug-float__tab'));
@@ -313,6 +311,25 @@
       });
       global.requestAnimationFrame(() => syncPanelHeight());
     };
+
+
+
+    // 디버그 패널 내부 콘텐츠가 변하면 높이를 즉시 재계산한다.
+    const panelResizeObserver = typeof global.ResizeObserver === 'function'
+      ? new global.ResizeObserver(() => {
+        if (host.dataset.state !== 'expanded') return;
+        syncPanelHeight();
+      })
+      : null;
+    host.querySelectorAll('.debug-float__tab-panel').forEach((panelEl) => {
+      panelResizeObserver?.observe(panelEl);
+    });
+
+    // 창 크기 변경(반응형)에서도 현재 탭 기준으로 패널 높이를 다시 맞춘다.
+    global.addEventListener('resize', () => {
+      if (host.dataset.state !== 'expanded') return;
+      syncPanelHeight();
+    });
 
     const dragTarget = host;
     const dragHandle = host.querySelector('.debug-float__header');

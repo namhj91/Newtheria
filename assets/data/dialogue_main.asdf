@@ -340,16 +340,10 @@ focus = goddess
 standing_animation_actor = goddess:zoom-in,pilgrim:float
 type_speed = 15
 line = 잘 가, 나의 작은 [[glitch:□□□□□]]. 부디 새로운 별에서는 덜 아프고, 더 많이 웃으며… 그렇게 잘 살아봐요. 당신의 새로운 여행에 별빛의 축복이 함께하길.
-}
+
+jump = 무:무}
 ---
 
-<block:아스테리아_블랙아웃>
-{
-
-screen_blackout = 20000,1000
-jump = 무:무
-}
----
 <event:무>
 <scene#0:없음>
 {

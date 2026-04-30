@@ -275,7 +275,11 @@
       dragState?.captureEl?.releasePointerCapture?.(dragState.pointerId);
       dragState = null;
     };
-    dragHandle?.addEventListener('pointerdown', (event) => beginDrag(event.pointerId, event.clientX, event.clientY, dragHandle));
+    dragHandle?.addEventListener('pointerdown', (event) => {
+      // 헤더 내부 컨트롤(최소화 버튼) 클릭은 드래그 시작으로 취급하지 않는다.
+      if (event.target.closest('button')) return;
+      beginDrag(event.pointerId, event.clientX, event.clientY, dragHandle);
+    });
     dragHandle?.addEventListener('pointermove', (event) => moveDrag(event.clientX, event.clientY));
     dragHandle?.addEventListener('pointerup', endDrag);
     dragHandle?.addEventListener('pointercancel', endDrag);

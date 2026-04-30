@@ -353,6 +353,7 @@ jump = event무:무
 <event:무>
 <scene#0>
 {}
+---
 <block:무>
 {
 screen_blackout = 20000,1000

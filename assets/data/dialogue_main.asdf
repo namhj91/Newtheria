@@ -2,14 +2,7 @@
 ; UTF-8
 ; 샘플 목적: 기존 샘플 대사를 삭제하고, 요청된 원문 내용을 로어 친화형 아스테리아/순례자 대화로 재구성한다.
 ; 문법 시연 목적: scene 캐스팅, 블록 대사, 배경/포커스/스탠딩/파티클/화면효과(번쩍임/암전)/자동 넘김(wait)/선택지(choice, hidden_choice)/점프(jump)/종료(end)를 모두 포함한다.
-<event:무>
-<scene#0>
-{}
-<block:무>
-{
-screen_blackout = 20000
-}
----
+
 <event:별바다_재기동_의식>
 <scene#0:깊은우주_기동>
 {
@@ -356,5 +349,12 @@ screen_blackout = 20000,1000
 end =true
 jump = 무:무
 }
-
+<event:무>
+<scene#0>
+{}
+<block:무>
+{
+screen_blackout = 20000,1000
+}
+---
 ---

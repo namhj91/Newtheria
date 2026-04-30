@@ -255,6 +255,11 @@
       host.dataset.state = expanded ? 'expanded' : 'collapsed';
       fab?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       panel?.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+      if (!expanded) {
+        host.style.removeProperty('--debug-panel-height');
+        return;
+      }
+      global.requestAnimationFrame(() => syncPanelHeight());
     };
     let suppressFabClick = false;
     fab?.addEventListener('click', () => {
@@ -265,6 +270,13 @@
       setExpanded(host.dataset.state !== 'expanded');
     });
     collapseButton?.addEventListener('click', () => setExpanded(false));
+    const syncPanelHeight = () => {
+      const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
+      if (!activePanel) return;
+      const contentHeight = Math.ceil(activePanel.scrollHeight + 74); // header + tabs + body 여백
+      const clamped = Math.max(172, Math.min(360, contentHeight));
+      host.style.setProperty('--debug-panel-height', `${clamped}px`);
+    };
     const setActiveTab = (tabKey = 'viewport') => {
       const tabs = Array.from(host.querySelectorAll('.debug-float__tab'));
       const panels = Array.from(host.querySelectorAll('.debug-float__tab-panel'));
@@ -274,6 +286,7 @@
         panelEl.classList.toggle('is-active', isActive);
         panelEl.hidden = !isActive;
       });
+      global.requestAnimationFrame(() => syncPanelHeight());
     };
 
     const dragTarget = host;
@@ -386,6 +399,7 @@
       if (type === 'switch') store.setSwitch?.(key, target.value);
       if (type === 'variable') store.setVariable?.(key, target.value);
       renderStatePanel();
+      global.requestAnimationFrame(() => syncPanelHeight());
     });
     statesPanel?.addEventListener('input', (event) => {
       const target = event.target;
@@ -399,6 +413,7 @@
       if (target.classList.contains('debug-page-prev')) statesPanel.dataset.page = String(Math.max(1, Number(statesPanel.dataset.page || '1') - 1));
       if (target.classList.contains('debug-page-next')) statesPanel.dataset.page = String(Number(statesPanel.dataset.page || '1') + 1);
       renderStatePanel();
+      global.requestAnimationFrame(() => syncPanelHeight());
     });
     renderStatePanel();
   };

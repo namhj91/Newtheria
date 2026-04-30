@@ -176,7 +176,7 @@
     }
     .debug-float[data-state="expanded"] {
       width: min(92vw, 340px);
-      height: 214px;
+      height: var(--debug-panel-height, 214px);
     }
     .debug-float[data-state="expanded"] .debug-float__fab {
       opacity: 0;
@@ -393,7 +393,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.70(260430-debug상태탭추가드래그확장방지)
+    ver.0.3.71(260430-debug탭별컨테이너동적높이)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">

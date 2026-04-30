@@ -227,10 +227,12 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
-    .debug-float__tab-panel[data-panel="states"] {
+    .debug-float__tab-panel[data-panel="states"],
+    .debug-float__tab-panel[data-panel="characters"] {
       grid-template-columns: 1fr;
       align-content: start;
-      max-height: 130px;
+      max-height: 190px;
+      overflow: auto;
     }
     .debug-float__view-btn {
       border: 1px solid rgba(117, 154, 242, 0.42);
@@ -250,7 +252,31 @@
       transform: translateY(-1px);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 18px rgba(8, 15, 32, 0.52);
     }
-    .debug-state-controls { display: flex; justify-content: space-between; gap: 8px; }
+    
+    .debug-character-controls { display: flex; justify-content: flex-end; }
+    .debug-character-reload,
+    .debug-character-save {
+      border: 1px solid rgba(102, 131, 204, 0.55);
+      border-radius: 8px;
+      background: rgba(24, 32, 57, 0.95);
+      color: #e8f0ff;
+      min-height: 30px;
+      cursor: pointer;
+    }
+    .debug-character-list { display: grid; gap: 8px; }
+    .debug-character-card { display: grid; gap: 6px; }
+    .debug-character-card textarea {
+      width: 100%;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      border: 1px solid rgba(102, 131, 204, 0.55);
+      border-radius: 8px;
+      background: rgba(10, 16, 33, 0.95);
+      color: #e8f0ff;
+      padding: 8px;
+      resize: vertical;
+      min-height: 120px;
+    }
+.debug-state-controls { display: flex; justify-content: space-between; gap: 8px; }
     .debug-state-filter,
     .debug-state-pagination button,
     .debug-state-row select,

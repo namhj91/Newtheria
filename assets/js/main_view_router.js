@@ -205,9 +205,11 @@
         </header>
         <div class="debug-float__tabs" role="tablist" aria-label="디버그 탭">
           <button type="button" class="debug-float__tab is-active" role="tab" data-tab="viewport">뷰포인트</button>
+          <button type="button" class="debug-float__tab" role="tab" data-tab="states">스위치/변수</button>
         </div>
         <div class="debug-float__content">
           <section class="debug-float__tab-panel is-active" data-panel="viewport"></section>
+          <section class="debug-float__tab-panel" data-panel="states" hidden></section>
         </div>
       </section>
     `;
@@ -217,6 +219,7 @@
     const panel = host.querySelector('.debug-float__panel');
     const collapseButton = host.querySelector('.debug-float__collapse');
     const viewportPanel = host.querySelector('[data-panel="viewport"]');
+    const statesPanel = host.querySelector('[data-panel="states"]');
     if (viewportPanel) {
       const buttons = [
         { id: DEFAULT_VIEW_ID, label: '기본' },
@@ -229,14 +232,49 @@
         .map((item) => `<button type="button" class="debug-float__view-btn" data-view="${item.id}">${item.label}</button>`)
         .join('');
     }
+    // 스위치/변수 탭: 페이지 + 타입 필터를 제공해 상태가 많아져도 탐색할 수 있도록 구성한다.
+    if (statesPanel) {
+      statesPanel.innerHTML = `
+        <div class="debug-state-controls">
+          <select class="debug-state-filter" aria-label="상태 타입 필터">
+            <option value="all">전체</option>
+            <option value="switch">스위치</option>
+            <option value="variable">변수</option>
+          </select>
+          <div class="debug-state-pagination">
+            <button type="button" class="debug-page-prev">◀</button>
+            <span class="debug-page-label">1 / 1</span>
+            <button type="button" class="debug-page-next">▶</button>
+          </div>
+        </div>
+        <div class="debug-state-list" aria-live="polite"></div>
+      `;
+    }
 
     const setExpanded = (expanded) => {
       host.dataset.state = expanded ? 'expanded' : 'collapsed';
       fab?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       panel?.setAttribute('aria-hidden', expanded ? 'false' : 'true');
     };
-    fab?.addEventListener('click', () => setExpanded(host.dataset.state !== 'expanded'));
+    let suppressFabClick = false;
+    fab?.addEventListener('click', () => {
+      if (suppressFabClick) {
+        suppressFabClick = false;
+        return;
+      }
+      setExpanded(host.dataset.state !== 'expanded');
+    });
     collapseButton?.addEventListener('click', () => setExpanded(false));
+    const setActiveTab = (tabKey = 'viewport') => {
+      const tabs = Array.from(host.querySelectorAll('.debug-float__tab'));
+      const panels = Array.from(host.querySelectorAll('.debug-float__tab-panel'));
+      tabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabKey));
+      panels.forEach((panelEl) => {
+        const isActive = panelEl.dataset.panel === tabKey;
+        panelEl.classList.toggle('is-active', isActive);
+        panelEl.hidden = !isActive;
+      });
+    };
 
     const dragTarget = host;
     const dragHandle = host.querySelector('.debug-float__header');
@@ -272,6 +310,7 @@
       dragTarget.style.bottom = 'auto';
     };
     const endDrag = () => {
+      if (dragState?.moved && dragState.captureEl === dragFab) suppressFabClick = true;
       dragState?.captureEl?.releasePointerCapture?.(dragState.pointerId);
       dragState = null;
     };
@@ -290,10 +329,78 @@
     dragFab?.addEventListener('pointercancel', endDrag);
 
     host.addEventListener('click', (event) => {
+      const tabButton = event.target.closest('.debug-float__tab');
+      if (tabButton) {
+        setActiveTab(tabButton.dataset.tab || 'viewport');
+        return;
+      }
       const button = event.target.closest('button[data-view]');
       if (!button) return;
       activateView(button.dataset.view);
     });
+
+    const renderStatePanel = () => {
+      if (!statesPanel) return;
+      const store = global.NewtheriaGameStateStore?.getStore?.('global');
+      const payload = store?.getState?.() || { switches: [], variables: [] };
+      const filterEl = statesPanel.querySelector('.debug-state-filter');
+      const listEl = statesPanel.querySelector('.debug-state-list');
+      const pageLabelEl = statesPanel.querySelector('.debug-page-label');
+      const prevButton = statesPanel.querySelector('.debug-page-prev');
+      const nextButton = statesPanel.querySelector('.debug-page-next');
+      const pageSize = 8;
+      const filter = filterEl?.value || 'all';
+      const entries = [];
+      if (filter !== 'variable') payload.switches.forEach((item) => entries.push({ type: 'switch', ...item }));
+      if (filter !== 'switch') payload.variables.forEach((item) => entries.push({ type: 'variable', ...item }));
+      entries.sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+      const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+      const currentPage = Math.min(totalPages, Math.max(1, Number(statesPanel.dataset.page || '1')));
+      statesPanel.dataset.page = String(currentPage);
+      const start = (currentPage - 1) * pageSize;
+      const pageItems = entries.slice(start, start + pageSize);
+      if (pageLabelEl) pageLabelEl.textContent = `${currentPage} / ${totalPages}`;
+      if (prevButton) prevButton.disabled = currentPage <= 1;
+      if (nextButton) nextButton.disabled = currentPage >= totalPages;
+      if (!listEl) return;
+      if (!pageItems.length) {
+        listEl.innerHTML = '<p class="debug-state-empty">표시할 항목이 없습니다.</p>';
+        return;
+      }
+      listEl.innerHTML = pageItems.map((item) => `
+        <label class="debug-state-row">
+          <span class="debug-state-meta">#${item.id} · ${item.type === 'switch' ? 'SW' : 'VAR'} · ${item.name || '(이름없음)'}</span>
+          ${item.type === 'switch'
+            ? `<select data-state-type="switch" data-state-key="${item.id}"><option value="on" ${item.value ? 'selected' : ''}>ON</option><option value="off" ${!item.value ? 'selected' : ''}>OFF</option></select>`
+            : `<input type="number" step="1" data-state-type="variable" data-state-key="${item.id}" value="${Number(item.value || 0)}" />`}
+        </label>
+      `).join('');
+    };
+    statesPanel?.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const type = target.dataset.stateType;
+      const key = target.dataset.stateKey;
+      const store = global.NewtheriaGameStateStore?.getStore?.('global');
+      if (!store || !type || !key) return;
+      if (type === 'switch') store.setSwitch?.(key, target.value);
+      if (type === 'variable') store.setVariable?.(key, target.value);
+      renderStatePanel();
+    });
+    statesPanel?.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.className !== 'debug-state-filter') return;
+      statesPanel.dataset.page = '1';
+      renderStatePanel();
+    });
+    statesPanel?.addEventListener('click', (event) => {
+      const target = event.target.closest('button');
+      if (!target) return;
+      if (target.classList.contains('debug-page-prev')) statesPanel.dataset.page = String(Math.max(1, Number(statesPanel.dataset.page || '1') - 1));
+      if (target.classList.contains('debug-page-next')) statesPanel.dataset.page = String(Number(statesPanel.dataset.page || '1') + 1);
+      renderStatePanel();
+    });
+    renderStatePanel();
   };
 
   const loadSaveSlotContext = (requestedSlotId = '') => {

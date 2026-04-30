@@ -163,8 +163,9 @@
       background: rgba(7, 12, 26, 0.95);
       box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
       padding: 10px;
-      gap: 10px;      
+      gap: 10px;
       display: grid;
+      grid-template-rows: auto auto 1fr;
       position: absolute;
       inset: 0;
       opacity: 0;
@@ -222,10 +223,16 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+    .debug-float__content {
+      min-height: 0;
+      overflow: hidden;
+    }
     .debug-float__tab-panel {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
+      max-width: 100%;
+      overflow: hidden;
     }
     /* hidden 속성 패널은 강제로 숨겨 탭 콘텐츠가 겹쳐 보이지 않게 한다. */
     .debug-float__tab-panel[hidden] {
@@ -272,6 +279,7 @@
     .debug-character-card { display: grid; gap: 6px; }
     .debug-character-card textarea {
       width: 100%;
+      max-width: 100%;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       border: 1px solid rgba(102, 131, 204, 0.55);
       border-radius: 8px;

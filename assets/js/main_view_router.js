@@ -229,6 +229,9 @@
     const fab = host.querySelector('.debug-float__fab');
     const panel = host.querySelector('.debug-float__panel');
     const collapseButton = host.querySelector('.debug-float__collapse');
+    const headerEl = host.querySelector('.debug-float__header');
+    const tabsEl = host.querySelector('.debug-float__tabs');
+    const contentEl = host.querySelector('.debug-float__content');
     const viewportPanel = host.querySelector('[data-panel="viewport"]');
     const statesPanel = host.querySelector('[data-panel="states"]');
     const charactersPanel = host.querySelector('[data-panel="characters"]');
@@ -295,10 +298,20 @@
     const syncPanelHeight = () => {
       const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
       if (!activePanel) return;
-      // 상한 클램프를 제거하고, 탭 콘텐츠 실측 높이에 맞춰 패널을 직접 확장한다.
-      const contentHeight = Math.ceil(activePanel.scrollHeight + 96); // header + tabs + body 여백
-      const nextHeight = Math.max(172, contentHeight);
+      // 헤더/탭 영역은 고정 크기로 유지하고, 콘텐츠 영역만 내용물 높이에 맞춰 확장한다.
+      const headerHeight = Math.ceil(headerEl?.getBoundingClientRect?.().height || 0);
+      const tabsHeight = Math.ceil(tabsEl?.getBoundingClientRect?.().height || 0);
+      const panelStyle = global.getComputedStyle?.(panel) || null;
+      const gap = panelStyle ? Number.parseFloat(panelStyle.rowGap || panelStyle.gap || '0') || 0 : 0;
+      const paddingTop = panelStyle ? Number.parseFloat(panelStyle.paddingTop || '0') || 0 : 0;
+      const paddingBottom = panelStyle ? Number.parseFloat(panelStyle.paddingBottom || '0') || 0 : 0;
+      const chromeHeight = headerHeight + tabsHeight + Math.ceil(gap * 2 + paddingTop + paddingBottom);
+      const contentHeight = Math.ceil(activePanel.scrollHeight);
+      const nextHeight = Math.max(172, chromeHeight + contentHeight);
       host.style.setProperty('--debug-panel-height', `${nextHeight}px`);
+      if (contentEl) {
+        contentEl.style.height = `${contentHeight}px`;
+      }
     };
     const setActiveTab = (tabKey = 'viewport') => {
       const tabs = Array.from(host.querySelectorAll('.debug-float__tab'));

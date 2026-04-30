@@ -287,7 +287,9 @@
       const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
       if (!activePanel) return;
       const contentHeight = Math.ceil(activePanel.scrollHeight + 74); // header + tabs + body 여백
-      const clamped = Math.max(172, Math.min(360, contentHeight));
+      // 화면 높이에 맞춘 동적 상한: 작은 화면에서는 패널이 뷰포트를 넘지 않도록 안전 여백을 확보한다.
+      const viewportMax = Math.max(220, Math.floor((global.innerHeight || window.innerHeight || 800) - 24));
+      const clamped = Math.max(172, Math.min(viewportMax, contentHeight));
       host.style.setProperty('--debug-panel-height', `${clamped}px`);
     };
     const setActiveTab = (tabKey = 'viewport') => {

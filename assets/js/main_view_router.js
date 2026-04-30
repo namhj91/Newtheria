@@ -70,17 +70,26 @@
         }, 30);
       }
 
-      try {
-        const saved = global.sessionStorage?.getItem(SESSION_KEYS.worldMapCamera);
-        if (saved) {
-          const cameraState = JSON.parse(saved);
-          global.NewtheriaWorldMapRuntime?.setCameraState?.(cameraState);
-        } else {
+      // 월드맵 뷰 첫 진입 직후에는 레이아웃 계산이 아직 안정되지 않아
+      // 캔버스 리사이즈가 한 프레임 늦게 반영될 수 있으므로 2중 rAF로 복원/렌더를 지연한다.
+      const restoreWorldMapView = () => {
+        try {
+          const saved = global.sessionStorage?.getItem(SESSION_KEYS.worldMapCamera);
+          if (saved) {
+            const cameraState = JSON.parse(saved);
+            global.NewtheriaWorldMapRuntime?.setCameraState?.(cameraState);
+          } else {
+            global.NewtheriaWorldMapRuntime?.rerender?.();
+          }
+          // 첫 입력(휠/드래그) 전에도 화면이 즉시 맞도록 1회 추가 렌더를 보장한다.
           global.NewtheriaWorldMapRuntime?.rerender?.();
+        } catch (error) {
+          console.warn('[MainViewRouter] 월드맵 카메라 상태 복원에 실패했습니다.', error);
         }
-      } catch (error) {
-        console.warn('[MainViewRouter] 월드맵 카메라 상태 복원에 실패했습니다.', error);
-      }
+      };
+      global.requestAnimationFrame(() => {
+        global.requestAnimationFrame(restoreWorldMapView);
+      });
     }
 
     activeViewId = viewId;
@@ -286,9 +295,10 @@
     const syncPanelHeight = () => {
       const activePanel = host.querySelector('.debug-float__tab-panel.is-active');
       if (!activePanel) return;
-      const contentHeight = Math.ceil(activePanel.scrollHeight + 74); // header + tabs + body 여백
+      const contentHeight = Math.ceil(activePanel.scrollHeight + 96); // header + tabs + body 여백(하단 버튼 잘림 방지 보정 포함)
       // 화면 높이에 맞춘 동적 상한: 작은 화면에서는 패널이 뷰포트를 넘지 않도록 안전 여백을 확보한다.
-      const viewportMax = Math.max(220, Math.floor((global.innerHeight || window.innerHeight || 800) - 24));
+      // 스크롤 없이 탭 콘텐츠를 최대한 수용하기 위해 안전 여백만 남기고 높이를 크게 확보한다.
+      const viewportMax = Math.max(240, Math.floor((global.innerHeight || window.innerHeight || 800) - 12));
       const clamped = Math.max(172, Math.min(viewportMax, contentHeight));
       host.style.setProperty('--debug-panel-height', `${clamped}px`);
     };

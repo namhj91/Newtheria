@@ -231,20 +231,23 @@
     .debug-float__tab-panel[hidden] {
       display: none !important;
     }
+    .debug-float__tab-panel[data-panel="viewport"] {
+      align-content: start;
+      overflow: hidden;
+    }
     .debug-float__tab-panel[data-panel="states"],
     .debug-float__tab-panel[data-panel="characters"] {
       grid-template-columns: 1fr;
       align-content: start;
-      max-height: 190px;
-      overflow: auto;
+      overflow: hidden;
     }
     .debug-float__view-btn {
       border: 1px solid rgba(117, 154, 242, 0.42);
       background: linear-gradient(160deg, rgba(77, 98, 162, 0.9), rgba(42, 53, 91, 0.92));
       color: #eef5ff;
       border-radius: 10px;
-      min-height: 34px;
-      font-size: 0.84rem;
+      min-height: 30px;
+      font-size: 0.8rem;
       font-weight: 700;
       letter-spacing: 0.02em;
       cursor: pointer;
@@ -278,7 +281,7 @@
       color: #e8f0ff;
       padding: 8px;
       resize: vertical;
-      min-height: 120px;
+      min-height: 84px;
     }
 .debug-state-controls { display: flex; justify-content: space-between; gap: 8px; }
     .debug-state-filter,

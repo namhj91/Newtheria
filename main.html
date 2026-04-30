@@ -124,30 +124,126 @@
       padding-bottom: 8px;
     }
 
-    /* 개발 단계에서 빠른 전환을 위한 미니 네비게이션 */
-    .dev-nav {
-      position: absolute;
+    /* DEBUGMODE=on 전용 플로팅 디버그 메뉴 */
+    .debug-float {
+      position: fixed;
       right: 12px;
       bottom: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      z-index: 99;
+      z-index: 240;
+      user-select: none;
+      touch-action: none;
+      width: 52px;
+      height: 52px;
+      transition: width .24s ease, height .24s ease, border-radius .24s ease, box-shadow .24s ease;
     }
-
-    .dev-nav button {
-      border: 1px solid var(--line);
-      background: rgba(26, 31, 52, 0.9);
-      color: var(--text);
-      padding: 8px 10px;
-      border-radius: 8px;
+    .debug-float__fab {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      border: 1px solid rgba(103, 212, 255, 0.45);
+      background: radial-gradient(circle at 24% 24%, rgba(142, 238, 255, 0.42), rgba(66, 78, 130, 0.95) 54%, rgba(25, 33, 62, 0.95) 100%);
+      color: #f3fbff;
+      font-size: 1.16rem;
+      box-shadow: 0 10px 24px rgba(6, 12, 28, 0.54), inset 0 1px 0 rgba(255, 255, 255, 0.15);
       cursor: pointer;
-      font-size: 0.85rem;
+      transition: opacity .18s ease, transform .2s ease, box-shadow .2s ease;
+      position: absolute;
+      inset: 0;
+      z-index: 2;
     }
-
-    .dev-nav button:hover {
+    .debug-float__fab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(7, 14, 31, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .debug-float__panel {
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(7, 12, 26, 0.95);
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
+      padding: 10px;
+      gap: 10px;      
+      display: grid;
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.95);
+      transform-origin: right bottom;
+      transition: opacity .2s ease, transform .24s ease;
+      z-index: 1;
+    }
+    .debug-float[data-state="expanded"] {
+      width: min(92vw, 340px);
+      height: 214px;
+    }
+    .debug-float[data-state="expanded"] .debug-float__fab {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.84);
+    }
+    .debug-float[data-state="expanded"] .debug-float__panel {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+    .debug-float__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: move;
+      padding: 4px 2px;
+      color: #d4ebff;
+    }
+    .debug-float__collapse {
+      border: 0;
+      border-radius: 8px;
+      background: rgba(44, 57, 92, 0.9);
+      color: #dff1ff;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+    }
+    .debug-float__tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .debug-float__tab {
+      border: 1px solid var(--line);
+      background: rgba(29, 35, 58, 0.82);
+      color: #d8e5ff;
+      border-radius: 8px;
+      min-height: 28px;
+      padding: 0 8px;
+      cursor: pointer;
+    }
+    .debug-float__tab.is-active {
       border-color: var(--accent);
       color: var(--accent);
+    }
+    .debug-float__tab-panel {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .debug-float__view-btn {
+      border: 1px solid rgba(117, 154, 242, 0.42);
+      background: linear-gradient(160deg, rgba(77, 98, 162, 0.9), rgba(42, 53, 91, 0.92));
+      color: #eef5ff;
+      border-radius: 10px;
+      min-height: 34px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 6px 14px rgba(1, 7, 22, 0.45);
+      transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+    }
+    .debug-float__view-btn:hover {
+      border-color: rgba(114, 219, 255, 0.9);
+      transform: translateY(-1px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 18px rgba(8, 15, 32, 0.52);
     }
 
     /* 월드맵 제작 시퀀스 패널 */
@@ -276,7 +372,7 @@
 <body>
   <!--
     버전 정보(사용자 요청 형식)
-    ver.0.3.64(260429-점프이벤트스코프강제)
+    ver.0.3.68(260430-debugfab패널모프스타일)
   -->
 
   <main id="game-root" aria-label="게임 메인 화면">
@@ -394,14 +490,6 @@
       </div>
     </section>
 
-    <!-- 개발 편의용: 각 뷰 전환 버튼(추후 게임 로직 연결 시 제거 가능) -->
-    <nav class="dev-nav" aria-label="개발용 뷰 전환">
-      <button type="button" data-view="view-default">기본</button>
-      <button type="button" data-view="view-dialogue">대화</button>
-      <button type="button" data-view="view-worldbuild">맵제작</button>
-      <button type="button" data-view="view-worldmap">월드맵</button>
-      <button type="button" data-view="view-battle">전투</button>
-    </nav>
   </main>
 
   <script src="./assets/js/card_templates.js"></script>
